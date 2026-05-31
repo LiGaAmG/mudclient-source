@@ -15,3 +15,10 @@
 /Adan.Client.Plugins.AI
 /**/obj
 /**/bin/
+
+# Local tooling and build artifacts
+/.codex/
+/artifacts/
+/release-check/
+/*.log
+
