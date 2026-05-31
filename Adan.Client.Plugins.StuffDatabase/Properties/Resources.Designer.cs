@@ -261,6 +261,18 @@ namespace Adan.Client.Plugins.StuffDatabase.Properties {
         /// <summary>
         ///   Looks up a localized string similar to lorec.
         /// </summary>
+        internal static string LoreDropCommand {
+            get { return ResourceManager.GetString("LoreDropCommand", resourceCulture); }
+        }
+        internal static string LoreDropError {
+            get { return ResourceManager.GetString("LoreDropError", resourceCulture); }
+        }
+        internal static string LoreDropHelp {
+            get { return ResourceManager.GetString("LoreDropHelp", resourceCulture); }
+        }
+        internal static string LoreAllCommandsHelp {
+            get { return ResourceManager.GetString("LoreAllCommandsHelp", resourceCulture); }
+        }
         internal static string LoreCommentCommand {
             get {
                 return ResourceManager.GetString("LoreCommentCommand", resourceCulture);

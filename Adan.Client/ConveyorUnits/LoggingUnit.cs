@@ -33,6 +33,8 @@ namespace Adan.Client.ConveyorUnits
     /// </summary>
     public sealed class LoggingUnit : ConveyorUnit
     {
+        private const int LogFlushIntervalMilliseconds = 250;
+
         private readonly object _syncRoot = new object();
         private readonly ConcurrentQueue<TextMessage> _messageQueue = new ConcurrentQueue<TextMessage>();
 
@@ -222,14 +224,21 @@ namespace Adan.Client.ConveyorUnits
                     if (_isLogging)
                     {
                         TextMessage message;
+                        var hasWrittenMessages = false;
                         while (_messageQueue.TryDequeue(out message))
                         {
                             _streamWriter.WriteLine(message.InnerText);
+                            hasWrittenMessages = true;
+                        }
+
+                        if (hasWrittenMessages)
+                        {
+                            _streamWriter.Flush();
                         }
                     }
                 }
 
-                Thread.Sleep(1000);
+                Thread.Sleep(LogFlushIntervalMilliseconds);
             }
         }
     }

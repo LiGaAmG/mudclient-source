@@ -9,6 +9,7 @@
 
 namespace Adan.Client.Plugins.GroupWidget.ViewModel
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
 
@@ -101,6 +102,29 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             private set;
         }
 
+        public bool Matches([NotNull] string affectName)
+        {
+            Assert.ArgumentNotNull(affectName, "affectName");
+
+            return AffectNames.Any(name => AreAffectNamesEqual(name, affectName));
+        }
+
+        [NotNull]
+        public string GetIcon([NotNull] string affectName)
+        {
+            Assert.ArgumentNotNull(affectName, "affectName");
+
+            for (var i = 0; i < AffectNames.Count; i++)
+            {
+                if (AreAffectNamesEqual(AffectNames[i], affectName))
+                {
+                    return Icons[i];
+                }
+            }
+
+            return string.Empty;
+        }
+
         /// <summary>
         /// Gets the default icon.
         /// </summary>
@@ -123,6 +147,17 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
         {
             get;
             set;
+        }
+
+        private static bool AreAffectNamesEqual([NotNull] string left, [NotNull] string right)
+        {
+            return string.Equals(NormalizeAffectName(left), NormalizeAffectName(right), StringComparison.OrdinalIgnoreCase);
+        }
+
+        [NotNull]
+        private static string NormalizeAffectName([NotNull] string value)
+        {
+            return value.Trim().Replace('_', ' ');
         }
     }
 }

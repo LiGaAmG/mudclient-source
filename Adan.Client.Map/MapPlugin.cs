@@ -32,6 +32,7 @@ namespace Adan.Client.Map
         private readonly MapControl _mapControl;
         private ZoneManager _zoneManager;
         private RouteManager _routeManager;
+        private HerbManager _herbManager;
 
         /// <summary>
         /// 
@@ -74,6 +75,7 @@ namespace Adan.Client.Map
         public override void InitializeConveyor(MessageConveyor conveyor)
         {
             conveyor.AddConveyorUnit(new RouteUnit(_routeManager, conveyor));
+            conveyor.AddConveyorUnit(new ConveyorUnits.HerbUnit(_herbManager, conveyor));
             conveyor.AddMessageDeserializer(new CurrentRoomMessageDeserializer(conveyor));
         }
 
@@ -102,8 +104,12 @@ namespace Adan.Client.Map
 
 
             _routeManager = new RouteManager(MainWindowEx);
+            _herbManager = new HerbManager(_routeManager);
+            _herbManager.LoadSettings();
             _mapControl.RouteManager = _routeManager;
-            _zoneManager = new ZoneManager(_mapControl, MainWindowEx, _routeManager);
+            _mapControl.HerbManager = _herbManager;
+            _zoneManager = new ZoneManager(_mapControl, MainWindowEx, _routeManager, _herbManager);
+            _herbManager.SetZoneManager(_zoneManager);
             initializationStatusModel.PluginInitializationStatus = "Routes loading";
             _routeManager.LoadRoutes();
 
@@ -124,6 +130,7 @@ namespace Adan.Client.Map
         public override void OnChangedOutputWindow(RootModel rootModel)
         {
             _routeManager.OutputWindowChanged(rootModel);
+            _herbManager.OutputWindowChanged(rootModel);
             _zoneManager.OutputWindowChanged(rootModel);
         }
 

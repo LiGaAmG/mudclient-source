@@ -19,12 +19,15 @@
                    FontSize="14"
                    Text="{x:Static Properties:Resources.RouteDeleteSelect}"
                    Margin="5"/>
-        <ListBox Grid.Row="0"
+        <TextBox x:Name="SearchBox"
+                 Margin="5,0,5,3"
+                 TextChanged="SearchBox_TextChanged" />
+        <ListBox x:Name="RoutesList"
+                 Grid.Row="0"
                  Margin="5,0,5,5"
-                 ItemsSource="{Binding Path=AllRoutes}"
                  SelectedItem="{Binding Path=SelectedRoute}"
                  HorizontalAlignment="Stretch"
-                 Height="205">
+                 Height="192">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal"

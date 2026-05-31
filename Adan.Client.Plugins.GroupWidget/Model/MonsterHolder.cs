@@ -72,12 +72,15 @@ namespace Adan.Client.Plugins.GroupWidget.Model
             }
         }
 
+        public bool LastUpdateIsRound { get; private set; }
+
         private void MessageConveyor_MessageReceived(object sender, MessageReceivedEventArgs e)
         {
             if (e.Message.MessageType == Constants.RoomMonstersMessage)
             {
                 var monsterMessage = e.Message as RoomMonstersMessage;
 
+                LastUpdateIsRound = monsterMessage.IsRound;
                 Characters = monsterMessage.Monsters;
                 RootModel.RoomMonstersStatus = Characters;
 

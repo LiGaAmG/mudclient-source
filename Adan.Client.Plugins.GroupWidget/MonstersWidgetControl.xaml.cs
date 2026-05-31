@@ -96,7 +96,9 @@ namespace Adan.Client.Plugins.GroupWidget
             Application.Current.Dispatcher.BeginInvoke(executeToAct, DispatcherPriority.Background);
         }
 
-        public void UpdateModel([NotNull] List<MonsterStatus> characters)
+        private bool _pendingIsRound = true;
+
+        public void UpdateModel([NotNull] List<MonsterStatus> characters, bool isRound = true)
         {
             Assert.ArgumentNotNull(characters, "roomMonstersMessage");
 
@@ -107,6 +109,7 @@ namespace Adan.Client.Plugins.GroupWidget
                     RoomMonstersViewModel viewModel = DataContext as RoomMonstersViewModel;
 
                     List<MonsterStatus> list = null;
+                    bool pendingIsRound;
                     lock (_stack_lock)
                     {
                         if (_monsters_stack.Count > 0)
@@ -114,11 +117,12 @@ namespace Adan.Client.Plugins.GroupWidget
                             list = _monsters_stack.Pop();
                             _monsters_stack.Clear();
                         }
+                        pendingIsRound = _pendingIsRound;
                     }
 
                     if (list != null)
                     {
-                        viewModel.UpdateModel(list);
+                        viewModel.UpdateModel(list, pendingIsRound);
                     }
                 }
                 catch (Exception) { }
@@ -127,6 +131,7 @@ namespace Adan.Client.Plugins.GroupWidget
             lock (_stack_lock)
             {
                 _monsters_stack.Push(characters);
+                _pendingIsRound = isRound;
             }
 
             Application.Current.Dispatcher.BeginInvoke(actToExecute, DispatcherPriority.Background);

@@ -20,12 +20,15 @@
                    FontSize="14"
                    Text="{x:Static Properties:Resources.RouteDestinationSelect}"
                    Margin="5" />
-        <ListBox Grid.Row="0"
+        <TextBox x:Name="SearchBox"
+                 Margin="5,0,5,3"
+                 TextChanged="SearchBox_TextChanged" />
+        <ListBox x:Name="RoutesList"
+                 Grid.Row="0"
                  Margin="5,0,5,5"
-                 ItemsSource="{Binding Path=AvailableDestinations}"
                  SelectedItem="{Binding Path=SelectedRouteDestination}"
                  HorizontalAlignment="Stretch"
-                 Height="205">
+                 Height="190">
         </ListBox>
 
         <StackPanel Orientation="Horizontal"

@@ -109,5 +109,14 @@ namespace Adan.Client.Map.Dialogs
             RouteManager.PrintHelp();
             Close();
         }
+
+        private void HandleGenerateRoutesClicked([NotNull] object sender, [NotNull] RoutedEventArgs e)
+        {
+            Assert.ArgumentNotNull(sender, "sender");
+            Assert.ArgumentNotNull(e, "e");
+
+            RouteManager.GenerateRoutes();
+            Close();
+        }
     }
 }

@@ -6045,6 +6045,262 @@
                 ImageSource="Images/tornado.png" />
     <ImageBrush x:Key="Brush_StunImmune"
                 ImageSource="Images/stun-immune.png" />
+    <VisualBrush x:Key="Brush_Fog"
+                 Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Width="26"
+                    Height="26">
+                <Ellipse Width="24"
+                         Height="24"
+                         Canvas.Left="1"
+                         Canvas.Top="1"
+                         Stroke="#FF8FD5EA"
+                         StrokeThickness="1">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush GradientOrigin="0.35,0.25">
+                            <GradientStop Color="#FFF1FCFF"
+                                          Offset="0" />
+                            <GradientStop Color="#FF527C91"
+                                          Offset="0.6" />
+                            <GradientStop Color="#FF142735"
+                                          Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Ellipse Width="6.8"
+                         Height="6.8"
+                         Canvas.Left="9.6"
+                         Canvas.Top="10.5"
+                         Fill="#FF203541"
+                         Stroke="#FFC7EFFA"
+                         StrokeThickness="0.8" />
+                <Path Data="M6.5,22 C7.2,17.8 18.8,17.8 19.5,22 Z"
+                      Fill="#FF203541"
+                      Stroke="#FFC7EFFA"
+                      StrokeThickness="0.8"
+                      StrokeLineJoin="Round" />
+                <Path Data="M5,6.3 C8.2,3.9 11,7.8 14.1,5.8 C16.8,4.1 19.5,4.8 21.6,6.8"
+                      Fill="{x:Null}"
+                      Stroke="#FFFFFFFF"
+                      StrokeThickness="1.9"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.95" />
+                <Path Data="M4.4,9.1 C7.5,7.1 10.6,10.7 13.8,8.8 C16.8,7 20.2,7.8 22.3,9.8"
+                      Fill="{x:Null}"
+                      Stroke="#FFC4EAF5"
+                      StrokeThickness="1.7"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.95" />
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <VisualBrush x:Key="Brush_SimpleFog"
+                 Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Width="26"
+                    Height="26">
+                <Ellipse Width="24"
+                         Height="24"
+                         Canvas.Left="1"
+                         Canvas.Top="1"
+                         Stroke="#FFB4C2C8"
+                         StrokeThickness="1">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush GradientOrigin="0.35,0.25">
+                            <GradientStop Color="#FFE7EBEE"
+                                          Offset="0" />
+                            <GradientStop Color="#FF7F8A90"
+                                          Offset="0.62" />
+                            <GradientStop Color="#FF262D31"
+                                          Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Ellipse Width="7.2"
+                         Height="7.2"
+                         Canvas.Left="9.4"
+                         Canvas.Top="4"
+                         Fill="#FFD6DADD"
+                         Stroke="#FF343B40"
+                         StrokeThickness="0.9" />
+                <Path Data="M10.2,11.4 L15.8,11.4 L17.3,21.2 L8.7,21.2 Z"
+                      Fill="#FF9FA8AD"
+                      Stroke="#FF333A3F"
+                      StrokeThickness="1"
+                      StrokeLineJoin="Round" />
+                <Path Data="M8.7,13.6 L5.7,18.1 M17.3,13.6 L20.3,18.1"
+                      Fill="{x:Null}"
+                      Stroke="#FFD6DADD"
+                      StrokeThickness="1.5"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.85" />
+                <Path Data="M10.6,21 L10.2,24 M15.4,21 L15.8,24"
+                      Fill="{x:Null}"
+                      Stroke="#FFD6DADD"
+                      StrokeThickness="1.3"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.8" />
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <VisualBrush x:Key="Brush_DarkWord"
+                 Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Width="26"
+                    Height="26">
+                <Ellipse Width="24"
+                         Height="24"
+                         Canvas.Left="1"
+                         Canvas.Top="1"
+                         Stroke="#FFD4A2FF"
+                         StrokeThickness="1">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush GradientOrigin="0.35,0.25">
+                            <GradientStop Color="#FF59347C"
+                                          Offset="0" />
+                            <GradientStop Color="#FF1A1026"
+                                          Offset="0.62" />
+                            <GradientStop Color="#FF040308"
+                                          Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Path Data="M5,7.2 C5,5.7 6.2,4.5 7.7,4.5 L18.3,4.5 C19.8,4.5 21,5.7 21,7.2 L21,14.4 C21,15.9 19.8,17.1 18.3,17.1 L15.2,17.1 L12.6,21.1 L11.4,17.1 L7.7,17.1 C6.2,17.1 5,15.9 5,14.4 Z"
+                      Fill="#FF07050D"
+                      Stroke="#FFD6B2FF"
+                      StrokeThickness="1.3"
+                      StrokeLineJoin="Round" />
+                <Path Data="M9,8.4 C10.4,7.5 11.5,7.5 13,8.4 M8.2,11 C10.2,9.7 12.1,9.7 14.1,11 M11.2,13.8 C12.5,12.8 14.1,12.8 15.5,13.8"
+                      Fill="{x:Null}"
+                      Stroke="#FFE2C9FF"
+                      StrokeThickness="1.25"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.95" />
+                <Path Data="M17.7,7 L19.3,9.2 L17.1,10.4 L18.9,12.5"
+                      Fill="{x:Null}"
+                      Stroke="#FF9E45FF"
+                      StrokeThickness="1.2"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.95" />
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <VisualBrush x:Key="Brush_Ossification"
+                 Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Width="26"
+                    Height="26">
+                <Ellipse Width="24"
+                         Height="24"
+                         Canvas.Left="1"
+                         Canvas.Top="1"
+                         Stroke="#FFCBD2D6"
+                         StrokeThickness="1">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush GradientOrigin="0.35,0.25">
+                            <GradientStop Color="#FFF8F8F4"
+                                          Offset="0" />
+                            <GradientStop Color="#FF8F979A"
+                                          Offset="0.58" />
+                            <GradientStop Color="#FF343B3F"
+                                          Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Path Data="M9,3 L16,3 L20,9 L18,21 L8,21 L6,9 Z"
+                      Fill="#FFB7BEC1"
+                      Stroke="#FF394247"
+                      StrokeThickness="1.2"
+                      StrokeLineJoin="Round" />
+                <Path Data="M13,4 L11,9 L14,11 L12,16 L15,22"
+                      Fill="{x:Null}"
+                      Stroke="#FF596267"
+                      StrokeThickness="1.2"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round" />
+                <Path Data="M8,12 L12,11"
+                      Fill="{x:Null}"
+                      Stroke="#FFFFFFFF"
+                      StrokeThickness="1.1"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.75" />
+                <Path Data="M16,8 L19,7"
+                      Fill="{x:Null}"
+                      Stroke="#FFFFFFFF"
+                      StrokeThickness="1.1"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.65" />
+                <TextBlock Text="О"
+                           Canvas.Left="9.3"
+                           Canvas.Top="8"
+                           FontFamily="Segoe UI"
+                           FontSize="8"
+                           FontWeight="Bold"
+                           Foreground="#FF243036" />
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <VisualBrush x:Key="Brush_GroupAccuracy"
+                 Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Width="26"
+                    Height="26">
+                <Ellipse Width="24"
+                         Height="24"
+                         Canvas.Left="1"
+                         Canvas.Top="1"
+                         Stroke="#FFFFE27A"
+                         StrokeThickness="1">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush GradientOrigin="0.35,0.25">
+                            <GradientStop Color="#FFFFFFD4"
+                                          Offset="0" />
+                            <GradientStop Color="#FF526D4D"
+                                          Offset="0.62" />
+                            <GradientStop Color="#FF172A20"
+                                          Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Ellipse Width="17"
+                         Height="17"
+                         Canvas.Left="4.5"
+                         Canvas.Top="4.5"
+                         Fill="{x:Null}"
+                         Stroke="#FFFFFFFF"
+                         StrokeThickness="1.4" />
+                <Ellipse Width="10.5"
+                         Height="10.5"
+                         Canvas.Left="7.75"
+                         Canvas.Top="7.75"
+                         Fill="{x:Null}"
+                         Stroke="#FFFFF261"
+                         StrokeThickness="1.3" />
+                <Ellipse Width="4.2"
+                         Height="4.2"
+                         Canvas.Left="10.9"
+                         Canvas.Top="10.9"
+                         Fill="#FFFFF261"
+                         Stroke="#FF18241E"
+                         StrokeThickness="0.7" />
+                <Path Data="M13,2.8 L13,7 M13,19 L13,23.2 M2.8,13 L7,13 M19,13 L23.2,13"
+                      Fill="{x:Null}"
+                      Stroke="#FFE7F9FF"
+                      StrokeThickness="1.4"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Opacity="0.9" />
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
     <VisualBrush x:Key="Brush_Hunger"
                  Stretch="Uniform">
         <VisualBrush.Visual>
@@ -6379,6 +6635,36 @@
             <RectangleGeometry Rect="0,0,100,100" />
         </GeometryDrawing.Geometry>
     </GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Fog"
+                     Brush="{StaticResource Brush_Fog}">
+        <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,100,100" />
+        </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_SimpleFog"
+                     Brush="{StaticResource Brush_SimpleFog}">
+        <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,100,100" />
+        </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_DarkWord"
+                     Brush="{StaticResource Brush_DarkWord}">
+        <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,100,100" />
+        </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Ossification"
+                     Brush="{StaticResource Brush_Ossification}">
+        <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,100,100" />
+        </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_GroupAccuracy"
+                     Brush="{StaticResource Brush_GroupAccuracy}">
+        <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,100,100" />
+        </GeometryDrawing.Geometry>
+    </GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_Accuracy"
                      Brush="{StaticResource Brush_Accuracy}">
         <GeometryDrawing.Geometry>
@@ -6481,6 +6767,16 @@
                   Drawing="{StaticResource Drawing_Tornado}" />
     <DrawingImage x:Key="ImageSource_StunImmune"
                   Drawing="{StaticResource Drawing_StunImmune}" />
+    <DrawingImage x:Key="ImageSource_Fog"
+                  Drawing="{StaticResource Drawing_Fog}" />
+    <DrawingImage x:Key="ImageSource_SimpleFog"
+                  Drawing="{StaticResource Drawing_SimpleFog}" />
+    <DrawingImage x:Key="ImageSource_DarkWord"
+                  Drawing="{StaticResource Drawing_DarkWord}" />
+    <DrawingImage x:Key="ImageSource_Ossification"
+                  Drawing="{StaticResource Drawing_Ossification}" />
+    <DrawingImage x:Key="ImageSource_GroupAccuracy"
+                  Drawing="{StaticResource Drawing_GroupAccuracy}" />
     <DrawingImage x:Key="ImageSource_Hunger"
                   Drawing="{StaticResource Drawing_Hunger}" />
     <DrawingImage x:Key="ImageSource_Thirst"
@@ -6630,6 +6926,16 @@
                            Then="{StaticResource ImageSource_Tornado}" />
         <Utils:SwitchCase  When="StunImmune"
                            Then="{StaticResource ImageSource_StunImmune}" />
+        <Utils:SwitchCase  When="Fog"
+                           Then="{StaticResource ImageSource_Fog}" />
+        <Utils:SwitchCase  When="SimpleFog"
+                           Then="{StaticResource ImageSource_SimpleFog}" />
+        <Utils:SwitchCase  When="DarkWord"
+                           Then="{StaticResource ImageSource_DarkWord}" />
+        <Utils:SwitchCase  When="Ossification"
+                           Then="{StaticResource ImageSource_Ossification}" />
+        <Utils:SwitchCase  When="GroupAccuracy"
+                           Then="{StaticResource ImageSource_GroupAccuracy}" />
         <Utils:SwitchCase  When="Hunger"
                            Then="{StaticResource ImageSource_Hunger}" />
         <Utils:SwitchCase  When="Thirst"

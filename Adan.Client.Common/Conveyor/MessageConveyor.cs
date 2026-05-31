@@ -261,6 +261,14 @@ namespace Adan.Client.Common.Conveyor
 
             try
             {
+                // Apply proxy settings from global settings
+                var settings = SettingsHolder.Instance.Settings;
+                if (settings != null)
+                {
+                    _mccpClient.Socks5Host = settings.Socks5ProxyHost;
+                    _mccpClient.Socks5Port = settings.Socks5ProxyPort;
+                }
+
                 _mccpClient.Connect(host, port);
 
                 LastConnectHost = host;
@@ -517,3 +525,4 @@ namespace Adan.Client.Common.Conveyor
         #endregion
     }
 }
+

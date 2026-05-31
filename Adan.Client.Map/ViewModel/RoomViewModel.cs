@@ -312,6 +312,40 @@ namespace Adan.Client.Map.ViewModel
                                                             _allActionDescriptions, true));
 
         /// <summary>
+        /// Gets or sets a value indicating whether this room contains herbs.
+        /// </summary>
+        public bool HasHerb
+        {
+            get => AdditionalRoomParameters.HasHerb;
+            set
+            {
+                AdditionalRoomParameters.HasHerb = value;
+                AdditionalRoomParameters.HasChanges = true;
+                OnPropertyChanged("HasHerb");
+                OnPropertyChanged("HerbControlsVisible");
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the danger level of this herb room.
+        /// </summary>
+        public HerbDangerLevel HerbDangerLevel
+        {
+            get => AdditionalRoomParameters.HerbDangerLevel;
+            set
+            {
+                AdditionalRoomParameters.HerbDangerLevel = value;
+                AdditionalRoomParameters.HasChanges = true;
+                OnPropertyChanged("HerbDangerLevel");
+            }
+        }
+
+        /// <summary>
+        /// Gets whether herb danger level controls should be visible.
+        /// </summary>
+        public bool HerbControlsVisible => AdditionalRoomParameters.HasHerb;
+
+        /// <summary>
         /// Gets or sets the color to use to display this room on the map.
         /// </summary>
         /// <value>
@@ -451,6 +485,9 @@ namespace Adan.Client.Map.ViewModel
             OnPropertyChanged("Color");
             OnPropertyChanged("Alias");
             OnPropertyChanged("Comments");
+            OnPropertyChanged("HasHerb");
+            OnPropertyChanged("HerbDangerLevel");
+            OnPropertyChanged("HerbControlsVisible");
         }
     }
 }

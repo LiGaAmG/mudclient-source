@@ -26,6 +26,7 @@
         private bool _displayNumber = Settings.Default.MonsterDisplayNumber;
         private MonsterViewModel _selectedMonster;
         private bool _moreItemsAvailable;
+        private int _nextMonsterId = 1;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RoomMonstersViewModel"/> class.
@@ -39,7 +40,7 @@
             _tickingTimer.Tick += (o, e) => UpdateTimings();
             _tickingTimer.Start();
             AffectsPanelWidth = _displayedAffectCount * 23;
-            Width = AffectsPanelWidth + 22 + 140 + 60 + 20 + 20 + 5 + 5;
+            Width = AffectsPanelWidth + 22 + 30 + 140 + 60 + 20 + 20 + 5 + 5;
             if (!DisplayNumber)
             {
                 Width -= 22;
@@ -147,49 +148,139 @@
         /// Updates the model.
         /// </summary>
         /// <param name="monsters">The monsters.</param>
-        public void UpdateModel([NotNull] IEnumerable<MonsterStatus> monsters)
+        public void UpdateModel([NotNull] IEnumerable<MonsterStatus> monsters, bool isRound = true)
         {
             Assert.ArgumentNotNull(monsters, "monsters");
 
-            int position = 0;
-            bool moreItemsAvailable = false;
-            foreach (var monster in monsters)
+            var monsterList = monsters.ToList();
+            if (monsterList.Count == 0 || !isRound)
             {
-                if (position >= DisplayedItemLimit)
+                _nextMonsterId = 1;
+                Monsters.Clear();
+                MoreItemsAvailable = false;
+                if (monsterList.Count == 0)
+                    return;
+            }
+
+            // Group existing VMs by name for HP-based matching
+            var existingByName = new Dictionary<string, List<MonsterViewModel>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var existing in Monsters)
+            {
+                List<MonsterViewModel> list;
+                if (!existingByName.TryGetValue(existing.Name, out list))
+                {
+                    list = new List<MonsterViewModel>();
+                    existingByName[existing.Name] = list;
+                }
+                list.Add(existing);
+            }
+
+            // Group new monsters by name for HP-based matching
+            var newByName = new Dictionary<string, List<MonsterStatus>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var monster in monsterList)
+            {
+                List<MonsterStatus> list;
+                if (!newByName.TryGetValue(monster.Name, out list))
+                {
+                    list = new List<MonsterStatus>();
+                    newByName[monster.Name] = list;
+                }
+                list.Add(monster);
+            }
+
+            // Build ID mapping per same-name group:
+            // - New monsters always arrive at the FRONT of the list
+            // - So when count grew: existing ones are at the TAIL → tail-match
+            // - When count shrank (deaths): use HP matching to find survivors
+            var vmForMonster = new Dictionary<MonsterStatus, MonsterViewModel>();
+            foreach (var name in existingByName.Keys)
+            {
+                List<MonsterStatus> newGroup;
+                if (!newByName.TryGetValue(name, out newGroup) || newGroup.Count == 0)
+                    continue;
+
+                var oldGroup = existingByName[name];
+
+                if (newGroup.Count >= oldGroup.Count)
+                {
+                    // Arrivals: new ones at front, existing ones at tail
+                    int offset = newGroup.Count - oldGroup.Count;
+                    for (int i = 0; i < oldGroup.Count; i++)
+                        vmForMonster[newGroup[offset + i]] = oldGroup[i];
+                }
+                else
+                {
+                    // Deaths/departures: find minimum-cost HP matching (optimal, not greedy)
+                    var oldHps = oldGroup.Select(vm => vm.MonsterStatus.HitsPercent).ToList();
+                    var newHps = newGroup.Select(m => m.HitsPercent).ToList();
+                    var assignment = MinCostAssignment(oldHps, newHps);
+                    for (int i = 0; i < newGroup.Count; i++)
+                        vmForMonster[newGroup[i]] = oldGroup[assignment[i]];
+                }
+            }
+
+            var newList = new List<MonsterViewModel>();
+            bool moreItemsAvailable = false;
+            int position = 1;
+            foreach (var monster in monsterList)
+            {
+                if (position > DisplayedItemLimit)
                 {
                     moreItemsAvailable = true;
                     break;
                 }
 
-                if (position < Monsters.Count && Monsters[position].Name == monster.Name)
+                MonsterViewModel vm;
+                if (vmForMonster.TryGetValue(monster, out vm))
                 {
-                    Monsters[position].UpdateFromModel(monster, position + 1);
-                    if (SelectedMonster != null && SelectedMonster == Monsters[position])
-                    {
+                    vm.UpdateFromModel(monster, position);
+                    if (SelectedMonster != null && SelectedMonster == vm && RootModel != null)
                         RootModel.SelectedRoomMonster = monster;
-                    }
                 }
                 else
                 {
                     var affectsList = _displayedAffectPriorities.Select(af => Constants.AllAffects.First(a => a.Name == af));
-                    Monsters.Insert(position, new MonsterViewModel(monster, affectsList, position + 1, AffectsPanelWidth) { DisplayNumber = DisplayNumber });
+                    vm = new MonsterViewModel(monster, affectsList, position, AffectsPanelWidth) { DisplayNumber = DisplayNumber };
+                    vm.MonsterId = _nextMonsterId++;
                 }
 
+                newList.Add(vm);
                 position++;
             }
 
-            var count = Monsters.Count;
-            for (int i = position; i < count; i++)
+            // Sync Monsters collection: update in-place to preserve selection and avoid flicker
+            for (int i = 0; i < newList.Count; i++)
             {
-                if (SelectedMonster != null && SelectedMonster == Monsters[position])
+                if (i < Monsters.Count)
                 {
-                    SelectedMonster = null;
+                    if (Monsters[i] != newList[i])
+                        Monsters[i] = newList[i];
                 }
+                else
+                {
+                    Monsters.Add(newList[i]);
+                }
+            }
 
-                Monsters.RemoveAt(position);
+            while (Monsters.Count > newList.Count)
+            {
+                if (SelectedMonster == Monsters[Monsters.Count - 1])
+                    SelectedMonster = null;
+                Monsters.RemoveAt(Monsters.Count - 1);
             }
 
             MoreItemsAvailable = moreItemsAvailable;
+
+            // Update MonsterIdMap so $monsteridN variables resolve correctly
+            if (RootModel != null)
+            {
+                RootModel.MonsterIdMap.Clear();
+                foreach (var vm in newList)
+                {
+                    if (vm.MonsterId > 0)
+                        RootModel.MonsterIdMap[vm.MonsterId] = vm.MonsterStatus;
+                }
+            }
         }
 
         /// <summary>
@@ -198,11 +289,12 @@
         public void ReloadDisplayedAffects()
         {
             Monsters.Clear();
+            _nextMonsterId = 1;
             _displayedAffectPriorities = new List<string>(Settings.Default.MonsterAffects);
             DisplayNumber = Settings.Default.GroupWidgetDisplayNumber;
             DisplayedAffectCount = Settings.Default.MonsterDisplayAffectsCount;
             AffectsPanelWidth = 23 * _displayedAffectCount;
-            Width = AffectsPanelWidth + 22 + 140 + 60 + 20 + 20 + 5 + 5;
+            Width = AffectsPanelWidth + 22 + 30 + 140 + 60 + 20 + 20 + 5 + 5;
             if (!DisplayNumber)
             {
                 Width -= 22;
@@ -215,6 +307,42 @@
             }
             MoreItemsAvailable = false;
             OnPropertyChanged("Width");
+        }
+
+        // Finds minimum-cost assignment: newHps[i] → oldHps[result[i]]
+        // Brute-force, works correctly for N≤6 (typical monster group size)
+        private static int[] MinCostAssignment(IList<float> oldHps, IList<float> newHps)
+        {
+            int n = newHps.Count;
+            int m = oldHps.Count;
+            var best = new int[n];
+            for (int i = 0; i < n; i++) best[i] = i;
+            float bestCost = float.MaxValue;
+            var cur = new int[n];
+            var used = new bool[m];
+
+            Assign(0, 0f);
+
+            return best;
+
+            void Assign(int idx, float cost)
+            {
+                if (cost >= bestCost) return;
+                if (idx == n)
+                {
+                    bestCost = cost;
+                    System.Array.Copy(cur, best, n);
+                    return;
+                }
+                for (int i = 0; i < m; i++)
+                {
+                    if (used[i]) continue;
+                    used[i] = true;
+                    cur[idx] = i;
+                    Assign(idx + 1, cost + Math.Abs(newHps[idx] - oldHps[i]));
+                    used[i] = false;
+                }
+            }
         }
 
         private void UpdateTimings()

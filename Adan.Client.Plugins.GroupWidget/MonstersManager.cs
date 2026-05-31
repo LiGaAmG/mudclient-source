@@ -70,7 +70,7 @@ namespace Adan.Client.Plugins.GroupWidget
                 }
                 monstersViewModel.RootModel = _monsterHolders[uid].RootModel;
                 _monstersWidget.ViewModelUid = uid;
-                _monstersWidget.UpdateModel(_monsterHolders[uid].Characters);
+                _monstersWidget.UpdateModel(_monsterHolders[uid].Characters, _monsterHolders[uid].LastUpdateIsRound);
             }
         }
 
@@ -84,7 +84,7 @@ namespace Adan.Client.Plugins.GroupWidget
 
             if (_monstersWidget.ViewModelUid == monsterHolder.Uid)
             {
-                _monstersWidget.UpdateModel(monsterHolder.Characters);
+                _monstersWidget.UpdateModel(monsterHolder.Characters, monsterHolder.LastUpdateIsRound);
             }
         }
     }

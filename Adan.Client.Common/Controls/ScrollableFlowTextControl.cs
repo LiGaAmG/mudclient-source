@@ -8,6 +8,7 @@ namespace Adan.Client.Common.Controls
     using System.Windows;
     using System.Windows.Controls;
     using System.Windows.Controls.Primitives;
+    using System.Windows.Documents;
     using System.Windows.Input;
     using System.Windows.Media;
     using System.Windows.Media.TextFormatting;
@@ -18,6 +19,7 @@ namespace Adan.Client.Common.Controls
     using Messages;
 
     using TextFormatting;
+    using Themes;
     using Settings;
     using Utils;
 
@@ -38,6 +40,8 @@ namespace Adan.Client.Common.Controls
         private readonly CustomTextParagraphProperties _customTextParagraphProperties = new CustomTextParagraphProperties();
         private readonly TextRunCache _textRunCache = new TextRunCache();
         private readonly Stack<TextLine> _linesToRenderStack = new Stack<TextLine>();
+        private readonly ToolTip _interactiveToolTip = new ToolTip();
+        private readonly List<ToolTipHotspot> _toolTipHotspots = new List<ToolTipHotspot>();
 
 
         private readonly DispatcherTimer _doubleClickTimer;
@@ -45,6 +49,8 @@ namespace Adan.Client.Common.Controls
         private int _currentLineNumber;
         private int _currentNumberOfLinesInView;
         private double _lineHeight;
+        private string _shownToolTipText = string.Empty;
+        private IList<TextMessageBlock.ToolTipLine> _shownToolTipLines;
 
         #endregion
 
@@ -60,6 +66,12 @@ namespace Adan.Client.Common.Controls
             _textSource = new MessageTextSource(_selectionSettings);
             _doubleClickTimer = new DispatcherTimer(new TimeSpan(0, 0, 0, 0, 150), DispatcherPriority.Background, (o, e) => ClearTextSelection(), Dispatcher.CurrentDispatcher);
             _doubleClickTimer.Stop();
+            _interactiveToolTip.Placement = PlacementMode.Relative;
+            _interactiveToolTip.PlacementTarget = this;
+            _interactiveToolTip.StaysOpen = true;
+            _interactiveToolTip.MaxWidth = 800;
+            _interactiveToolTip.IsHitTestVisible = false;
+            ToolTipService.SetShowDuration(this, int.MaxValue);
 
             MaximumLinesToStore = Math.Max(SettingsHolder.Instance.Settings.ScrollBuffer, 100);
             SettingsHolder.Instance.Settings.OnSettingsChanged += HandleSettingsChanged;
@@ -565,6 +577,7 @@ namespace Adan.Client.Common.Controls
             Assert.ArgumentNotNull(e, "e");
 
             base.OnMouseLeftButtonDown(e);
+            CloseInteractiveToolTip();
             _selectionSettings.Dragging = true;
             _selectionSettings.NeedUpdate = true;
             _selectionSettings.SetSelectionStartPosition(e.GetPosition(this));
@@ -588,7 +601,10 @@ namespace Adan.Client.Common.Controls
                 _selectionSettings.NeedUpdate = true;
                 e.Handled = true;
                 InvalidateVisual();
+                return;
             }
+
+            UpdateInteractiveToolTip(e.GetPosition(this));
         }
 
         /// <summary>
@@ -619,6 +635,7 @@ namespace Adan.Client.Common.Controls
         {
             Assert.ArgumentNotNull(e, "e");
 
+            CloseInteractiveToolTip();
             if (!_selectionSettings.Dragging)
             {
                 Mouse.OverrideCursor = null;
@@ -635,6 +652,7 @@ namespace Adan.Client.Common.Controls
         {
             Assert.ArgumentNotNull(e, "e");
 
+            CloseInteractiveToolTip();
             _selectionSettings.Dragging = false;
             ClearTextSelection();
             base.OnLostMouseCapture(e);
@@ -658,9 +676,11 @@ namespace Adan.Client.Common.Controls
             {
                 if (Visibility != Visibility.Visible)
                 {
+                    CloseInteractiveToolTip();
                     return;
                 }
 
+                _toolTipHotspots.Clear();
                 drawingContext.DrawRectangle(Themes.ThemeManager.Instance.ActiveTheme.GetBrushByTextColor(Themes.TextColor.None, true), new Pen(Themes.ThemeManager.Instance.ActiveTheme.GetBrushByTextColor(Themes.TextColor.None, true), 0), new Rect(0, 0, ActualWidth, ActualHeight));
                 var renderedLines = 0;
                 if (_selectionSettings.NeedUpdate)
@@ -674,8 +694,10 @@ namespace Adan.Client.Common.Controls
                     var lineNumber = _currentLineNumber;
                     while (currentHeight > 0 && lineNumber > 0)
                     {
-                        _textSource.Message = _messages[lineNumber - 1];
+                        var currentMessage = _messages[lineNumber - 1];
+                        _textSource.Message = currentMessage;
                         var textStorePosition = 0;
+                        var toolTipRanges = GetToolTipRanges(currentMessage);
 
                         _linesToRenderStack.Clear();
 
@@ -685,20 +707,27 @@ namespace Adan.Client.Common.Controls
                             _linesToRenderStack.Push(line);
                             textStorePosition += line.Length;
                         }
-                        while (textStorePosition < _messages[lineNumber - 1].InnerText.Length);
+                        while (textStorePosition < currentMessage.InnerText.Length);
 
                         var drawnChars = 0;
                         bool messageSelected = false;
                         while (_linesToRenderStack.Count > 0)
                         {
                             var line = _linesToRenderStack.Pop();
-                            line.Draw(drawingContext, new Point(0, currentHeight - line.Height), InvertAxes.None);
+                            var lineTop = currentHeight - line.Height;
+                            var lineStart = drawnChars;
+                            line.Draw(drawingContext, new Point(0, lineTop), InvertAxes.None);
+
+                            if (toolTipRanges.Count > 0)
+                            {
+                                AddToolTipHotspotsForLine(toolTipRanges, line, lineStart, lineTop);
+                            }
 
                             _lineHeight = line.Height;
                             drawnChars += line.Length;
                             if (_selectionSettings.NeedUpdate)
                             {
-                                messageSelected = ProcessLineForSelection(line, _messages[lineNumber - 1], currentHeight, drawnChars, messageSelected);
+                                messageSelected = ProcessLineForSelection(line, currentMessage, currentHeight, drawnChars, messageSelected);
                             }
 
                             currentHeight -= line.Height;
@@ -870,6 +899,203 @@ namespace Adan.Client.Common.Controls
             return messageSelected;
         }
 
+        private void UpdateInteractiveToolTip(Point position)
+        {
+            if (_toolTipHotspots.Count == 0)
+            {
+                CloseInteractiveToolTip();
+                return;
+            }
+
+            ToolTipHotspot hoveredHotspot = null;
+            foreach (var hotspot in _toolTipHotspots)
+            {
+                if (hotspot.Bounds.Contains(position))
+                {
+                    hoveredHotspot = hotspot;
+                    break;
+                }
+            }
+
+            if (hoveredHotspot == null || IsToolTipEmpty(hoveredHotspot.ToolTipText, hoveredHotspot.ToolTipLines))
+            {
+                CloseInteractiveToolTip();
+                return;
+            }
+
+            var isSameToolTip = _interactiveToolTip.IsOpen
+                && string.Equals(_shownToolTipText, hoveredHotspot.ToolTipText, StringComparison.Ordinal)
+                && ReferenceEquals(_shownToolTipLines, hoveredHotspot.ToolTipLines);
+            _interactiveToolTip.HorizontalOffset = position.X + 16;
+            _interactiveToolTip.VerticalOffset = position.Y + 16;
+
+            if (!isSameToolTip)
+            {
+                _shownToolTipText = hoveredHotspot.ToolTipText;
+                _shownToolTipLines = hoveredHotspot.ToolTipLines;
+                _interactiveToolTip.Content = BuildInteractiveToolTipContent(hoveredHotspot.ToolTipText, hoveredHotspot.ToolTipLines);
+                _interactiveToolTip.IsOpen = false;
+                _interactiveToolTip.IsOpen = true;
+            }
+        }
+
+        private void CloseInteractiveToolTip()
+        {
+            _shownToolTipText = string.Empty;
+            _shownToolTipLines = null;
+            _interactiveToolTip.IsOpen = false;
+        }
+
+        [NotNull]
+        private static object BuildInteractiveToolTipContent([CanBeNull] string text, [CanBeNull] IList<TextMessageBlock.ToolTipLine> toolTipLines)
+        {
+            if (toolTipLines == null || toolTipLines.Count == 0)
+            {
+                return text ?? string.Empty;
+            }
+
+            var stackPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical
+            };
+
+            var activeTheme = ThemeManager.Instance.ActiveTheme;
+            var fontFamily = new FontFamily(SettingsHolder.Instance.Settings.MUDFontName);
+            var fontSize = SettingsHolder.Instance.Settings.MUDFontSize + 2;
+
+            foreach (var toolTipLine in toolTipLines)
+            {
+                var lineTextBlock = new TextBlock
+                {
+                    TextWrapping = TextWrapping.Wrap,
+                    FontFamily = fontFamily,
+                    FontSize = fontSize,
+                    Foreground = activeTheme.GetBrushByTextColor(TextColor.BrightWhite, false)
+                };
+
+                if (toolTipLine != null && toolTipLine.Blocks != null)
+                {
+                    foreach (var block in toolTipLine.Blocks)
+                    {
+                        if (block == null || string.IsNullOrEmpty(block.Text))
+                        {
+                            continue;
+                        }
+
+                        var run = new Run(block.Text)
+                        {
+                            Foreground = activeTheme.GetBrushByTextColor(block.Foreground, false)
+                        };
+                        if (block.Background != TextColor.None)
+                        {
+                            run.Background = activeTheme.GetBrushByTextColor(block.Background, true);
+                        }
+
+                        lineTextBlock.Inlines.Add(run);
+                    }
+                }
+
+                stackPanel.Children.Add(lineTextBlock);
+            }
+
+            return stackPanel;
+        }
+
+        private static bool IsToolTipEmpty([CanBeNull] string text, [CanBeNull] IList<TextMessageBlock.ToolTipLine> toolTipLines)
+        {
+            return string.IsNullOrWhiteSpace(text) && (toolTipLines == null || toolTipLines.Count == 0);
+        }
+
+        [NotNull]
+        private static List<ToolTipRange> GetToolTipRanges([NotNull] TextMessage message)
+        {
+            Assert.ArgumentNotNull(message, "message");
+
+            var result = new List<ToolTipRange>();
+            var currentOffset = 0;
+            foreach (var block in message.MessageBlocks)
+            {
+                var blockLength = block.Text.Length;
+                if (blockLength == 0)
+                {
+                    continue;
+                }
+
+                if (!IsToolTipEmpty(block.ToolTipText, block.ToolTipLines))
+                {
+                    result.Add(new ToolTipRange
+                    {
+                        Start = currentOffset,
+                        End = currentOffset + blockLength,
+                        ToolTipText = block.ToolTipText,
+                        ToolTipLines = block.ToolTipLines
+                    });
+                }
+
+                currentOffset += blockLength;
+            }
+
+            return result;
+        }
+
+        private void AddToolTipHotspotsForLine([NotNull] IEnumerable<ToolTipRange> toolTipRanges, [NotNull] TextLine line, int lineStart, double lineTop)
+        {
+            Assert.ArgumentNotNull(toolTipRanges, "toolTipRanges");
+            Assert.ArgumentNotNull(line, "line");
+
+            var lineLength = line.Length;
+            var lineEnd = lineStart + lineLength;
+            if (lineLength <= 0)
+            {
+                return;
+            }
+
+            foreach (var toolTipRange in toolTipRanges)
+            {
+                if (toolTipRange.End <= lineStart || toolTipRange.Start >= lineEnd)
+                {
+                    continue;
+                }
+
+                var overlapStart = Math.Max(lineStart, toolTipRange.Start);
+                var overlapEnd = Math.Min(lineEnd, toolTipRange.End);
+                if (overlapEnd <= overlapStart)
+                {
+                    continue;
+                }
+
+                var startInLine = overlapStart - lineStart;
+                var endInLine = overlapEnd - lineStart;
+
+                double xStart;
+                double xEnd;
+                try
+                {
+                    xStart = line.GetDistanceFromCharacterHit(new CharacterHit(startInLine, 0));
+                    xEnd = line.GetDistanceFromCharacterHit(new CharacterHit(endInLine, 0));
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (xEnd < xStart)
+                {
+                    var temp = xStart;
+                    xStart = xEnd;
+                    xEnd = temp;
+                }
+
+                var width = Math.Max(1.0, xEnd - xStart);
+                _toolTipHotspots.Add(new ToolTipHotspot
+                {
+                    Bounds = new Rect(xStart, lineTop, width, line.Height),
+                    ToolTipText = toolTipRange.ToolTipText,
+                    ToolTipLines = toolTipRange.ToolTipLines
+                });
+            }
+        }
+
         private void ClearTextSelection()
         {
             _selectionSettings.SelectedMessages.Clear();
@@ -950,6 +1176,54 @@ namespace Adan.Client.Common.Controls
             if (e.Name == "ScrollBuffer")
             {
                 MaximumLinesToStore = Math.Max(SettingsHolder.Instance.Settings.ScrollBuffer, 100);
+            }
+        }
+
+        private sealed class ToolTipRange
+        {
+            public int Start
+            {
+                get;
+                set;
+            }
+
+            public int End
+            {
+                get;
+                set;
+            }
+
+            public string ToolTipText
+            {
+                get;
+                set;
+            }
+
+            public IList<TextMessageBlock.ToolTipLine> ToolTipLines
+            {
+                get;
+                set;
+            }
+        }
+
+        private sealed class ToolTipHotspot
+        {
+            public Rect Bounds
+            {
+                get;
+                set;
+            }
+
+            public string ToolTipText
+            {
+                get;
+                set;
+            }
+
+            public IList<TextMessageBlock.ToolTipLine> ToolTipLines
+            {
+                get;
+                set;
             }
         }
 

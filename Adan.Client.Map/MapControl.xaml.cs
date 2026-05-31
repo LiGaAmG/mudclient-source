@@ -124,11 +124,18 @@ namespace Adan.Client.Map
         /// <summary>
         /// Gets or sets the route manager.
         /// </summary>
-        /// <value>
-        /// The route manager.
-        /// </value>
         [NotNull]
         public RouteManager RouteManager
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Gets or sets the herb manager.
+        /// </summary>
+        [CanBeNull]
+        public HerbManager HerbManager
         {
             get;
             set;
@@ -144,6 +151,7 @@ namespace Adan.Client.Map
             Assert.ArgumentNotNull(newZone, "newZone");
 
             RouteManager?.UpdateCurrentRoom(currentRoom, newZone);
+            HerbManager?.UpdateCurrentRoom(currentRoom, newZone);
 
             var actionToExecute = (Action)(() =>
             {
@@ -165,7 +173,9 @@ namespace Adan.Client.Map
         {
             Assert.ArgumentNotNull(newZone, "newZone");
 
-            RouteManager?.UpdateCurrentRoom(newZone.AllRooms.FirstOrDefault(r => r.RoomId == currentRoom), newZone);
+            var roomVm = newZone.AllRooms.FirstOrDefault(r => r.RoomId == currentRoom);
+            RouteManager?.UpdateCurrentRoom(roomVm, newZone);
+            HerbManager?.UpdateCurrentRoom(roomVm, newZone);
 
             var actionToExecute = (Action)(() =>
             {
@@ -187,6 +197,7 @@ namespace Adan.Client.Map
             if (ViewModel != null)
             {
                 RouteManager?.UpdateCurrentRoom(currentRoom, ViewModel);
+                HerbManager?.UpdateCurrentRoom(currentRoom, ViewModel);
             }
 
             var actionToExecute = (Action)(() =>
@@ -209,7 +220,9 @@ namespace Adan.Client.Map
         {
             if (ViewModel != null)
             {
-                RouteManager?.UpdateCurrentRoom(ViewModel.AllRooms.FirstOrDefault(r => r.RoomId == currentRoom), ViewModel);
+                var roomVm = ViewModel.AllRooms.FirstOrDefault(r => r.RoomId == currentRoom);
+                RouteManager?.UpdateCurrentRoom(roomVm, ViewModel);
+                HerbManager?.UpdateCurrentRoom(roomVm, ViewModel);
             }
 
             var actionToExecute = (Action)(() =>

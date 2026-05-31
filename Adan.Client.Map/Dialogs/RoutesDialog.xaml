@@ -55,6 +55,11 @@
                 Click="HandlePrintHelpClicked"/>
         <Button Margin="5"
                 Padding="5"
+                Content="Сгенерировать маршруты"
+                HorizontalAlignment="Stretch"
+                Click="HandleGenerateRoutesClicked"/>
+        <Button Margin="5"
+                Padding="5"
                 Content="{x:Static Properties:Resources.RoutesCancel}"
                 HorizontalAlignment="Stretch"
                 IsCancel="True"/>

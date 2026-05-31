@@ -243,9 +243,8 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
                 SecondsLeft = 0;
             }
 
-            var iconIndex = AffectDescription.AffectNames.IndexOf(affect.Name);
             var oldDisplayIcon = DisplayIcon;
-            DisplayIcon = iconIndex >= 0 ? AffectDescription.Icons[iconIndex] : string.Empty;
+            DisplayIcon = AffectDescription.GetIcon(affect.Name);
             if (string.IsNullOrEmpty(oldDisplayIcon) && !string.IsNullOrEmpty(DisplayIcon))
             {
                 OnPropertyChanged("Priority");

@@ -209,6 +209,8 @@
                 ScrollBuffer = 5000,
                 IsLogCommands = false,
                 AutoConnect = true,
+                Socks5ProxyHost = string.Empty,
+                Socks5ProxyPort = 0,
                 MainWindowLeft = 0,
                 MainWindowTop = 0,
                 MainWindowWidth = 800,

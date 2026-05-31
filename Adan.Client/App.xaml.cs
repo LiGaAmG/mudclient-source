@@ -33,6 +33,7 @@ namespace Adan.Client
         {
             Thread.CurrentThread.CurrentCulture=new CultureInfo("RU-RU");
             Thread.CurrentThread.CurrentUICulture= new CultureInfo("RU-RU");
+
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
         }

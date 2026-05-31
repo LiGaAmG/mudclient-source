@@ -39,6 +39,7 @@ namespace Adan.Client.ViewModel
         private readonly IEnumerable<GroupViewModel> _allGroups;
         private readonly IEnumerable<ActionDescription> _actionDescriptions;
         private AliasViewModel _selectedAlias;
+        private string _searchText = string.Empty;
 
         #endregion
 
@@ -64,6 +65,42 @@ namespace Adan.Client.ViewModel
         #endregion
 
         #region Properties
+
+        public string SearchText
+        {
+            get { return _searchText; }
+            set
+            {
+                _searchText = value ?? string.Empty;
+                OnPropertyChanged("SearchText");
+                OnPropertyChanged("FilteredAliases");
+                OnPropertyChanged("IsSearchActive");
+                OnPropertyChanged("IsGroupedViewVisible");
+            }
+        }
+
+        public bool IsSearchActive
+        {
+            get { return !string.IsNullOrEmpty(_searchText); }
+        }
+
+        public bool IsGroupedViewVisible
+        {
+            get { return string.IsNullOrEmpty(_searchText); }
+        }
+
+        public IEnumerable<AliasViewModel> FilteredAliases
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_searchText))
+                    return Enumerable.Empty<AliasViewModel>();
+                var lower = _searchText.ToLowerInvariant();
+                return Groups.SelectMany(g => g.Aliases)
+                             .Where(a => a.Command.ToLowerInvariant().Contains(lower)
+                                      || a.ActionsViewModel.ActionsDescription.ToLowerInvariant().Contains(lower));
+            }
+        }
 
         /// <summary>
         /// Gets the add alias command.

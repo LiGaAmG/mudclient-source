@@ -31,6 +31,7 @@ namespace Adan.Client.ViewModel
 
         private readonly IEnumerable<GroupViewModel> _allGroups;
         private HighlightViewModel _selectedHighlight;
+        private string _searchText = string.Empty;
 
         #endregion
 
@@ -53,6 +54,41 @@ namespace Adan.Client.ViewModel
         #endregion
 
         #region Properties
+
+        public string SearchText
+        {
+            get { return _searchText; }
+            set
+            {
+                _searchText = value ?? string.Empty;
+                OnPropertyChanged("SearchText");
+                OnPropertyChanged("FilteredHighlights");
+                OnPropertyChanged("IsSearchActive");
+                OnPropertyChanged("IsGroupedViewVisible");
+            }
+        }
+
+        public bool IsSearchActive
+        {
+            get { return !string.IsNullOrEmpty(_searchText); }
+        }
+
+        public bool IsGroupedViewVisible
+        {
+            get { return string.IsNullOrEmpty(_searchText); }
+        }
+
+        public IEnumerable<HighlightViewModel> FilteredHighlights
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_searchText))
+                    return Enumerable.Empty<HighlightViewModel>();
+                var lower = _searchText.ToLowerInvariant();
+                return Groups.SelectMany(g => g.Highlights)
+                             .Where(h => h.TextToHighlight.ToLowerInvariant().Contains(lower));
+            }
+        }
 
         /// <summary>
         /// Gets the add highlight command.

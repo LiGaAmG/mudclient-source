@@ -45,6 +45,8 @@
                 <RowDefinition />
                 <RowDefinition />
                 <RowDefinition />
+                <RowDefinition />
+                <RowDefinition />
             </Grid.RowDefinitions>
             <TextBlock Text="{x:Static Properties:Resources.RoomAlias}"
                        Foreground="{DynamicResource TextBrush}"
@@ -136,6 +138,50 @@
                        Margin="5,5,5,0"
                        Grid.Row="3"
                        Grid.Column="1" />
+            <!-- Herb checkbox -->
+            <TextBlock Text="Трава:"
+                       Foreground="{DynamicResource TextBrush}"
+                       FontSize="14"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="5,5,0,0"
+                       VerticalAlignment="Center"
+                       Grid.Row="4"
+                       Grid.Column="0" />
+            <CheckBox Grid.Row="4"
+                      Grid.Column="1"
+                      Margin="5,5,0,0"
+                      VerticalAlignment="Center"
+                      Content="Есть трава"
+                      Foreground="{DynamicResource TextBrush}"
+                      IsChecked="{Binding Path=HasHerb, Mode=TwoWay}" />
+
+            <!-- Herb danger level — visible only when HasHerb = true -->
+            <TextBlock Text="Опасность:"
+                       Foreground="{DynamicResource TextBrush}"
+                       FontSize="14"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="5,5,0,5"
+                       VerticalAlignment="Center"
+                       Grid.Row="5"
+                       Grid.Column="0"
+                       Visibility="{Binding Path=HerbControlsVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <StackPanel Grid.Row="5"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Margin="5,5,0,5"
+                        Visibility="{Binding Path=HerbControlsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <RadioButton Content="Безопасная"
+                             Foreground="{DynamicResource TextBrush}"
+                             Margin="0,0,8,0"
+                             IsChecked="{Binding Path=HerbDangerLevel, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Safe}" />
+                <RadioButton Content="Опасная"
+                             Foreground="{DynamicResource TextBrush}"
+                             Margin="0,0,8,0"
+                             IsChecked="{Binding Path=HerbDangerLevel, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Dangerous}" />
+                <RadioButton Content="Очень опасная"
+                             Foreground="{DynamicResource TextBrush}"
+                             IsChecked="{Binding Path=HerbDangerLevel, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=VeryDangerous}" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="5,10,5,0">

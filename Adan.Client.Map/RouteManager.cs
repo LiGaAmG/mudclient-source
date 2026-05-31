@@ -598,16 +598,46 @@
                 return false;
             }
 
-            var routesContainingCurrentRoom = _allRoutes.Where(r => r.RoomIdentifiersSet.Contains(_currentRoom.RoomId));
+            var routesContainingCurrentRoom = _allRoutes.Where(r => r.RoomIdentifiersSet.Contains(_currentRoom.RoomId)).ToList();
             if (!routesContainingCurrentRoom.Any())
             {
                 _rootModel.PushMessageToConveyor(new ErrorMessage(Resources.RoutesAreNotAvailable));
                 return false;
             }
 
-            if (!(routesContainingCurrentRoom.Any(r => r.RoutePointsAvailableFromStart.ContainsKey(selectedRouteDestination))
-                || routesContainingCurrentRoom.Any(r => r.RoutePointsAvailableFromEnd.ContainsKey(selectedRouteDestination))))
+            // Exact match
+            bool exactMatch = routesContainingCurrentRoom.Any(r => r.RoutePointsAvailableFromStart.ContainsKey(selectedRouteDestination))
+                           || routesContainingCurrentRoom.Any(r => r.RoutePointsAvailableFromEnd.ContainsKey(selectedRouteDestination));
+
+            if (!exactMatch)
             {
+                // Substring match across all available destinations
+                var matches = AvailableDestinations
+                    .Where(d => d.IndexOf(selectedRouteDestination, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToList();
+
+                if (matches.Count == 1)
+                {
+                    return GotoDestination(matches[0]);
+                }
+
+                if (matches.Count > 1)
+                {
+                    // Open dialog with pre-filled filter so user can pick
+                    var dialog = new Dialogs.RouteDestinationSelectDialog
+                    {
+                        Owner = _mainWindow,
+                        DataContext = this,
+                        InitialFilter = selectedRouteDestination
+                    };
+                    var res = dialog.ShowDialog();
+                    if (res.HasValue && res.Value && !string.IsNullOrEmpty(SelectedRouteDestination))
+                    {
+                        return GotoDestination(SelectedRouteDestination);
+                    }
+                    return false;
+                }
+
                 _rootModel.PushMessageToConveyor(new ErrorMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetIsNotAvailable, selectedRouteDestination)));
                 return false;
             }
@@ -651,6 +681,46 @@
 
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteStopped, TextColor.BrightYellow));
             _currentRouteTarget = string.Empty;
+        }
+
+        /// <summary>
+        /// Generates routes for all zones using BFS and reloads them.
+        /// </summary>
+        public void GenerateRoutes()
+        {
+            if (_rootModel == null) return;
+
+            var zonesDir = Path.Combine(GetMapsFolder(), "MapGenerator", "MapResults");
+            if (!Directory.Exists(zonesDir))
+            {
+                _rootModel.PushMessageToConveyor(new ErrorMessage($"Папка с зонами не найдена: {zonesDir}"));
+                return;
+            }
+
+            _rootModel.PushMessageToConveyor(new InfoMessage("Генерация маршрутов... подождите.", TextColor.BrightYellow));
+
+            RouteGenerationResult result;
+            try
+            {
+                result = RouteGenerator.Generate(zonesDir, _allRoutes);
+            }
+            catch (Exception ex)
+            {
+                _rootModel.PushMessageToConveyor(new ErrorMessage($"Ошибка генерации маршрутов: {ex.Message}"));
+                return;
+            }
+
+            _allRoutes = result.AllRoutes;
+            RebuildRouteIndexes();
+            UpdateCurrentZoneRooms();
+            SaveRoutes();
+
+            _rootModel.PushMessageToConveyor(new InfoMessage(
+                $"Маршруты сгенерированы: было {result.OriginalRouteCount}, добавлено {result.NewRouteCount}, итого {result.AllRoutes.Count}.",
+                TextColor.BrightYellow));
+            _rootModel.PushMessageToConveyor(new InfoMessage(
+                $"Зон всего: {result.ZonesTotal}. Уже было покрыто: {result.ZonesCoveredBefore}. Новых зон охвачено: {result.ZonesNewlyCovered}. Без маршрутов: {result.ZonesUncovered}.",
+                TextColor.BrightYellow));
         }
 
         /// <summary>

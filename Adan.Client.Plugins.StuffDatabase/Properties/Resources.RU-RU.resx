@@ -318,6 +318,18 @@
   <data name="LoreCommentCommand" xml:space="preserve">
     <value>лорк</value>
   </data>
+  <data name="LoreDropCommand" xml:space="preserve">
+    <value>лорд</value>
+  </data>
+  <data name="LoreDropError" xml:space="preserve">
+    <value>Невозможно добавить место дропа. Сначала найдите нужный предмет.</value>
+  </data>
+  <data name="LoreDropHelp" xml:space="preserve">
+    <value>лорд монстр, зона — добавить место дропа. лорд удалить N — удалить место дропа #N.</value>
+  </data>
+  <data name="LoreAllCommandsHelp" xml:space="preserve">
+    <value>Команды лора: лор &lt;название&gt; — поиск | лорк &lt;текст&gt; — комментарий | лорд &lt;монстр&gt;, &lt;зона&gt; — добавить дроп | лорд удалить N — удалить дроп | лорсправка — полная справка</value>
+  </data>
   <data name="LoreHelpCommand" xml:space="preserve">
     <value>лорсправка</value>
   </data>

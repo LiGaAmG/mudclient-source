@@ -93,6 +93,23 @@
             }
         }
 
+        private int _monsterId;
+        public int MonsterId
+        {
+            get { return _monsterId; }
+            set
+            {
+                _monsterId = value;
+                OnPropertyChanged("MonsterId");
+                OnPropertyChanged("MonsterIdLabel");
+            }
+        }
+
+        public string MonsterIdLabel
+        {
+            get { return "id" + _monsterId; }
+        }
+
         /// <summary>
         /// Updates this view model from model.
         /// </summary>

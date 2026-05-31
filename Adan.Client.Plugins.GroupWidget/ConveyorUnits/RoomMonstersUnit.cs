@@ -66,6 +66,14 @@
 
                 _monstersWidgetControl.PreviousMonster();
             }
+            else if (textCommand.CommandText.StartsWith("#testmonster", System.StringComparison.InvariantCulture))
+            {
+                textCommand.Handled = true;
+
+                var msg = new Messages.RoomMonstersMessage();
+                msg.Monsters.Add(new Common.Model.MonsterStatus { Name = "Пигмей-маг" });
+                Conveyor.PushMessage(msg);
+            }
         }
     }
 }

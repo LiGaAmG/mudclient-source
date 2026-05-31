@@ -318,6 +318,18 @@
   <data name="LoreCommentCommand" xml:space="preserve">
     <value>lorec</value>
   </data>
+  <data name="LoreDropCommand" xml:space="preserve">
+    <value>lored</value>
+  </data>
+  <data name="LoreDropError" xml:space="preserve">
+    <value>Cannot add drop location. Find required object first.</value>
+  </data>
+  <data name="LoreDropHelp" xml:space="preserve">
+    <value>lored monster, zone — add drop location. lored del N — remove drop location #N.</value>
+  </data>
+  <data name="LoreAllCommandsHelp" xml:space="preserve">
+    <value>Lore commands: lore &lt;name&gt; — search DB | lorec &lt;text&gt; — add comment | lored &lt;monster&gt;, &lt;zone&gt; — add drop | lored del N — remove drop | lorehelp — full help</value>
+  </data>
   <data name="LoreHelpCommand" xml:space="preserve">
     <value>lorehelp</value>
   </data>

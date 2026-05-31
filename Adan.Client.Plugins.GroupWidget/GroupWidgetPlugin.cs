@@ -36,6 +36,7 @@
         /// </summary>
         public GroupWidgetPlugin()
         {
+            Settings.Default.EnsureAllKnownAffectsSelected();
             _viewModel = new GroupStatusViewModel();
             _groupWidgetControl = new GroupWidgetControl { DataContext = _viewModel };
         }

@@ -26,6 +26,19 @@ namespace Adan.Client.Plugins.StuffDatabase.Messages
     using Adan.Client.Plugins.StuffDatabase.Model;
 
     /// <summary>
+    /// A single drop location entry: monster name + zone.
+    /// </summary>
+    [Serializable]
+    public class DropLocation
+    {
+        [XmlAttribute]
+        public string Monster { get; set; }
+
+        [XmlAttribute]
+        public string Zone { get; set; }
+    }
+
+    /// <summary>
     /// Message containing stats of some object.
     /// </summary>
     [Serializable]
@@ -39,6 +52,7 @@ namespace Adan.Client.Plugins.StuffDatabase.Messages
         private readonly List<string> _noFlags;
         private readonly List<ScrollOrPotionSpell> _scrollOrPotionSpells;
         private readonly List<AppliedAffect> _appliedAffects;
+        private readonly List<DropLocation> _dropLocations;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LoreMessage"/> class.
@@ -57,6 +71,7 @@ namespace Adan.Client.Plugins.StuffDatabase.Messages
             _noFlags = new List<string>();
             _scrollOrPotionSpells = new List<ScrollOrPotionSpell>();
             _appliedAffects = new List<AppliedAffect>();
+            _dropLocations = new List<DropLocation>();
             ItemSetAffects = new ItemSetAffects();
         }
 
@@ -436,6 +451,17 @@ namespace Adan.Client.Plugins.StuffDatabase.Messages
         }
 
         /// <summary>
+        /// Gets the list of drop locations (monster + zone) where this item was found.
+        /// </summary>
+        [NotNull]
+        [XmlArray("DropLocations")]
+        [XmlArrayItem("Drop")]
+        public List<DropLocation> DropLocations
+        {
+            get { return _dropLocations; }
+        }
+
+        /// <summary>
         /// Gets or sets the comments.
         /// </summary>
         /// <value>
@@ -571,6 +597,15 @@ namespace Adan.Client.Plugins.StuffDatabase.Messages
                             .Select(appliedAffect => appliedAffect.ConvertToInfoMessage()));
                     }
                 }
+            }
+
+            if (_dropLocations.Any())
+            {
+                var drops = string.Join("; ", _dropLocations.Select(d =>
+                    string.IsNullOrEmpty(d.Zone) ? d.Monster : d.Monster + " (" + d.Zone + ")"));
+                var dropMsg = new InfoMessage("Падает с: ", TextColor.BrightWhite);
+                dropMsg.AppendText(drops, TextColor.BrightYellow);
+                result.Add(dropMsg);
             }
 
             if (!string.IsNullOrEmpty(Comments))

@@ -104,6 +104,7 @@
     <Compile Include="Model\AdditionalRoomParameters.cs" />
     <Compile Include="Model\ExitDirection.cs" />
     <Compile Include="Model\Room.cs" />
+    <Compile Include="Model\HerbDangerLevel.cs" />
     <Compile Include="Model\RoomColor.cs" />
     <Compile Include="Model\RoomExit.cs" />
     <Compile Include="Model\RoomIcon.cs" />
@@ -135,9 +136,13 @@
     <Compile Include="Dialogs\RoomEditDialog.xaml.cs">
       <DependentUpon>RoomEditDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="HerbManager.cs" />
+    <Compile Include="RouteGenerator.cs" />
     <Compile Include="RouteManager.cs" />
     <Compile Include="RoutePathElement.cs" />
+    <Compile Include="ConveyorUnits\HerbUnit.cs" />
     <Compile Include="ConveyorUnits\RouteUnit.cs" />
+    <Compile Include="Utils\EnumToBoolConverter.cs" />
     <Compile Include="ViewModel\RoomExitViewModel.cs" />
     <Compile Include="ViewModel\RoomViewModel.cs" />
     <Compile Include="ViewModel\ZoneViewModel.cs" />

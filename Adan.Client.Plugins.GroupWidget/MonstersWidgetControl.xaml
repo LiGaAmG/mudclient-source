@@ -93,6 +93,15 @@
                                    Visibility="{Binding DisplayNumber, Converter={StaticResource BooleanToVisibilityConverter}}"
                                    Margin="0,0,0,2"
                                     />
+                        <TextBlock Text="{Binding MonsterIdLabel}"
+                                   Width="30"
+                                   FontSize="9pt"
+                                   FontFamily="Lucida Console"
+                                   VerticalAlignment="Bottom"
+                                   HorizontalAlignment="Left"
+                                   Foreground="#FF00CCCC"
+                                   Margin="0,0,0,2"
+                                    />
                         <StackPanel Width="140" Orientation="Horizontal">
                             <TextBlock Text="{Binding Name}"
                                    FontSize="12pt"

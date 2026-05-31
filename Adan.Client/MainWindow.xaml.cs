@@ -20,13 +20,18 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using Adan.Client.Resources.AvalonDock;
 using Xceed.Wpf.AvalonDock.Layout;
 using Xceed.Wpf.AvalonDock.Layout.Serialization;
@@ -46,8 +51,31 @@ namespace Adan.Client
         private readonly IList<RootModel> _allRootModels = new List<RootModel>();
 
         private WindowState _nonFullScreenWindowState;
+        private IntPtr _smallIconHandle = IntPtr.Zero;
+        private IntPtr _largeIconHandle = IntPtr.Zero;
+
+        private const int WM_SETICON = 0x0080;
+        private const int ICON_SMALL = 0;
+        private const int ICON_BIG = 1;
 
         #endregion
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool DestroyIcon(IntPtr hIcon);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr CopyIcon(IntPtr hIcon);
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        private static extern uint ExtractIconEx(
+            string lpszFile,
+            int nIconIndex,
+            IntPtr[] phiconLarge,
+            IntPtr[] phiconSmall,
+            uint nIcons);
 
         #region Constructors
         /// <summary>
@@ -56,6 +84,13 @@ namespace Adan.Client
         public MainWindow()
         {
             InitializeComponent();
+            try
+            {
+                Icon = new BitmapImage(new Uri("pack://application:,,,/icon.ico", UriKind.Absolute));
+            }
+            catch
+            {
+            }
 
             //Load all types for deserialization
             var types = new List<Type>
@@ -172,6 +207,87 @@ namespace Adan.Client
         }
 
         #endregion
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            ApplyTaskbarIcons();
+        }
+
+        private void ApplyTaskbarIcons()
+        {
+            try
+            {
+                var executablePath = Assembly.GetExecutingAssembly().Location;
+                var largeIcons = new IntPtr[1];
+                var smallIcons = new IntPtr[1];
+                var extracted = ExtractIconEx(executablePath, 0, largeIcons, smallIcons, 1);
+                if (extracted > 0)
+                {
+                    _largeIconHandle = largeIcons[0];
+                    _smallIconHandle = smallIcons[0];
+                }
+
+                if (_largeIconHandle == IntPtr.Zero || _smallIconHandle == IntPtr.Zero)
+                {
+                    using (var associatedIcon = System.Drawing.Icon.ExtractAssociatedIcon(executablePath))
+                    {
+                        if (associatedIcon == null)
+                        {
+                            return;
+                        }
+
+                        using (var smallIcon = new System.Drawing.Icon(associatedIcon, new System.Drawing.Size(16, 16)))
+                        using (var largeIcon = new System.Drawing.Icon(associatedIcon, new System.Drawing.Size(32, 32)))
+                        {
+                            if (_smallIconHandle == IntPtr.Zero)
+                            {
+                                _smallIconHandle = CopyIcon(smallIcon.Handle);
+                            }
+
+                            if (_largeIconHandle == IntPtr.Zero)
+                            {
+                                _largeIconHandle = CopyIcon(largeIcon.Handle);
+                            }
+                        }
+                    }
+                }
+
+                var windowHandle = new WindowInteropHelper(this).Handle;
+                if (windowHandle == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                if (_smallIconHandle != IntPtr.Zero)
+                {
+                    SendMessage(windowHandle, WM_SETICON, new IntPtr(ICON_SMALL), _smallIconHandle);
+                }
+
+                if (_largeIconHandle != IntPtr.Zero)
+                {
+                    SendMessage(windowHandle, WM_SETICON, new IntPtr(ICON_BIG), _largeIconHandle);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private void ReleaseTaskbarIcons()
+        {
+            if (_smallIconHandle != IntPtr.Zero)
+            {
+                DestroyIcon(_smallIconHandle);
+                _smallIconHandle = IntPtr.Zero;
+            }
+
+            if (_largeIconHandle != IntPtr.Zero)
+            {
+                DestroyIcon(_largeIconHandle);
+                _largeIconHandle = IntPtr.Zero;
+            }
+        }
 
         private void HandleSettingsError(object sender, SettingsErrorEventArgs e)
         {
@@ -660,7 +776,9 @@ namespace Adan.Client
             var connectionDialogViewModel = new ConnectionDialogViewModel
             {
                 HostName = SettingsHolder.Instance.Settings.ConnectHostName,
-                Port = SettingsHolder.Instance.Settings.ConnectPort
+                Port = SettingsHolder.Instance.Settings.ConnectPort,
+                ProxyHost = SettingsHolder.Instance.Settings.Socks5ProxyHost,
+                ProxyPort = SettingsHolder.Instance.Settings.Socks5ProxyPort,
             };
 
             var dialog = new ConnectionDialog { DataContext = connectionDialogViewModel, Owner = this };
@@ -670,6 +788,8 @@ namespace Adan.Client
             {
                 SettingsHolder.Instance.Settings.ConnectHostName = connectionDialogViewModel.HostName;
                 SettingsHolder.Instance.Settings.ConnectPort = connectionDialogViewModel.Port;
+                SettingsHolder.Instance.Settings.Socks5ProxyHost = connectionDialogViewModel.ProxyHost;
+                SettingsHolder.Instance.Settings.Socks5ProxyPort = connectionDialogViewModel.ProxyPort;
             }
         }
 
@@ -811,6 +931,7 @@ namespace Adan.Client
 
             SaveAllSettings();
             PluginHost.Instance.Dispose();
+            ReleaseTaskbarIcons();
             base.OnClosing(e);
         }
 
@@ -890,3 +1011,5 @@ namespace Adan.Client
         }
     }
 }
+
+

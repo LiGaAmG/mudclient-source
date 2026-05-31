@@ -40,6 +40,7 @@
         [CanBeNull]
         private readonly Window _mainWindow;
         private readonly RouteManager _routeManger;
+        private readonly HerbManager _herbManager;
         private readonly ConcurrentDictionary<int, ZoneViewModel> _loadedZones = new ConcurrentDictionary<int, ZoneViewModel>();
         private readonly Timer _timer;
 
@@ -52,13 +53,14 @@
         /// <param name="mapControl">The map control.</param>
         /// <param name="MainWindowEx">The main window.</param>
         /// <param name="routeManger">The route manger.</param>
-        public ZoneManager([CanBeNull] MapControl mapControl, [CanBeNull] Window MainWindowEx, [NotNull] RouteManager routeManger)
+        public ZoneManager([CanBeNull] MapControl mapControl, [CanBeNull] Window MainWindowEx, [NotNull] RouteManager routeManger, [CanBeNull] HerbManager herbManager = null)
         {
             Assert.ArgumentNotNull(routeManger, "routeManger");
 
             _mapControl = mapControl;
             _mainWindow = MainWindowEx;
             _routeManger = routeManger;
+            _herbManager = herbManager;
             _emptyZone = new ZoneViewModel(new Zone { Id = -1000 }, Enumerable.Empty<AdditionalRoomParameters>()) { ZoomLevel = Settings.Default.MapZoomLevel };
             _timer = new Timer(15000) { AutoReset = false };
             _timer.Elapsed += _timer_Elapsed;
@@ -264,6 +266,12 @@
         /// 
         /// </summary>
         /// <param name="zoneHolder"></param>
+        public string GetZoneName(int zoneId)
+        {
+            var zone = GetZone(zoneId);
+            return zone?.Name ?? string.Empty;
+        }
+
         public void UpdateControl(ZoneHolder zoneHolder)
         {
             if (_mapControl?.ViewModel != null && _mapControl.ViewModelUid == zoneHolder.Uid)
@@ -390,8 +398,8 @@
                 }
                 zoneViewModel = new ZoneViewModel(loadedZone, zoneVisits);
                 _loadedZones.TryAdd(zoneId, zoneViewModel);
+                _herbManager?.RegisterZoneWaypoints(zoneViewModel);
             }
-
 
             return zoneViewModel;
         }
@@ -419,6 +427,48 @@
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Scans all ZoneVisits XML files and returns herb room IDs grouped by zone,
+        /// filtered by max danger level.
+        /// </summary>
+        public List<KeyValuePair<int, List<int>>> ScanAllHerbRooms(Model.HerbDangerLevel maxLevel)
+        {
+            var result = new List<KeyValuePair<int, List<int>>>();
+            var visitsFolder = GetZoneVisitsFolder();
+            if (!Directory.Exists(visitsFolder))
+                return result;
+
+            foreach (var file in Directory.GetFiles(visitsFolder, "*.xml"))
+            {
+                var fileName = Path.GetFileNameWithoutExtension(file);
+                if (!int.TryParse(fileName, out int zoneId))
+                    continue;
+
+                try
+                {
+                    List<AdditionalRoomParameters> roomParams;
+                    using (var stream = File.OpenRead(file))
+                    {
+                        roomParams = (List<AdditionalRoomParameters>)AdditionalRoomParametersSerializer.Deserialize(stream);
+                    }
+
+                    var herbRooms = roomParams
+                        .Where(p => p.HasHerb && (int)p.HerbDangerLevel <= (int)maxLevel)
+                        .Select(p => p.RoomId)
+                        .ToList();
+
+                    if (herbRooms.Count > 0)
+                        result.Add(new KeyValuePair<int, List<int>>(zoneId, herbRooms));
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.Instance.Write($"HerbScan: error reading {file}: {ex.Message}");
+                }
+            }
+
+            return result;
         }
 
         private void SaveAdditionalRoomParameters([NotNull] ZoneViewModel zoneViewModel)

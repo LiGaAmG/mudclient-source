@@ -407,7 +407,7 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             {
                 foreach (var affectViewModel in Affects)
                 {
-                    if (affectViewModel.AffectDescription.AffectNames.Contains(affect.Name))
+                    if (affectViewModel.AffectDescription.Matches(affect.Name))
                     {
                         affectViewModel.UpdateFromModel(affect);
                         _notProcessedAffects.Remove(affectViewModel);

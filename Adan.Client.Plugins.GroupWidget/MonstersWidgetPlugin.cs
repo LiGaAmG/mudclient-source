@@ -36,6 +36,7 @@
         /// </summary>
         public MonstersWidgetPlugin()
         {
+            Settings.Default.EnsureAllKnownAffectsSelected();
             _viewModel = new RoomMonstersViewModel();
             _monstersWidgetControl = new MonstersWidgetControl { DataContext = _viewModel };
         }

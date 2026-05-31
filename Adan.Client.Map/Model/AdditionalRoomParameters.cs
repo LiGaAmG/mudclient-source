@@ -113,6 +113,27 @@ namespace Adan.Client.Map.Model
             set;
         }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether this room contains herbs.
+        /// </summary>
+        [XmlAttribute]
+        public bool HasHerb
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Gets or sets the danger level of this herb room.
+        /// Only meaningful when <see cref="HasHerb"/> is <c>true</c>.
+        /// </summary>
+        [XmlAttribute]
+        public HerbDangerLevel HerbDangerLevel
+        {
+            get;
+            set;
+        }
+
         [XmlIgnore]
         public bool HasChanges
         {
@@ -141,6 +162,8 @@ namespace Adan.Client.Map.Model
                            RoomAlias = RoomAlias,
                            RoomId = RoomId,
                            HasChanges = HasChanges,
+                           HasHerb = HasHerb,
+                           HerbDangerLevel = HerbDangerLevel,
                        };
         }
     }

@@ -35,7 +35,7 @@ namespace Adan.Client.Common.Messages
 
             // need to deep copy original message to prevent double substitution for example.
             var blocks = originalMessage.MessageBlocks.Select(
-                textMessageBlock => new TextMessageBlock(textMessageBlock.Text, textMessageBlock.Foreground, textMessageBlock.Background)).ToList();
+                textMessageBlock => new TextMessageBlock(textMessageBlock.Text, textMessageBlock.Foreground, textMessageBlock.Background, textMessageBlock.ToolTipText, textMessageBlock.ToolTipLines)).ToList();
 
             MessageBlocks = blocks;
             _isInnerTextComputed = false;
@@ -49,7 +49,7 @@ namespace Adan.Client.Common.Messages
         {
             Assert.ArgumentNotNull(messageBlocks, "messageBlocks");
 
-            MessageBlocks = messageBlocks.Select(block => new TextMessageBlock(block.Text, block.Foreground, block.Background)).ToList();
+            MessageBlocks = messageBlocks.Select(block => new TextMessageBlock(block.Text, block.Foreground, block.Background, block.ToolTipText, block.ToolTipLines)).ToList();
             _isInnerTextComputed = false;
         }
 
@@ -207,12 +207,12 @@ namespace Adan.Client.Common.Messages
             var indexInEndBlock = start + length - count;
 
             if (indexInStartBlock > 0)
-                blocks.Add(new TextMessageBlock(MessageBlocks[startBlock].Text.Substring(0, indexInStartBlock), MessageBlocks[startBlock].Foreground, MessageBlocks[startBlock].Background));
+                blocks.Add(new TextMessageBlock(MessageBlocks[startBlock].Text.Substring(0, indexInStartBlock), MessageBlocks[startBlock].Foreground, MessageBlocks[startBlock].Background, MessageBlocks[startBlock].ToolTipText, MessageBlocks[startBlock].ToolTipLines));
 
             blocks.Add(new TextMessageBlock(InnerText.Substring(start, length), foreground, background));
 
             if (indexInEndBlock < MessageBlocks[endBlock].Text.Length)
-                blocks.Add(new TextMessageBlock(MessageBlocks[endBlock].Text.Substring(indexInEndBlock), MessageBlocks[endBlock].Foreground, MessageBlocks[endBlock].Background));
+                blocks.Add(new TextMessageBlock(MessageBlocks[endBlock].Text.Substring(indexInEndBlock), MessageBlocks[endBlock].Foreground, MessageBlocks[endBlock].Background, MessageBlocks[endBlock].ToolTipText, MessageBlocks[endBlock].ToolTipLines));
 
             MessageBlocks.RemoveRange(startBlock, endBlock + 1 - startBlock);
             MessageBlocks.InsertRange(startBlock, blocks);
@@ -265,12 +265,12 @@ namespace Adan.Client.Common.Messages
             var indexInEndBlock = start + length - count;
 
             if (indexInStartBlock > 0)
-                blocks.Add(new TextMessageBlock(MessageBlocks[startBlock].Text.Substring(0, indexInStartBlock), MessageBlocks[startBlock].Foreground, MessageBlocks[startBlock].Background));
+                blocks.Add(new TextMessageBlock(MessageBlocks[startBlock].Text.Substring(0, indexInStartBlock), MessageBlocks[startBlock].Foreground, MessageBlocks[startBlock].Background, MessageBlocks[startBlock].ToolTipText, MessageBlocks[startBlock].ToolTipLines));
 
             blocks.Add(new TextMessageBlock(text, MessageBlocks[startBlock].Foreground, MessageBlocks[startBlock].Background));
 
             if (indexInEndBlock < MessageBlocks[endBlock].Text.Length)
-                blocks.Add(new TextMessageBlock(MessageBlocks[endBlock].Text.Substring(indexInEndBlock), MessageBlocks[endBlock].Foreground, MessageBlocks[endBlock].Background));
+                blocks.Add(new TextMessageBlock(MessageBlocks[endBlock].Text.Substring(indexInEndBlock), MessageBlocks[endBlock].Foreground, MessageBlocks[endBlock].Background, MessageBlocks[endBlock].ToolTipText, MessageBlocks[endBlock].ToolTipLines));
 
             MessageBlocks.RemoveRange(startBlock, endBlock + 1 - startBlock);
             MessageBlocks.InsertRange(startBlock, blocks);

@@ -331,6 +331,17 @@
         }
 
         /// <summary>
+        /// Maps monster ID (assigned by GroupWidget) to its current MonsterStatus.
+        /// Updated by GroupWidget on each monster list update.
+        /// </summary>
+        public Dictionary<int, MonsterStatus> MonsterIdMap { get; } = new Dictionary<int, MonsterStatus>();
+
+        /// <summary>
+        /// Current zone name — updated by the map plugin when zone changes.
+        /// </summary>
+        public string CurrentZoneName { get; set; } = string.Empty;
+
+        /// <summary>
         /// Gets the room monsters status.
         /// </summary>
         [NotNull]
@@ -456,6 +467,18 @@
                 return DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
             }
 
+            if (variableName.StartsWith("MonsterID", StringComparison.OrdinalIgnoreCase))
+            {
+                return GetMonsterIdTarget(variableName);
+            }
+
+            if (variableName.Equals("MonsterLast", StringComparison.OrdinalIgnoreCase))
+            {
+                if (RoomMonstersStatus.Count == 0)
+                    return string.Empty;
+                return GetMonsterOrGroupMateTarget("Monster" + RoomMonstersStatus.Count, "Monster", SelectedRoomMonster, RoomMonstersStatus);
+            }
+
             if (variableName.StartsWith("Monster", StringComparison.OrdinalIgnoreCase))
             {
                 return GetMonsterOrGroupMateTarget(variableName, "Monster", SelectedRoomMonster, RoomMonstersStatus);
@@ -486,6 +509,34 @@
             }
 
             return variablesList.Count > 0 ? variablesList[variablesList.Count - 1].Value : ("$" + variableName);
+        }
+
+        private string GetMonsterIdTarget(string variableName)
+        {
+            var idStr = variableName.Substring("MonsterID".Length).Trim();
+            int monsterId;
+            if (!int.TryParse(idStr, out monsterId))
+                return string.Empty;
+
+            MonsterStatus target;
+            if (!MonsterIdMap.TryGetValue(monsterId, out target))
+                return string.Empty;
+
+            if (string.IsNullOrEmpty(target.Name))
+                return string.Empty;
+
+            // Compute current game targeting name (e.g. "2.слизень" if it's the 2nd one now)
+            int prefix = 1;
+            foreach (var monster in RoomMonstersStatus)
+            {
+                if (monster == target)
+                    break;
+                if (monster.Name == target.Name)
+                    prefix++;
+            }
+
+            var baseName = target.Name.Replace(' ', '.');
+            return prefix > 1 ? prefix + "." + baseName : baseName;
         }
 
         private string GetMonsterOrGroupMateTarget(string variableName, string prefix, CharacterStatus selectedCharacter, IEnumerable<CharacterStatus> characters)
@@ -543,10 +594,10 @@
 
             if (targetNamePrefix > 1)
             {
-                return targetNamePrefix + "." + monsterFirstWordName.Replace(' ','.').Replace('-','.');
+                return targetNamePrefix + "." + monsterFirstWordName.Replace(' ','.');
             }
 
-            return monsterFirstWordName.Replace(' ', '.').Replace('-', '.');
+            return monsterFirstWordName.Replace(' ', '.');
         }
 
         /// <summary>
