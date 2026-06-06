@@ -352,7 +352,15 @@ namespace Adan.Client.Common.Conveyor
                 {
                     foreach (var conveyorUnit in ConveyorUnitsByMessageType[message.MessageType])
                     {
+#if DEBUG
+                        var sw = System.Diagnostics.Stopwatch.StartNew();
                         conveyorUnit.HandleMessage(message);
+                        sw.Stop();
+                        if (sw.ElapsedMilliseconds >= 2)
+                            PerfLog.Write(conveyorUnit.GetType().Name, message.GetType().Name, sw.ElapsedMilliseconds);
+#else
+                        conveyorUnit.HandleMessage(message);
+#endif
                         if (message.Handled)
                         {
                             break;

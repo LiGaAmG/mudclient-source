@@ -38,10 +38,13 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private const int MaxNegativeLoreLookupKeyLength = 160;
 
         private string _lastShownObjectName = string.Empty;
-        private readonly Dictionary<string, LoreTooltip> _loreTooltipsByObjectName = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
-        private readonly HashSet<string> _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+
+        // Volatile: фоновый таймер атомарно заменяет весь словарь новой версией.
+        // Горячий путь (MarkKnownLoreItems) только читает — никогда не трогает диск.
+        private volatile Dictionary<string, LoreTooltip> _loreTooltipsByObjectName = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
+        private volatile HashSet<string> _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
         private DateTime _loreFolderStampUtc = DateTime.MinValue;
-        private DateTime _nextLoreCacheCheckUtc = DateTime.MinValue;
+        private System.Threading.Timer _cacheRefreshTimer;
 
         private static readonly Regex _whiteSpaceRx = new Regex(@" {2,}", RegexOptions.Compiled);
         private static readonly Regex _anyWhiteSpaceRx = new Regex(@"\s+", RegexOptions.Compiled);
@@ -81,6 +84,18 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
         public StuffDatabaseUnit(MessageConveyor conveyor) : base(conveyor)
         {
+            // Первичная загрузка кэша сразу в фоне
+            System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
+            // Периодическая проверка изменений папки каждые 10 секунд — только в фоне
+            _cacheRefreshTimer = new System.Threading.Timer(_ => RefreshLoreCache(), null,
+                TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                _cacheRefreshTimer?.Dispose();
+            base.Dispose(disposing);
         }
 
         /// <summary>
@@ -150,8 +165,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                             // Явная очистка — сохраняем напрямую, минуя мердж комментария
                             SaveLoreFile(fileName, lore);
                             _loreFolderStampUtc = DateTime.MinValue;
-                            _nextLoreCacheCheckUtc = DateTime.MinValue;
                             ResetNegativeLoreLookupCache();
+                            System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
                             PushMessageToConveyor(new InfoMessage("Комментарий удалён.", TextColor.BrightYellow));
                         }
                         else
@@ -214,8 +229,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                         SaveLoreFile(fileName, lore);
                         PushMessageToConveyor(new InfoMessage(string.Format("Удалено место дропа #{0}: {1}", idx, removed.Monster), TextColor.BrightYellow));
                         _loreFolderStampUtc = DateTime.MinValue;
-                        _nextLoreCacheCheckUtc = DateTime.MinValue;
                         ResetNegativeLoreLookupCache();
+                        System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
                     }
                     else
                     {
@@ -254,8 +269,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     SaveLoreFile(fileName, lore);
                     PushMessageToConveyor(new InfoMessage(string.Format("Добавлено место дропа: {0}{1}", monster, string.IsNullOrEmpty(zone) ? "" : " (" + zone + ")"), TextColor.BrightYellow));
                     _loreFolderStampUtc = DateTime.MinValue;
-                    _nextLoreCacheCheckUtc = DateTime.MinValue;
                     ResetNegativeLoreLookupCache();
+                    System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
                 }
                 else
                 {
@@ -333,10 +348,11 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         {
             Assert.ArgumentNotNull(message, "message");
 
-            var textMessage = message as TextMessage;
-            if (textMessage != null)
+            // Сканируем только OutputToMainWindowMessage — реальный текст из игры.
+            // Подклассы (InfoMessage, ErrorMessage, CommandRepeatMessage) пропускаем.
+            if (message.GetType() == typeof(OutputToMainWindowMessage))
             {
-                MarkKnownLoreItems(textMessage);
+                MarkKnownLoreItems((TextMessage)message);
             }
 
             var loreMessage = message as LoreMessage;
@@ -428,8 +444,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             }
 
             _loreFolderStampUtc = DateTime.MinValue;
-            _nextLoreCacheCheckUtc = DateTime.MinValue;
             ResetNegativeLoreLookupCache();
+            System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
             PushMessageToConveyor(new InfoMessage(Resources.LoreGetHelp, TextColor.BrightYellow));
         }
 
@@ -531,9 +547,9 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     if (stream != null) stream.Dispose();
                 }
 
-                // Signal main thread to refresh cache on next message
+                // Запустить немедленный рефреш кэша в фоне (мы уже в Task.Run)
                 _loreFolderStampUtc = DateTime.MinValue;
-                _nextLoreCacheCheckUtc = DateTime.MinValue;
+                RefreshLoreCache();
             }
             catch { }
         }
@@ -563,8 +579,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 }
             }
 
-            EnsureLoreCacheIsActual();
-            if (_loreTooltipsByObjectName.Count == 0 || textMessage.MessageBlocks.Count == 0)
+            var loreCache = _loreTooltipsByObjectName; // читаем volatile-ссылку один раз
+            if (loreCache.Count == 0 || textMessage.MessageBlocks.Count == 0)
             {
                 return;
             }
@@ -606,7 +622,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
                     var objectName = NormalizeWhitespace(match.Groups[1].Value);
                     LoreTooltip loreTooltip;
-                    if (string.IsNullOrEmpty(objectName) || !_loreTooltipsByObjectName.TryGetValue(objectName, out loreTooltip))
+                    if (string.IsNullOrEmpty(objectName) || !loreCache.TryGetValue(objectName, out loreTooltip))
                     {
                         continue;
                     }
@@ -650,65 +666,60 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             }
         }
 
-        private void EnsureLoreCacheIsActual()
+        // Вызывается только из фонового потока (таймер + конструктор).
+        // Горячий путь MarkKnownLoreItems никогда не трогает диск.
+        private void RefreshLoreCache()
         {
-            var stuffFolder = GetStuffDbFolder();
-            if (!Directory.Exists(stuffFolder))
+            try
             {
-                _loreTooltipsByObjectName.Clear();
-                ResetNegativeLoreLookupCache();
-                _loreFolderStampUtc = DateTime.MinValue;
-                _nextLoreCacheCheckUtc = DateTime.MinValue;
-                return;
-            }
-
-            var now = DateTime.UtcNow;
-            if (_loreTooltipsByObjectName.Count > 0 && now < _nextLoreCacheCheckUtc)
-            {
-                return;
-            }
-
-            _nextLoreCacheCheckUtc = now.AddSeconds(5);
-            var folderStamp = Directory.GetLastWriteTimeUtc(stuffFolder);
-            if (_loreTooltipsByObjectName.Count > 0 && folderStamp == _loreFolderStampUtc)
-            {
-                return;
-            }
-
-            var fileNames = Directory.GetFiles(stuffFolder);
-            _loreTooltipsByObjectName.Clear();
-            ResetNegativeLoreLookupCache();
-            foreach (var fileName in fileNames)
-            {
-                try
+                var stuffFolder = GetStuffDbFolder();
+                if (!Directory.Exists(stuffFolder))
                 {
-                    using (var stream = File.OpenRead(fileName))
-                    {
-                        var loreMessage = (LoreMessage)_loreSerializer.Deserialize(stream);
-                        if (string.IsNullOrWhiteSpace(loreMessage.ObjectName))
-                        {
-                            continue;
-                        }
+                    _loreTooltipsByObjectName = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
+                    _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+                    _loreFolderStampUtc = DateTime.MinValue;
+                    return;
+                }
 
-                        var loreTooltip = CreateLoreTooltip(loreMessage);
-                        var normalizedKey = NormalizeLookupKey(loreMessage.ObjectName);
-                        _loreTooltipsByObjectName[normalizedKey] = loreTooltip;
-                        // Also index without count suffix so "колдовская пыль (x50)" matches lore stored as "колдовская пыль (x5)"
-                        var strippedCountKey = NormalizeLookupKey(TryStripCountSuffix(loreMessage.ObjectName));
-                        if (!string.IsNullOrEmpty(strippedCountKey)
-                            && !strippedCountKey.Equals(normalizedKey, StringComparison.OrdinalIgnoreCase)
-                            && !_loreTooltipsByObjectName.ContainsKey(strippedCountKey))
+                var folderStamp = Directory.GetLastWriteTimeUtc(stuffFolder);
+                if (_loreTooltipsByObjectName.Count > 0 && folderStamp == _loreFolderStampUtc)
+                {
+                    return; // Папка не изменилась — кэш актуален
+                }
+
+                var newCache = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
+                foreach (var fileName in Directory.GetFiles(stuffFolder))
+                {
+                    try
+                    {
+                        using (var stream = File.OpenRead(fileName))
                         {
-                            _loreTooltipsByObjectName[strippedCountKey] = loreTooltip;
+                            var loreMessage = (LoreMessage)_loreSerializer.Deserialize(stream);
+                            if (string.IsNullOrWhiteSpace(loreMessage.ObjectName))
+                                continue;
+
+                            var loreTooltip = CreateLoreTooltip(loreMessage);
+                            var normalizedKey = NormalizeLookupKey(loreMessage.ObjectName);
+                            newCache[normalizedKey] = loreTooltip;
+
+                            var strippedCountKey = NormalizeLookupKey(TryStripCountSuffix(loreMessage.ObjectName));
+                            if (!string.IsNullOrEmpty(strippedCountKey)
+                                && !strippedCountKey.Equals(normalizedKey, StringComparison.OrdinalIgnoreCase)
+                                && !newCache.ContainsKey(strippedCountKey))
+                            {
+                                newCache[strippedCountKey] = loreTooltip;
+                            }
                         }
                     }
+                    catch { }
                 }
-                catch
-                {
-                }
-            }
 
-            _loreFolderStampUtc = folderStamp;
+                // Атомарная замена: горячий путь увидит либо старый, либо новый словарь целиком
+                _loreTooltipsByObjectName = newCache;
+                _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+                _loreFolderStampUtc = folderStamp;
+            }
+            catch { }
         }
 
         [NotNull]

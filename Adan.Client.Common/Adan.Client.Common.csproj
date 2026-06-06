@@ -107,6 +107,7 @@
     <Compile Include="ConveyorUnits\ConveyorUnit.cs" />
     <Compile Include="Conveyor\MessageConveyor.cs" />
     <Compile Include="Conveyor\MessageReceivedEventArgs.cs" />
+    <Compile Include="Conveyor\PerfLog.cs" />
     <Compile Include="Dialogs\OkDialog.xaml.cs">
       <DependentUpon>OkDialog.xaml</DependentUpon>
     </Compile>
