@@ -33,6 +33,7 @@ namespace Adan.Client.Map
 
         // Watchdog: if stuck in combat and can't move, retry after timeout
         private readonly Timer _retryMoveTimer;
+        private readonly Timer _moveRecoveryTimer;
         private int _lastSeenRoomId;
 
         public HerbManager([NotNull] RouteManager routeManager)
@@ -45,6 +46,9 @@ namespace Adan.Client.Map
 
             _retryMoveTimer = new Timer { AutoReset = true, Interval = 4000 };
             _retryMoveTimer.Elapsed += OnRetryMoveTimerElapsed;
+
+            _moveRecoveryTimer = new Timer { AutoReset = true, Interval = 2000 };
+            _moveRecoveryTimer.Elapsed += OnMoveRecoveryTimerElapsed;
 
             _autoRepeatTimer = new Timer { AutoReset = false, Interval = AutoRepeatDelayMs };
             _autoRepeatTimer.Elapsed += OnAutoRepeatTimerElapsed;
@@ -200,6 +204,9 @@ namespace Adan.Client.Map
         private int _pendingCollectCount;
         // Room where current gather cycle started — to ignore delayed messages from prev rooms
         private int _gatherRoomId;
+        private bool _waitingForMoveRecovery;
+        private const float LowMovesThresholdPercent = 2.0f;
+        private const float ResumeMovesThresholdPercent = 80.0f;
 
         private void ActOnDetectedHerbs(List<HerbEntry> herbs)
         {
@@ -373,10 +380,12 @@ namespace Adan.Client.Map
             _herbCollectionTimer.Stop();
             _herbDetectionTimer.Stop();
             _retryMoveTimer.Stop();
+            _moveRecoveryTimer.Stop();
             _autoRepeatTimer.Stop();
             _autoRepeat = false;
             _waitingForHerbCollection = false;
             _waitingForHerbDetection = false;
+            _waitingForMoveRecovery = false;
             _state = GatherState.Idle;
             _pendingRoomsInZone.Clear();
             _pendingZones = null;
@@ -543,6 +552,9 @@ namespace Adan.Client.Map
             if (_state == GatherState.Idle || _waitingForHerbCollection || _waitingForHerbDetection || _currentRoom == null)
                 return;
 
+            if (PauseForLowMovesIfNeeded())
+                return;
+
             // Don't interfere while GotoDestination is active
             if (_routeManager.CanStopCurrentRoute)
                 return;
@@ -624,6 +636,9 @@ namespace Adan.Client.Map
                 var nextRoom = FindNearestHerbRoom();
                 if (nextRoom != null)
                 {
+                    if (PauseForLowMovesIfNeeded())
+                        return;
+
                     _routeManager.NavigateToRoom(nextRoom, firstStepOnly: true);
                     _lastSeenRoomId = _currentRoom?.RoomId ?? 0;
                     _retryMoveTimer.Start();
@@ -652,6 +667,20 @@ namespace Adan.Client.Map
                 _state = GatherState.GatheringInZone;
                 HandleGatheringStep();
             }
+            else if (!_routeManager.CanStopCurrentRoute)
+            {
+                if (PauseForLowMovesIfNeeded())
+                    return;
+
+                bool started = _routeManager.GotoDestination(_travelTargetWaypoint);
+                if (!started)
+                {
+                    PushInfo(string.Format(CultureInfo.InvariantCulture,
+                        "Не удалось построить маршрут до '{0}', пропускаем зону.", _travelTargetWaypoint));
+                    _state = GatherState.GatheringInZone;
+                    EnterNextZone();
+                }
+            }
             // else: RouteManager is still navigating, nothing to do
         }
 
@@ -661,6 +690,9 @@ namespace Adan.Client.Map
             var routeRoom = FindNearestRouteRoomInCurrentZone();
             if (routeRoom != null)
             {
+                if (PauseForLowMovesIfNeeded())
+                    return;
+
                 _routeManager.NavigateToRoom(routeRoom, firstStepOnly: true);
                 _lastSeenRoomId = _currentRoom?.RoomId ?? 0;
                 _retryMoveTimer.Start();
@@ -677,6 +709,9 @@ namespace Adan.Client.Map
             }
 
             _state = GatherState.TravelingToZone;
+            if (PauseForLowMovesIfNeeded())
+                return;
+
             bool started = _routeManager.GotoDestination(_travelTargetWaypoint);
             if (!started)
             {
@@ -708,6 +743,9 @@ namespace Adan.Client.Map
                 var homeRoom = _homeZone.AllRooms.FirstOrDefault(r => r.RoomId == _homeRoomId);
                 if (homeRoom != null)
                 {
+                    if (PauseForLowMovesIfNeeded())
+                        return;
+
                     _routeManager.NavigateToRoom(homeRoom, firstStepOnly: true);
                     _lastSeenRoomId = _currentRoom?.RoomId ?? 0;
                     _retryMoveTimer.Start();
@@ -782,11 +820,17 @@ namespace Adan.Client.Map
                 if (routeRoom != null)
                 {
                     _state = GatherState.ReturningToZoneEntry;
+                    if (PauseForLowMovesIfNeeded())
+                        return;
+
                     _routeManager.NavigateToRoom(routeRoom, firstStepOnly: true);
                     _lastSeenRoomId = _currentRoom?.RoomId ?? 0;
                     _retryMoveTimer.Start();
                     return;
                 }
+
+                if (PauseForLowMovesIfNeeded())
+                    return;
 
                 bool started = _routeManager.GotoDestination(waypoint);
                 if (!started)
@@ -923,6 +967,9 @@ namespace Adan.Client.Map
             {
                 _returnHomeAfterZoneEntry = true;
                 _state = GatherState.ReturningToZoneEntry;
+                if (PauseForLowMovesIfNeeded())
+                    return;
+
                 _routeManager.NavigateToRoom(routeRoom, firstStepOnly: true);
                 _lastSeenRoomId = _currentRoom?.RoomId ?? 0;
                 _retryMoveTimer.Start();
@@ -933,6 +980,9 @@ namespace Adan.Client.Map
             string waypoint = FindWaypointForZone(_homeZone.Id);
             if (waypoint != null)
             {
+                if (PauseForLowMovesIfNeeded())
+                    return;
+
                 _routeManager.GotoDestination(waypoint);
             }
             else
@@ -1112,12 +1162,97 @@ namespace Adan.Client.Map
             _herbCollectionTimer.Stop();
             _herbDetectionTimer.Stop();
             _retryMoveTimer.Stop();
+            _moveRecoveryTimer.Stop();
             _waitingForHerbCollection = false;
             _waitingForHerbDetection = false;
+            _waitingForMoveRecovery = false;
             _state = GatherState.Idle;
             _pendingRoomsInZone.Clear();
             _pendingZones = null;
             _routeManager.StopRoutingToDestination();
+        }
+
+        private CharacterStatus GetSelfStatus()
+        {
+            return _rootModel?.GroupStatus?.FirstOrDefault();
+        }
+
+        private bool PauseForLowMovesIfNeeded()
+        {
+            if (_state == GatherState.Idle)
+                return false;
+
+            var self = GetSelfStatus();
+            if (self == null || self.MovesPercent >= LowMovesThresholdPercent)
+                return false;
+
+            if (_waitingForMoveRecovery)
+                return true;
+
+            _waitingForMoveRecovery = true;
+            _retryMoveTimer.Stop();
+            _routeManager.StopRoutingToDestination();
+            _moveRecoveryTimer.Start();
+            PushInfo(string.Format(
+                CultureInfo.InvariantCulture,
+                "Травник ждёт восстановления мувов: сейчас {0:0.#}%, продолжим на {1:0.#}%.",
+                self.MovesPercent,
+                ResumeMovesThresholdPercent));
+            return true;
+        }
+
+        private void OnMoveRecoveryTimerElapsed(object sender, ElapsedEventArgs e)
+        {
+            if (!_waitingForMoveRecovery || _state == GatherState.Idle)
+                return;
+
+            var self = GetSelfStatus();
+            if (self == null || self.MovesPercent < ResumeMovesThresholdPercent)
+                return;
+
+            _waitingForMoveRecovery = false;
+            _moveRecoveryTimer.Stop();
+            PushInfo(string.Format(
+                CultureInfo.InvariantCulture,
+                "Мувы восстановились до {0:0.#}%. Травник продолжает маршрут.",
+                self.MovesPercent));
+            ResumeAfterMoveRecovery();
+        }
+
+        private void ResumeAfterMoveRecovery()
+        {
+            switch (_state)
+            {
+                case GatherState.GatheringInZone:
+                    MoveToNextHerbRoom();
+                    break;
+
+                case GatherState.ReturningToZoneEntry:
+                    HandleReturnToZoneEntryStep();
+                    break;
+
+                case GatherState.ReturningHome:
+                    HandleReturnStep();
+                    break;
+
+                case GatherState.TravelingToZone:
+                    if (_currentZone != null && _currentZone.Id == _travelTargetZoneId)
+                    {
+                        HandleTravelStep();
+                    }
+                    else if (!string.IsNullOrEmpty(_travelTargetWaypoint))
+                    {
+                        bool started = _routeManager.GotoDestination(_travelTargetWaypoint);
+                        if (!started)
+                        {
+                            PushInfo(string.Format(CultureInfo.InvariantCulture,
+                                "Не удалось построить маршрут до '{0}', пропускаем зону.", _travelTargetWaypoint));
+                            _state = GatherState.GatheringInZone;
+                            EnterNextZone();
+                        }
+                    }
+                    break;
+            }
         }
 
         private void PushInfo(string text)

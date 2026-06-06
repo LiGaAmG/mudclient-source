@@ -39,6 +39,12 @@ namespace Adan.Client.Common.Model
         [NonSerialized]
         private PatternToken _rootPatternToken;
 
+        // Кэш первой константной строки для быстрого pre-check (не-regex хайлайты)
+        [NonSerialized]
+        private string _firstConstant = null;
+        [NonSerialized]
+        private bool _firstConstantResolved = false;
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Highlight"/> class.
@@ -125,6 +131,8 @@ namespace Adan.Client.Common.Model
                     _compiledRegex = null;
 
                 _rootPatternToken = null;
+                _firstConstant = null;
+                _firstConstantResolved = false;
             }
         }
 
@@ -187,6 +195,17 @@ namespace Adan.Client.Common.Model
             }
             else
             {
+                // Pre-check: если первый токен — константа, делаем быстрый IndexOf
+                // перед полноценным матчингом. Срезает ~90% нагрузки при многих хайлайтах.
+                if (!_firstConstantResolved)
+                {
+                    var rootToken = GetRootPatternToken(rootModel) as ConstantStringToken;
+                    _firstConstant = rootToken?.SearchValue;
+                    _firstConstantResolved = true;
+                }
+                if (_firstConstant != null && text.IndexOf(_firstConstant, StringComparison.Ordinal) < 0)
+                    return;
+
                 int position = 0;
                 ClearMatchingResults();
 

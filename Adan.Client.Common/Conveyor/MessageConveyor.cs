@@ -350,14 +350,25 @@ namespace Adan.Client.Common.Conveyor
             {
                 if (ConveyorUnitsByMessageType.ContainsKey(message.MessageType))
                 {
+#if DEBUG
+                    long totalMs = 0;
+                    string msgTypeName = message.GetType().Name;
+                    var slowUnits = new System.Text.StringBuilder();
+#endif
                     foreach (var conveyorUnit in ConveyorUnitsByMessageType[message.MessageType])
                     {
 #if DEBUG
                         var sw = System.Diagnostics.Stopwatch.StartNew();
                         conveyorUnit.HandleMessage(message);
                         sw.Stop();
-                        if (sw.ElapsedMilliseconds >= 2)
-                            PerfLog.Write(conveyorUnit.GetType().Name, message.GetType().Name, sw.ElapsedMilliseconds);
+                        long elapsed = sw.ElapsedMilliseconds;
+                        totalMs += elapsed;
+                        if (elapsed >= 2)
+                        {
+                            PerfLog.Write(conveyorUnit.GetType().Name, msgTypeName, elapsed);
+                            if (slowUnits.Length > 0) slowUnits.Append(", ");
+                            slowUnits.Append(conveyorUnit.GetType().Name).Append(':').Append(elapsed).Append("ms");
+                        }
 #else
                         conveyorUnit.HandleMessage(message);
 #endif
@@ -366,6 +377,10 @@ namespace Adan.Client.Common.Conveyor
                             break;
                         }
                     }
+#if DEBUG
+                    if (totalMs >= 10)
+                        PerfLog.WriteTotal(msgTypeName, totalMs, slowUnits.ToString());
+#endif
                 }
 
                 if (message.Handled)

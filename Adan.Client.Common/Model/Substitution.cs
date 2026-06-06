@@ -45,6 +45,18 @@ namespace Adan.Client.Common.Model
         [NonSerialized]
         private bool _firstConstantResolved = false;
 
+        // Кэш буквального префикса regex-паттерна для быстрого pre-check (regex замены)
+        [NonSerialized]
+        private string _regexLiteralPrefix = null;
+        [NonSerialized]
+        private bool _regexLiteralPrefixResolved = false;
+
+        // Кэш скомпилированного Regex для замен с переменными
+        [NonSerialized]
+        private Regex _cachedVarRegex = null;
+        [NonSerialized]
+        private string _cachedVarPattern = null;
+
         private Regex _wildRegex = new Regex(@"%[0-9]", RegexOptions.Compiled);
 
         /// <summary>
@@ -107,6 +119,10 @@ namespace Adan.Client.Common.Model
                 _rootPatternToken = null;
                 _firstConstant = null;
                 _firstConstantResolved = false;
+                _regexLiteralPrefix = null;
+                _regexLiteralPrefixResolved = false;
+                _cachedVarRegex = null;
+                _cachedVarPattern = null;
             }
         }
 
@@ -172,6 +188,19 @@ namespace Adan.Client.Common.Model
 
             if (IsRegExp)
             {
+                // Pre-check для regex-замен: буквальный префикс до первого метасимвола.
+                if (_compiledRegex != null)
+                {
+                    if (!_regexLiteralPrefixResolved)
+                    {
+                        _regexLiteralPrefix = ExtractRegexLiteralPrefix(_pattern);
+                        _regexLiteralPrefixResolved = true;
+                    }
+                    if (_regexLiteralPrefix.Length > 0 &&
+                        text.IndexOf(_regexLiteralPrefix, StringComparison.OrdinalIgnoreCase) < 0)
+                        return;
+                }
+
                 Regex rExp;
                 if (_compiledRegex != null)
                 {
@@ -183,7 +212,12 @@ namespace Adan.Client.Common.Model
                     if (!varReplace.IsAllVariables)
                         return;
 
-                    rExp = new Regex(varReplace.Value);
+                    if (_cachedVarRegex == null || _cachedVarPattern != varReplace.Value)
+                    {
+                        _cachedVarPattern = varReplace.Value;
+                        _cachedVarRegex = new Regex(_cachedVarPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant);
+                    }
+                    rExp = _cachedVarRegex;
                 }
 
                 StringBuilder sb = new StringBuilder(text.Length);
@@ -303,6 +337,29 @@ namespace Adan.Client.Common.Model
             {
                 _matchingResults[i] = null;
             }
+        }
+
+        /// <summary>
+        /// Извлекает буквальный префикс regex-паттерна до первого метасимвола.
+        /// </summary>
+        private static string ExtractRegexLiteralPrefix(string pattern)
+        {
+            if (string.IsNullOrEmpty(pattern))
+                return string.Empty;
+
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < pattern.Length; i++)
+            {
+                char c = pattern[i];
+                if (c == '\\')
+                    break;
+                if (c == '.' || c == '*' || c == '+' || c == '?' ||
+                    c == '[' || c == ']' || c == '(' || c == ')' ||
+                    c == '{' || c == '}' || c == '^' || c == '$' || c == '|')
+                    break;
+                sb.Append(c);
+            }
+            return sb.ToString();
         }
 
         [NotNull]

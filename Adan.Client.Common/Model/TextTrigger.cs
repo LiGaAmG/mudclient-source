@@ -40,6 +40,27 @@
         [NonSerialized]
         private bool _firstConstantResolved = false;
 
+        // Кэш буквального префикса regex-паттерна для быстрого pre-check (regex триггеры).
+        [NonSerialized]
+        private string _regexLiteralPrefix = null;
+        [NonSerialized]
+        private bool _regexLiteralPrefixResolved = false;
+
+        // Кэш обязательного литерала внутри паттерна (первый ≥4-символьный
+        // литерал вне контекста чередования). Используется когда префикс пустой
+        // (паттерн начинается с метасимвола, напр. ^(.+? )(попыталось...).
+        [NonSerialized]
+        private string _regexRequiredLiteral = null;
+        [NonSerialized]
+        private bool _regexRequiredLiteralResolved = false;
+
+        // Кэш скомпилированного Regex для триггеров с переменными ($groupmate1 и т.п.).
+        // Перекомпилируется только когда реально меняется resolved-паттерн.
+        [NonSerialized]
+        private Regex _cachedVarRegex = null;
+        [NonSerialized]
+        private string _cachedVarPattern = null;
+
         private readonly Regex _wildRegex = new Regex(@"%[0-9]", RegexOptions.Compiled);
 
         /// <summary>
@@ -100,6 +121,12 @@
                 _rootPatternToken = null;
                 _firstConstant = null;
                 _firstConstantResolved = false;
+                _regexLiteralPrefix = null;
+                _regexLiteralPrefixResolved = false;
+                _regexRequiredLiteral = null;
+                _regexRequiredLiteralResolved = false;
+                _cachedVarRegex = null;
+                _cachedVarPattern = null;
             }
         }
 
@@ -118,6 +145,36 @@
 
             if (IsRegExp)
             {
+                // Pre-check для regex-триггеров: извлекаем буквальный префикс до первого
+                // метасимвола и делаем быстрый IndexOf. Если префикс не найден — regex
+                // точно не сработает, пропускаем. Применяется только к compiled regex.
+                if (_compiledRegex != null)
+                {
+                    if (!_regexLiteralPrefixResolved)
+                    {
+                        _regexLiteralPrefix = ExtractRegexLiteralPrefix(MatchingPattern);
+                        _regexLiteralPrefixResolved = true;
+                    }
+                    if (_regexLiteralPrefix.Length > 0)
+                    {
+                        if (textMessage.InnerText.IndexOf(_regexLiteralPrefix, StringComparison.OrdinalIgnoreCase) < 0)
+                            return false;
+                    }
+                    else
+                    {
+                        // Префикс пустой (паттерн начинается с метасимвола).
+                        // Ищем обязательный литерал внутри паттерна.
+                        if (!_regexRequiredLiteralResolved)
+                        {
+                            _regexRequiredLiteral = ExtractRegexRequiredLiteral(MatchingPattern);
+                            _regexRequiredLiteralResolved = true;
+                        }
+                        if (_regexRequiredLiteral != null && _regexRequiredLiteral.Length > 0 &&
+                            textMessage.InnerText.IndexOf(_regexRequiredLiteral, StringComparison.OrdinalIgnoreCase) < 0)
+                            return false;
+                    }
+                }
+
                 Match match;
                 if (_compiledRegex != null)
                     match = _compiledRegex.Match(textMessage.InnerText);
@@ -127,8 +184,14 @@
                     if (!varReplace.IsAllVariables)
                         return false;
 
-                    Regex rExp = new Regex(varReplace.Value);
-                    match = rExp.Match(textMessage.InnerText);
+                    // Кешируем скомпилированный Regex: перекомпилируем только если
+                    // resolved-паттерн изменился (т.е. значение переменной сменилось).
+                    if (_cachedVarRegex == null || _cachedVarPattern != varReplace.Value)
+                    {
+                        _cachedVarPattern = varReplace.Value;
+                        _cachedVarRegex = new Regex(_cachedVarPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant);
+                    }
+                    match = _cachedVarRegex.Match(textMessage.InnerText);
                 }
 
                 if (!match.Success)
@@ -248,6 +311,134 @@
             {
                 _matchingResults[i] = string.Empty;
             }
+        }
+
+        /// <summary>
+        /// Ищет первый "обязательный" литерал длиной ≥4 символов внутри regex-паттерна.
+        /// Литерал считается обязательным если он не находится в контексте чередования (|)
+        /// ни на одном уровне вложенности.
+        /// Примеры:
+        ///   "^(.+? )(попыталось ударить)"  → "попыталось"
+        ///   "^[А-Я]{3,40} издал странный"  → "издал"  (после закрытия класса символов)
+        ///   "^(клевер|розмарин) растёт"    → "" (alternation → ничего не возвращаем)
+        /// </summary>
+        private static string ExtractRegexRequiredLiteral(string pattern)
+        {
+            if (string.IsNullOrEmpty(pattern))
+                return string.Empty;
+
+            const int MaxDepth = 20;
+            var alternationAtDepth = new bool[MaxDepth];
+            int depth = 0;
+            var current = new System.Text.StringBuilder();
+            string best = string.Empty;
+
+            for (int i = 0; i < pattern.Length; i++)
+            {
+                char c = pattern[i];
+
+                if (c == '\\')
+                {
+                    // Экранированный символ — не литерал, сбрасываем текущий буфер
+                    TryUpdateBest(current, alternationAtDepth, depth, ref best);
+                    current.Clear();
+                    i++; // пропускаем следующий символ
+                    continue;
+                }
+
+                switch (c)
+                {
+                    case '(':
+                        TryUpdateBest(current, alternationAtDepth, depth, ref best);
+                        current.Clear();
+                        if (depth < MaxDepth - 1) depth++;
+                        alternationAtDepth[depth] = false;
+                        break;
+                    case ')':
+                        TryUpdateBest(current, alternationAtDepth, depth, ref best);
+                        current.Clear();
+                        if (depth > 0) depth--;
+                        break;
+                    case '|':
+                        alternationAtDepth[depth] = true;
+                        TryUpdateBest(current, alternationAtDepth, depth, ref best);
+                        current.Clear();
+                        break;
+                    case '.': case '*': case '+': case '?':
+                    case '[': case ']': case '{': case '}':
+                    case '^': case '$':
+                        TryUpdateBest(current, alternationAtDepth, depth, ref best);
+                        current.Clear();
+                        break;
+                    default:
+                        // Проверяем: следующий символ — квантификатор? Тогда этот символ необязателен
+                        if (i + 1 < pattern.Length)
+                        {
+                            char next = pattern[i + 1];
+                            if (next == '*' || next == '?' || next == '{')
+                            {
+                                TryUpdateBest(current, alternationAtDepth, depth, ref best);
+                                current.Clear();
+                                break;
+                            }
+                        }
+                        current.Append(c);
+                        // Если нашли достаточно длинный литерал — можно вернуть сразу
+                        if (current.Length >= 6 && !HasAlternation(alternationAtDepth, depth))
+                            return current.ToString();
+                        break;
+                }
+            }
+
+            TryUpdateBest(current, alternationAtDepth, depth, ref best);
+            return best;
+        }
+
+        private static void TryUpdateBest(System.Text.StringBuilder sb, bool[] alternation, int depth, ref string best)
+        {
+            if (sb.Length >= 4 && !HasAlternation(alternation, depth) && sb.Length > best.Length)
+                best = sb.ToString();
+        }
+
+        private static bool HasAlternation(bool[] alternation, int depth)
+        {
+            for (int i = 0; i <= depth; i++)
+                if (alternation[i]) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Извлекает буквальную строку из начала regex-паттерна — всё до первого
+        /// неэкранированного метасимвола (. * + ? [ ] ( ) { } ^ $ | \).
+        /// Примеры:
+        ///   "нанесли \d+ урона"  → "нанесли "
+        ///   "атакует (вас|тебя)" → "атакует "
+        ///   "[Вв]ы атакуете"     → ""   (сразу метасимвол → pre-check не применяется)
+        ///   "вы убили монстра"   → "вы убили монстра"  (нет метасимволов)
+        /// </summary>
+        private static string ExtractRegexLiteralPrefix(string pattern)
+        {
+            if (string.IsNullOrEmpty(pattern))
+                return string.Empty;
+
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < pattern.Length; i++)
+            {
+                char c = pattern[i];
+                if (c == '\\')
+                {
+                    // Экранированный символ — стоп (следующий символ может быть \d, \w и т.п.)
+                    break;
+                }
+                if (c == '.' || c == '*' || c == '+' || c == '?' ||
+                    c == '[' || c == ']' || c == '(' || c == ')' ||
+                    c == '{' || c == '}' || c == '^' || c == '$' || c == '|')
+                {
+                    break;
+                }
+                sb.Append(c);
+            }
+            return sb.ToString();
         }
 
         [NotNull]

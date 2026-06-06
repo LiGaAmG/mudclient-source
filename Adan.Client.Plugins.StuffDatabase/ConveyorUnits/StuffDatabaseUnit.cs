@@ -36,6 +36,11 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
     {
         private const int MaxNegativeLoreLookupCacheSize = 12288;
         private const int MaxNegativeLoreLookupKeyLength = 160;
+        // Кэш строк, которые были проверены и не содержат lore-предметов.
+        // Ключ = нормализованная строка (цифровые последовательности → "#").
+        // Позволяет мгновенно пропускать повторяющиеся боевые строки.
+        private const int MaxNegativeLineCacheSize = 2048;
+        private HashSet<string> _negativeLineCache = new HashSet<string>(StringComparer.Ordinal);
 
         private string _lastShownObjectName = string.Empty;
 
@@ -611,6 +616,17 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 return;
             }
 
+            // Строчный негативный кэш: пропускаем строки, которые уже были проверены
+            // и не содержат lore-предметов. Числа нормализуются → "#", так что
+            // "Вы нанесли 47 урона" и "Вы нанесли 52 урона" — один ключ.
+            string normalizedLineKey = null;
+            if (!hasMatchingQuotes && !hasArrow)
+            {
+                normalizedLineKey = NormalizeDigitsForLineCache(sourceText);
+                if (_negativeLineCache.Contains(normalizedLineKey))
+                    return;
+            }
+
             var sourceBlocks = textMessage.MessageBlocks;
             var spans = BuildBlockSpans(sourceBlocks);
             if (spans.Count == 0)
@@ -669,6 +685,14 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             if (TryMarkStandaloneItemLine(textMessage, sourceText))
             {
                 return;
+            }
+
+            // Промах: запоминаем нормализованную строку как "не содержит lore"
+            if (normalizedLineKey != null)
+            {
+                if (_negativeLineCache.Count >= MaxNegativeLineCacheSize)
+                    _negativeLineCache.Clear();
+                _negativeLineCache.Add(normalizedLineKey);
             }
         }
 
@@ -1854,6 +1878,32 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private void ResetNegativeLoreLookupCache()
         {
             _negativeLoreLookupKeys.Clear();
+            _negativeLineCache.Clear();
+        }
+
+        /// <summary>
+        /// Нормализует строку для строчного негативного кэша:
+        /// заменяет последовательности цифр на "#".
+        /// "Вы нанесли 47 урона" → "Вы нанесли # урона"
+        /// </summary>
+        private static string NormalizeDigitsForLineCache(string s)
+        {
+            if (s == null) return string.Empty;
+            var sb = new System.Text.StringBuilder(s.Length);
+            bool inDigit = false;
+            foreach (char c in s)
+            {
+                if (c >= '0' && c <= '9')
+                {
+                    if (!inDigit) { sb.Append('#'); inDigit = true; }
+                }
+                else
+                {
+                    sb.Append(c);
+                    inDigit = false;
+                }
+            }
+            return sb.ToString();
         }
 
         [NotNull]

@@ -57,6 +57,7 @@ namespace Adan.Client.ConveyorUnits
         public override void HandleMessage(Message message)
         {
             Assert.ArgumentNotNull(message, "message");
+            var textMsg = message as Common.Messages.TextMessage;
             foreach (var trigger in Conveyor.RootModel.EnabledTriggersOrderedByPriority)
             {
                 if (message.SkipTriggers)
@@ -64,7 +65,24 @@ namespace Adan.Client.ConveyorUnits
                     break;
                 }
 
+#if DEBUG
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 trigger.HandleMessage(message, Conveyor.RootModel);
+                sw.Stop();
+                if (sw.ElapsedMilliseconds >= 3)
+                {
+                    var pattern = trigger.GetPatternString();
+                    if (pattern != null && pattern.Length > 60) pattern = pattern.Substring(0, 60) + "...";
+                    var text = textMsg?.InnerText ?? "";
+                    if (text.Length > 60) text = text.Substring(0, 60) + "...";
+                    Common.Conveyor.PerfLog.Write(
+                        string.Format("  Trigger[{0}]", pattern),
+                        text,
+                        sw.ElapsedMilliseconds);
+                }
+#else
+                trigger.HandleMessage(message, Conveyor.RootModel);
+#endif
             }
         }
 

@@ -22,11 +22,25 @@ namespace Adan.Client.Common.Conveyor
         }
 
         /// <summary>
-        /// Записывает медленный вызов в лог.
+        /// Записывает медленный вызов юнита в лог.
         /// </summary>
         public static void Write(string unitName, string messageName, long elapsedMs)
         {
             var line = $"{DateTime.Now:HH:mm:ss.fff} | {elapsedMs,4}ms | {unitName} | {messageName}\r\n";
+            lock (_lock)
+            {
+                try { File.AppendAllText(_logPath, line, Encoding.UTF8); }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Записывает суммарное время обработки одного сообщения всеми юнитами.
+        /// Вызывается когда суммарное время >= 10ms.
+        /// </summary>
+        public static void WriteTotal(string messageName, long totalMs, string slowUnits)
+        {
+            var line = $"{DateTime.Now:HH:mm:ss.fff} | {totalMs,4}ms | *** TOTAL *** | {messageName} | [{slowUnits}]\r\n";
             lock (_lock)
             {
                 try { File.AppendAllText(_logPath, line, Encoding.UTF8); }
