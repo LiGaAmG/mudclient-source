@@ -446,6 +446,9 @@ namespace Adan.Client.Common.Conveyor
             
             try
             {
+#if DEBUG
+                var _netSw = System.Diagnostics.Stopwatch.StartNew();
+#endif
                 int offset = e.Offset;
                 int actualBytesReceived = 0;
                 int end =  e.Offset + e.BytesReceived;
@@ -500,6 +503,11 @@ namespace Adan.Client.Common.Conveyor
 
                 if (actualBytesReceived > 0)
                     FlushBufferToDeserializer(actualBytesReceived, false);
+#if DEBUG
+                _netSw.Stop();
+                if (e.BytesReceived > 0)
+                    PerfLog.WriteNet(e.BytesReceived, _netSw.ElapsedMilliseconds);
+#endif
             }
             catch (Exception ex)
             {

@@ -36,11 +36,36 @@ namespace Adan.Client.Common.Conveyor
 
         /// <summary>
         /// Записывает суммарное время обработки одного сообщения всеми юнитами.
-        /// Вызывается когда суммарное время >= 10ms.
         /// </summary>
         public static void WriteTotal(string messageName, long totalMs, string slowUnits)
         {
             var line = $"{DateTime.Now:HH:mm:ss.fff} | {totalMs,4}ms | *** TOTAL *** | {messageName} | [{slowUnits}]\r\n";
+            lock (_lock)
+            {
+                try { File.AppendAllText(_logPath, line, Encoding.UTF8); }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Записывает событие прихода данных из сети.
+        /// </summary>
+        public static void WriteNet(int bytes, long parseMs)
+        {
+            var line = $"{DateTime.Now:HH:mm:ss.fff} |      | >>> NET {bytes}b parse={parseMs}ms\r\n";
+            lock (_lock)
+            {
+                try { File.AppendAllText(_logPath, line, Encoding.UTF8); }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Записывает событие рендера батча сообщений на UI-потоке.
+        /// </summary>
+        public static void WriteRender(int msgCount, long waitMs, long renderMs)
+        {
+            var line = $"{DateTime.Now:HH:mm:ss.fff} |      | >>> RENDER batch={msgCount} waited={waitMs}ms render={renderMs}ms\r\n";
             lock (_lock)
             {
                 try { File.AppendAllText(_logPath, line, Encoding.UTF8); }

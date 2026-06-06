@@ -105,10 +105,31 @@ namespace Adan.Client.Common.Model
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <returns></returns>
         public abstract string GetPatternString();
+
+        /// <summary>
+        /// Возвращает обязательный литерал для быстрого IndexOf-фильтра в TriggerUnit.
+        /// null = триггер не может быть профильтрован (нет надёжного литерала), всегда запускается.
+        /// </summary>
+        public virtual string GetRequiredLiteral()
+        {
+            return null;
+        }
+
+        /// <summary>
+        /// Возвращает набор альтернатив для any-of-фильтра: триггер запускается только если
+        /// хотя бы одна из строк присутствует в тексте. Используется когда GetRequiredLiteral()
+        /// вернул null (паттерн начинается с wildcard/переменной), но внутри есть обязательная
+        /// группа чередования из чистых слов — например (ударил|ударила|пнул|...).
+        /// null = не удалось извлечь альтернативы, запускать всегда.
+        /// </summary>
+        public virtual string[] GetAnyOfLiterals()
+        {
+            return null;
+        }
 
         /// <summary>
         /// Handles the message.

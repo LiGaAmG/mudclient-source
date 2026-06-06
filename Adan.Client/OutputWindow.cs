@@ -22,6 +22,10 @@ namespace Adan.Client
         private readonly MainWindow _mainWindow;
         private readonly Queue<TextMessage> _messageQueue = new Queue<TextMessage>();
         private readonly object _messageQueueLockObject = new object();
+#if DEBUG
+        // Время постановки первого сообщения в текущий батч (для замера задержки рендера)
+        private long _firstEnqueueTick = 0;
+#endif
         private RootModel _rootModel;
         private readonly MainOutputWindow _window;
 
@@ -142,12 +146,16 @@ namespace Adan.Client
             {
                 lock (_messageQueueLockObject)
                 {
+#if DEBUG
+                    if (_messageQueue.Count == 0)
+                        _firstEnqueueTick = System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
                     _messageQueue.Enqueue(message);
                 }
 
                 if (Application.Current != null)
                 {
-                    if (_window?.IsVisible==true)
+                    if (_window?.IsVisible == true)
                         Application.Current.Dispatcher.BeginInvoke((Action)ProcessMessageQueue, DispatcherPriority.Normal);
                     else
                         Application.Current.Dispatcher.BeginInvoke((Action)ProcessMessageQueue, DispatcherPriority.Background);
@@ -199,15 +207,33 @@ namespace Adan.Client
         private void ProcessMessageQueue()
         {
             IList<TextMessage> messages;
+#if DEBUG
+            long firstTick;
+#endif
             lock (_messageQueueLockObject)
             {
                 messages = _messageQueue.ToList();
                 _messageQueue.Clear();
+#if DEBUG
+                firstTick = _firstEnqueueTick;
+                _firstEnqueueTick = 0;
+#endif
             }
 
             if (messages.Count > 0)
             {
+#if DEBUG
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+#endif
                 _window.AddMessages(messages);
+#if DEBUG
+                sw.Stop();
+                long waitMs = firstTick > 0
+                    ? (long)((System.Diagnostics.Stopwatch.GetTimestamp() - firstTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency)
+                    : 0;
+                if (messages.Count > 1 || sw.ElapsedMilliseconds >= 5 || waitMs >= 20)
+                    Common.Conveyor.PerfLog.WriteRender(messages.Count, waitMs, sw.ElapsedMilliseconds);
+#endif
             }
         }
     }

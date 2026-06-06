@@ -63,6 +63,19 @@
 
         private readonly Regex _wildRegex = new Regex(@"%[0-9]", RegexOptions.Compiled);
 
+        // Ищет первую обязательную группу чередования из чистых слов (кириллица/пробелы).
+        // Например: (ударил|ударила|пнул|пнула|...) не перед '?'
+        // Используется для any-of pre-check в TriggerUnit.
+        [NonSerialized]
+        private static readonly Regex _altGroupExtractor = new Regex(
+            @"\(([а-яёА-ЯЁ][а-яёА-ЯЁ\s|]{4,})\)(?!\?|\*|\{0)",
+            RegexOptions.Compiled);
+
+        [NonSerialized]
+        private string[] _anyOfLiterals = null;
+        [NonSerialized]
+        private bool _anyOfLiteralsResolved = false;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="TextTrigger"/> class.
         /// </summary>
@@ -127,6 +140,8 @@
                 _regexRequiredLiteralResolved = false;
                 _cachedVarRegex = null;
                 _cachedVarPattern = null;
+                _anyOfLiterals = null;
+                _anyOfLiteralsResolved = false;
             }
         }
 
@@ -268,6 +283,94 @@
         public override string GetPatternString()
         {
             return MatchingPattern;
+        }
+
+        /// <summary>
+        /// Возвращает обязательный литерал для быстрого IndexOf-фильтра в TriggerUnit.
+        /// Переиспользует уже кэшированные поля. null = всегда запускать.
+        /// </summary>
+        public override string GetRequiredLiteral()
+        {
+            if (string.IsNullOrEmpty(MatchingPattern))
+                return null;
+
+            if (!IsRegExp)
+            {
+                // Не-regex: текст до первого %N
+                int wildIdx = MatchingPattern.IndexOf('%');
+                string lit = wildIdx < 0 ? MatchingPattern : MatchingPattern.Substring(0, wildIdx);
+                return lit.Length >= 2 ? lit : null;
+            }
+
+            // Regex без переменных — используем скомпилированный regex
+            if (_compiledRegex != null)
+            {
+                // Сначала пробуем literal prefix
+                if (!_regexLiteralPrefixResolved)
+                {
+                    _regexLiteralPrefix = ExtractRegexLiteralPrefix(MatchingPattern);
+                    _regexLiteralPrefixResolved = true;
+                }
+                if (_regexLiteralPrefix != null && _regexLiteralPrefix.Length >= 2)
+                    return _regexLiteralPrefix;
+
+                // Потом required literal внутри паттерна
+                if (!_regexRequiredLiteralResolved)
+                {
+                    _regexRequiredLiteral = ExtractRegexRequiredLiteral(MatchingPattern);
+                    _regexRequiredLiteralResolved = true;
+                }
+                if (_regexRequiredLiteral != null && _regexRequiredLiteral.Length >= 2)
+                    return _regexRequiredLiteral;
+            }
+
+            // Regex с переменными ($groupmate1 и т.п.) — литерал ненадёжен, всегда запускать
+            return null;
+        }
+
+        /// <summary>
+        /// Для regex-триггеров без фиксированного префикса ищет обязательную группу чередования
+        /// из чистых кириллических слов. Например: (ударил|ударила|пнул|пнула|...).
+        /// Если хоть одно из этих слов есть в тексте — regex может совпасть, иначе точно нет.
+        /// </summary>
+        public override string[] GetAnyOfLiterals()
+        {
+            if (!IsRegExp || string.IsNullOrEmpty(MatchingPattern))
+                return null;
+
+            if (_anyOfLiteralsResolved)
+                return _anyOfLiterals;
+
+            _anyOfLiteralsResolved = true;
+
+            // Только для regex без фиксированного литерала
+            var m = _altGroupExtractor.Match(MatchingPattern);
+            while (m.Success)
+            {
+                var parts = m.Groups[1].Value.Split('|');
+                var words = new System.Collections.Generic.List<string>(parts.Length);
+                bool allGood = true;
+                foreach (var p in parts)
+                {
+                    var w = p.Trim();
+                    if (w.Length >= 3)
+                        words.Add(w);
+                    else
+                    {
+                        // Слишком короткое — ненадёжно для фильтрации
+                        allGood = false;
+                        break;
+                    }
+                }
+                if (allGood && words.Count >= 2)
+                {
+                    _anyOfLiterals = words.ToArray();
+                    return _anyOfLiterals;
+                }
+                m = m.NextMatch();
+            }
+
+            return null;
         }
 
         public override string UndoInfo()
