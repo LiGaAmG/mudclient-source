@@ -44,7 +44,7 @@ namespace Adan.Client.Common.Utils.PatternMatching
         /// <value>
         /// The search value.
         /// </value>
-        protected string SearchValue
+        public string SearchValue
         {
             get;
             set;

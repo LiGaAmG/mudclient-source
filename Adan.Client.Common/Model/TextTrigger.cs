@@ -34,6 +34,12 @@
         [NonSerialized]
         private Regex _compiledRegex = null;
 
+        // Кэш первой константной строки для быстрого pre-check (не-regex триггеры)
+        [NonSerialized]
+        private string _firstConstant = null;
+        [NonSerialized]
+        private bool _firstConstantResolved = false;
+
         private readonly Regex _wildRegex = new Regex(@"%[0-9]", RegexOptions.Compiled);
 
         /// <summary>
@@ -90,8 +96,10 @@
                     _compiledRegex = new Regex(_matchingPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant);
                 else
                     _compiledRegex = null;
-                
+
                 _rootPatternToken = null;
+                _firstConstant = null;
+                _firstConstantResolved = false;
             }
         }
 
@@ -134,6 +142,16 @@
 
                 return true;
             }
+
+            // Pre-check для не-regex триггеров
+            if (!_firstConstantResolved)
+            {
+                var rootToken = GetRootPatternToken(rootModel) as Utils.PatternMatching.ConstantStringToken;
+                _firstConstant = rootToken?.SearchValue;
+                _firstConstantResolved = true;
+            }
+            if (_firstConstant != null && textMessage.InnerText.IndexOf(_firstConstant, StringComparison.Ordinal) < 0)
+                return false;
 
             var res = GetRootPatternToken(rootModel).Match(textMessage.InnerText, 0, _matchingResults);
             return res.IsSuccess;

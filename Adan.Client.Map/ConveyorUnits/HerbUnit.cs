@@ -66,16 +66,20 @@ namespace Adan.Client.Map.ConveyorUnits
             }
 
             // "травничество 125%"
-            var skillMatch = _herbSkillRegex.Match(text);
-            if (skillMatch.Success)
+            if (text.IndexOf("травничество", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                int skill;
-                if (int.TryParse(skillMatch.Groups[1].Value, out skill))
-                    _herbManager.OnHerbingSkillDetected(skill);
-                return;
+                var skillMatch = _herbSkillRegex.Match(text);
+                if (skillMatch.Success)
+                {
+                    int skill;
+                    if (int.TryParse(skillMatch.Groups[1].Value, out skill))
+                        _herbManager.OnHerbingSkillDetected(skill);
+                    return;
+                }
             }
 
             // "Клевер растет здесь." / "Земляной корень виднеется здесь."
+            if (text.IndexOf("здесь", StringComparison.OrdinalIgnoreCase) < 0) return;
             var herbMatch = _herbRoomRegex.Match(text);
             if (herbMatch.Success)
             {
