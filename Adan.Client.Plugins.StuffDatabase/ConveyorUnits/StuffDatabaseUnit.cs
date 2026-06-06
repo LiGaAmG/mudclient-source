@@ -561,21 +561,25 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             var rawText = textMessage.InnerText;
             if (!string.IsNullOrEmpty(rawText))
             {
-                // Track current zone from "где" output as fallback
-                var zoneMatch = _zoneRx.Match(rawText);
-                if (zoneMatch.Success)
+                // Track current zone — быстрый pre-check перед regex
+                if (rawText.IndexOf("находитесь в зоне", StringComparison.Ordinal) >= 0)
                 {
-                    _currentZoneFromText = zoneMatch.Groups[1].Value.Trim();
+                    var zoneMatch = _zoneRx.Match(rawText);
+                    if (zoneMatch.Success)
+                        _currentZoneFromText = zoneMatch.Groups[1].Value.Trim();
                 }
 
-                // Record drop location when item is picked up from monster corpse (async to avoid lag)
-                var pickupMatch = _pickupFromCorpseRx.Match(rawText);
-                if (pickupMatch.Success)
+                // Record drop location — быстрый pre-check перед тяжёлым multiline regex
+                if (rawText.IndexOf("из трупа", StringComparison.Ordinal) >= 0)
                 {
-                    var itemRaw = NormalizeWhitespace(pickupMatch.Groups[1].Value);
-                    var monsterRaw = NormalizeWhitespace(pickupMatch.Groups[2].Value).TrimEnd('.', '!', ',');
-                    var zone = CurrentZone;
-                    System.Threading.Tasks.Task.Run(() => TryRecordDropLocation(itemRaw, monsterRaw, zone));
+                    var pickupMatch = _pickupFromCorpseRx.Match(rawText);
+                    if (pickupMatch.Success)
+                    {
+                        var itemRaw = NormalizeWhitespace(pickupMatch.Groups[1].Value);
+                        var monsterRaw = NormalizeWhitespace(pickupMatch.Groups[2].Value).TrimEnd('.', '!', ',');
+                        var zone = CurrentZone;
+                        System.Threading.Tasks.Task.Run(() => TryRecordDropLocation(itemRaw, monsterRaw, zone));
+                    }
                 }
             }
 
@@ -599,6 +603,13 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
             var hasQuotedItem = sourceText.IndexOf('\'') >= 0;
             var matches = hasQuotedItem ? _quotedItemNameRegex.Matches(sourceText) : null;
+            bool hasMatchingQuotes = matches != null && matches.Count > 0;
+
+            // Быстрый выход: не строим спаны пока не знаем что строка вообще кандидат
+            if (!hasMatchingQuotes && !IsLikelyStandaloneCandidateLine(sourceText, hasArrow))
+            {
+                return;
+            }
 
             var sourceBlocks = textMessage.MessageBlocks;
             var spans = BuildBlockSpans(sourceBlocks);
@@ -607,7 +618,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 return;
             }
 
-            if (matches != null && matches.Count > 0)
+            if (hasMatchingQuotes)
             {
                 var resultBlocks = new List<TextMessageBlock>(sourceBlocks.Count);
                 int currentPosition = 0;
@@ -653,11 +664,6 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                         return;
                     }
                 }
-            }
-
-            if (!IsLikelyStandaloneCandidateLine(sourceText, hasArrow))
-            {
-                return;
             }
 
             if (TryMarkStandaloneItemLine(textMessage, sourceText))
