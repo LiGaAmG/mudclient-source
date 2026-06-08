@@ -46,7 +46,10 @@ namespace Adan.Client.ConveyorUnits
         }
 
         private List<SubEntry> _orderedSubs = null;
-        private string[] _uniqueConstants = null;  // только ненулевые, для IndexOf-перебора
+        // _twoCharGroups: вместо O(N×L) перебора N констант на каждом сообщении длины L —
+        // делаем один проход по тексту (O(L)), на каждой паре символов находим совпавшие
+        // константы через словарь. Итог: O(L + K×avgLen) где K — кол-во совпавших констант.
+        private Dictionary<(char, char), string[]> _twoCharGroups = null;
         private int _lastIndexedSubCount = -1;      // для обнаружения изменений
 
         /// <summary>
@@ -103,34 +106,53 @@ namespace Adan.Client.ConveyorUnits
             if (string.IsNullOrEmpty(text))
                 return;
 
-            // Определяем какие константы присутствуют в тексте
-            // (одна проверка на уникальную константу вместо N проверок на каждый сабс)
+            // Определяем какие константы присутствуют в тексте.
+            // Используем 2-символьное группирование: проходим по тексту один раз,
+            // для каждой пары (text[i], text[i+1]) смотрим только константы с таким префиксом.
+            // O(textLength × avgGroupSize) вместо O(numConstants × textLength).
             HashSet<string> presentConstants = null;
-            if (_uniqueConstants != null && _uniqueConstants.Length > 0)
+            if (_twoCharGroups != null && text.Length >= 2)
             {
-                presentConstants = new HashSet<string>();
-                foreach (var c in _uniqueConstants)
+                presentConstants = new HashSet<string>(System.StringComparer.Ordinal);
+                for (int i = 0; i < text.Length - 1; i++)
                 {
-                    if (text.IndexOf(c, System.StringComparison.Ordinal) >= 0)
-                        presentConstants.Add(c);
+                    if (_twoCharGroups.TryGetValue((text[i], text[i + 1]), out var candidates))
+                    {
+                        foreach (var c in candidates)
+                        {
+                            if (!presentConstants.Contains(c)
+                                && text.IndexOf(c, System.StringComparison.Ordinal) >= 0)
+                            {
+                                presentConstants.Add(c);
+                            }
+                        }
+                    }
                 }
             }
 
+#if DEBUG
+            var _subSw = System.Diagnostics.Stopwatch.StartNew();
+            int _subRunCount = 0;
+#endif
             // Запускаем сабсы в правильном порядке, пропуская те, чья константа не найдена
             foreach (var entry in _orderedSubs)
             {
-                if (entry.Constant == null)
-                {
-                    // Нет константы — запускаем всегда (wildcard-паттерн или regex)
-                    entry.Sub.HandleMessage(textMessage, rootModel);
-                }
-                else if (presentConstants != null && presentConstants.Contains(entry.Constant))
-                {
-                    // Константа найдена в тексте — запускаем
-                    entry.Sub.HandleMessage(textMessage, rootModel);
-                }
-                // Иначе — пропускаем, экономим вызов метода
+                bool run = entry.Constant == null
+                    || (presentConstants != null && presentConstants.Contains(entry.Constant));
+                if (!run) continue;
+#if DEBUG
+                _subRunCount++;
+#endif
+                entry.Sub.HandleMessage(textMessage, rootModel);
             }
+#if DEBUG
+            _subSw.Stop();
+            if (_subSw.ElapsedMilliseconds >= 10)
+            {
+                var logText = text.Length > 80 ? text.Substring(0, 80) + "..." : text;
+                Common.Conveyor.PerfLog.Write("SubstitutionUnit [ran=" + _subRunCount + "/" + (_orderedSubs != null ? _orderedSubs.Count : 0) + "]", logText, _subSw.ElapsedMilliseconds);
+            }
+#endif
         }
 
         #endregion
@@ -168,7 +190,30 @@ namespace Adan.Client.ConveyorUnits
             }
 
             _orderedSubs = ordered;
-            _uniqueConstants = uniqueSet.Count > 0 ? uniqueSet.ToArray() : null;
+
+            // Строим 2-символьный индекс для быстрого поиска совпавших констант.
+            if (uniqueSet.Count > 0)
+            {
+                var tempGroups = new Dictionary<(char, char), List<string>>();
+                foreach (var c in uniqueSet)
+                {
+                    if (c.Length >= 2)
+                    {
+                        var key = (c[0], c[1]);
+                        if (!tempGroups.TryGetValue(key, out var list))
+                            tempGroups[key] = list = new List<string>();
+                        list.Add(c);
+                    }
+                }
+                var groups2 = new Dictionary<(char, char), string[]>(tempGroups.Count);
+                foreach (var kv in tempGroups)
+                    groups2[kv.Key] = kv.Value.ToArray();
+                _twoCharGroups = groups2;
+            }
+            else
+            {
+                _twoCharGroups = null;
+            }
         }
 
         /// <summary>
@@ -203,9 +248,35 @@ namespace Adan.Client.ConveyorUnits
             else
             {
                 // Для wildcard-паттернов: берём текст до первого %N
-                int wildIdx = pattern.IndexOf('%');
-                string literal = wildIdx < 0 ? pattern : pattern.Substring(0, wildIdx);
-                return literal.Length >= 2 ? literal : null;
+                // Пропускаем ведущий ^ (якорь начала строки — не буквальный символ)
+                int startIdx = (pattern.Length > 0 && pattern[0] == '^') ? 1 : 0;
+                int wildIdx = pattern.IndexOf('%', startIdx);
+                string literal = wildIdx < 0 ? pattern.Substring(startIdx) : pattern.Substring(startIdx, wildIdx - startIdx);
+                if (literal.Length >= 2)
+                    return literal;
+
+                // Паттерн начинается с %N (нет константы перед wildcard).
+                // Берём первый литерал ПОСЛЕ wildcard — он тоже обязателен.
+                // Например: "%1 оглушен." → "оглушен", "%1 взял%2 %3" → "взял"
+                if (wildIdx >= 0 && wildIdx + 2 < pattern.Length)
+                {
+                    int afterWild = wildIdx + 2; // пропускаем % и цифру
+                    // Пропускаем пробелы/знаки после wildcard
+                    while (afterWild < pattern.Length &&
+                           (pattern[afterWild] == ' ' || pattern[afterWild] == ',' || pattern[afterWild] == '.'))
+                        afterWild++;
+                    // Находим следующий сегмент до следующего %N или конца
+                    int nextWild = pattern.IndexOf('%', afterWild);
+                    string afterLiteral = nextWild < 0
+                        ? pattern.Substring(afterWild)
+                        : pattern.Substring(afterWild, nextWild - afterWild);
+                    // Обрезаем хвостовые знаки препинания
+                    afterLiteral = afterLiteral.TrimEnd('.', '!', ',', ':', ';', ' ');
+                    if (afterLiteral.Length >= 3)
+                        return afterLiteral;
+                }
+
+                return null;
             }
         }
     }

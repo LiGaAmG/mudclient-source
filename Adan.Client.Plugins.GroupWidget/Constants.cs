@@ -65,6 +65,19 @@ namespace Adan.Client.Plugins.GroupWidget
                                   new AffectDescription("GroupAccuracy", "Групповая точность", "групповая точность", "GroupAccuracy"),
                                   new AffectDescription("Tornado", Resources.Tornado, "торнадо", "Tornado") { IsRoundBased = true },
                                   new AffectDescription("Thirst", Resources.HungerThirst, new List<string> {"жажда", "голод"},new List<string> { "Thirst", "Hunger"}) { IsRoundBased = false },
+                                  new AffectDescription("Calm",            "Успокоение",          "успокоение",            "Calm"),
+                                  new AffectDescription("Sanctify",        "Освящение",           "освящение",             "Sanctify"),
+                                  new AffectDescription("MagicShield",     "Магический щит",      "магический щит",        "MagicShield"),
+                                  new AffectDescription("IceShield",       "Ледяной щит",         "ледяной щит",           "IceShield"),
+                                  new AffectDescription("SpiritAura",      "Духовная аура",       "духовная аура",         "SpiritAura"),
+                                  new AffectDescription("LightProtection", "Защита от света",     "защита от света",       "LightProtection"),
+                                  new AffectDescription("DarkProtection",  "Защита от тьмы",      "защита от тьмы",        "DarkProtection"),
+                                  new AffectDescription("StoneSkin",       "Каменная кожа",       "каменная кожа",         "StoneSkin"),
+                                  new AffectDescription("LifeTouch",       "Живое прикосновение", "живое прикосновение",   "LifeTouch"),
+                                  new AffectDescription("Enlarge",         "Увеличение",          "увеличение",            "Enlarge"),
+                                  new AffectDescription("Meditation",      "Медитация",           "медитация",             "Meditation"),
+                                  new AffectDescription("WaterBreath",     "Дыхание под водой",   "дыхание под водой",     "WaterBreath"),
+                                  new AffectDescription("Pain",            "Боль",                "боль",                  "Pain") { IsRoundBased = true },
                               };
 
         /// <summary>

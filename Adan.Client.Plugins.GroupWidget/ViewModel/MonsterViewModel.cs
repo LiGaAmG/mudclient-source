@@ -111,6 +111,18 @@
         }
 
         /// <summary>
+        /// Reassigns this VM to a completely different monster (pool reuse, bypasses name check).
+        /// </summary>
+        public void Reassign([NotNull] MonsterStatus monster, int position)
+        {
+            Assert.ArgumentNotNull(monster, "monster");
+            MonsterStatus = monster;
+            PlayerCharacter = monster.IsPlayerCharacter;
+            Boss = monster.IsBoss;
+            base.Reassign(monster, position);
+        }
+
+        /// <summary>
         /// Updates this view model from model.
         /// </summary>
         public override void UpdateFromModel(CharacterStatus characterStatus, int position)

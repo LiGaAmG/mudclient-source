@@ -28,12 +28,19 @@
         private bool _moreItemsAvailable;
         private int _nextMonsterId = 1;
 
+        // Пул VM которые больше не в Monsters (WPF уже отвязал их после ReplaceAll).
+        // Reassign на unbound VM = PropertyChanged с 0 подписчиков = бесплатно.
+        // Цель: убрать аллокации 300+ объектов на каждую комнату → меньше GC gen2 пауз.
+        private const int StandbyPoolMaxSize = 60;
+        private readonly List<MonsterViewModel> _standbyPool = new List<MonsterViewModel>(StandbyPoolMaxSize);
+
+
         /// <summary>
         /// Initializes a new instance of the <see cref="RoomMonstersViewModel"/> class.
         /// </summary>
         public RoomMonstersViewModel()
         {
-            Monsters = new ObservableCollection<MonsterViewModel>();
+            Monsters = new BulkObservableCollection<MonsterViewModel>();
 
             _tickingTimer = new DispatcherTimer(DispatcherPriority.Background);
             _tickingTimer.Interval = TimeSpan.FromSeconds(1);
@@ -103,7 +110,7 @@
         /// Gets the group mates of current player.
         /// </summary>
         [NotNull]
-        public ObservableCollection<MonsterViewModel> Monsters
+        public BulkObservableCollection<MonsterViewModel> Monsters
         {
             get;
             private set;
@@ -156,10 +163,15 @@
             if (monsterList.Count == 0 || !isRound)
             {
                 _nextMonsterId = 1;
-                Monsters.Clear();
                 MoreItemsAvailable = false;
                 if (monsterList.Count == 0)
+                {
+                    foreach (var old in Monsters)
+                        if (_standbyPool.Count < StandbyPoolMaxSize)
+                            _standbyPool.Add(old);
+                    Monsters.ReplaceAll(System.Array.Empty<MonsterViewModel>());
                     return;
+                }
             }
 
             // Group existing VMs by name for HP-based matching
@@ -219,6 +231,11 @@
                 }
             }
 
+            // Pre-compute affects list once — avoids O(monsters × affects × allAffects) linear scans inside the loop
+            var affectsForNewMonsters = _displayedAffectPriorities
+                .Select(af => Constants.AllAffects.First(a => a.Name == af))
+                .ToList();
+
             var newList = new List<MonsterViewModel>();
             bool moreItemsAvailable = false;
             int position = 1;
@@ -237,10 +254,19 @@
                     if (SelectedMonster != null && SelectedMonster == vm && RootModel != null)
                         RootModel.SelectedRoomMonster = monster;
                 }
+                else if (_standbyPool.Count > 0)
+                {
+                    // Reuse unbound VM from pool — Reassign is cheap (0 WPF subscribers).
+                    // Avoids allocating 300+ new objects per room → reduces gen2 GC pressure.
+                    vm = _standbyPool[_standbyPool.Count - 1];
+                    _standbyPool.RemoveAt(_standbyPool.Count - 1);
+                    vm.Reassign(monster, position);
+                    vm.DisplayNumber = DisplayNumber;
+                    vm.MonsterId = _nextMonsterId++;
+                }
                 else
                 {
-                    var affectsList = _displayedAffectPriorities.Select(af => Constants.AllAffects.First(a => a.Name == af));
-                    vm = new MonsterViewModel(monster, affectsList, position, AffectsPanelWidth) { DisplayNumber = DisplayNumber };
+                    vm = new MonsterViewModel(monster, affectsForNewMonsters, position, AffectsPanelWidth) { DisplayNumber = DisplayNumber };
                     vm.MonsterId = _nextMonsterId++;
                 }
 
@@ -248,28 +274,39 @@
                 position++;
             }
 
-            // Sync Monsters collection: update in-place to preserve selection and avoid flicker
-            for (int i = 0; i < newList.Count; i++)
-            {
-                if (i < Monsters.Count)
-                {
-                    if (Monsters[i] != newList[i])
-                        Monsters[i] = newList[i];
-                }
-                else
-                {
-                    Monsters.Add(newList[i]);
-                }
-            }
-
-            while (Monsters.Count > newList.Count)
-            {
-                if (SelectedMonster == Monsters[Monsters.Count - 1])
-                    SelectedMonster = null;
-                Monsters.RemoveAt(Monsters.Count - 1);
-            }
-
             MoreItemsAvailable = moreItemsAvailable;
+
+            // Проверяем: изменился ли набор VM-объектов (новые монстры / смерти)?
+            // Если набор тот же — vm.UpdateFromModel уже обновил свойства in-place,
+            // ReplaceAll (Reset notification) не нужен → WPF не перестраивает весь ListBox.
+            bool collectionChanged = newList.Count != Monsters.Count;
+            if (!collectionChanged)
+            {
+                for (int i = 0; i < newList.Count; i++)
+                {
+                    if (!ReferenceEquals(newList[i], Monsters[i]))
+                    {
+                        collectionChanged = true;
+                        break;
+                    }
+                }
+            }
+
+            if (collectionChanged)
+            {
+                if (SelectedMonster != null && !newList.Contains(SelectedMonster))
+                    SelectedMonster = null;
+
+                // Collect old VMs that won't be in the new list into standby pool
+                // BEFORE ReplaceAll — we need the old list while it's still in Monsters.
+                // After ReplaceAll WPF unbinds them, making future Reassign calls cheap.
+                var newListSet = new HashSet<MonsterViewModel>(newList);
+                foreach (var old in Monsters)
+                    if (!newListSet.Contains(old) && _standbyPool.Count < StandbyPoolMaxSize)
+                        _standbyPool.Add(old);
+
+                Monsters.ReplaceAll(newList);
+            }
 
             // Update MonsterIdMap so $monsteridN variables resolve correctly
             if (RootModel != null)

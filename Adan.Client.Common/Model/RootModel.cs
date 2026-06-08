@@ -424,6 +424,13 @@
         /// <param name="variableName">Name of the variable.</param>
         /// <param name="value">The value.</param>
         /// <param name="isSilent">IsSilent</param>
+        /// <summary>
+        /// Incremented every time any variable changes. Used by TextTrigger to skip
+        /// ReplaceVariables when nothing has changed since last regex compilation.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnore]
+        public int VariableVersion { get; private set; }
+
         public void SetVariableValue([NotNull]string variableName, [NotNull] string value, [NotNull] bool isSilent)
         {
             Assert.ArgumentNotNullOrEmpty(variableName, "variableName");
@@ -439,6 +446,8 @@
             {
                 Variables.Add(new Variable() { Name = variableName, Value = value });
             }
+
+            VariableVersion++;
 
             if (!isSilent)
             {

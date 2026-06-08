@@ -56,10 +56,14 @@
 
         // Кэш скомпилированного Regex для триггеров с переменными ($groupmate1 и т.п.).
         // Перекомпилируется только когда реально меняется resolved-паттерн.
+        // _lastVarVersion хранит RootModel.VariableVersion на момент последней компиляции —
+        // если версия не изменилась, ReplaceVariables пропускается полностью.
         [NonSerialized]
         private Regex _cachedVarRegex = null;
         [NonSerialized]
         private string _cachedVarPattern = null;
+        [NonSerialized]
+        private int _lastVarVersion = -1;
 
         private readonly Regex _wildRegex = new Regex(@"%[0-9]", RegexOptions.Compiled);
 
@@ -140,6 +144,7 @@
                 _regexRequiredLiteralResolved = false;
                 _cachedVarRegex = null;
                 _cachedVarPattern = null;
+                _lastVarVersion = -1;
                 _anyOfLiterals = null;
                 _anyOfLiteralsResolved = false;
             }
@@ -195,18 +200,28 @@
                     match = _compiledRegex.Match(textMessage.InnerText);
                 else
                 {
-                    var varReplace = rootModel.ReplaceVariables(MatchingPattern);
-                    if (!varReplace.IsAllVariables)
-                        return false;
-
-                    // Кешируем скомпилированный Regex: перекомпилируем только если
-                    // resolved-паттерн изменился (т.е. значение переменной сменилось).
-                    if (_cachedVarRegex == null || _cachedVarPattern != varReplace.Value)
+                    // Оптимизация: если переменные не менялись с последней компиляции,
+                    // пропускаем дорогой ReplaceVariables и используем кэшированный regex напрямую.
+                    int curVarVersion = rootModel.VariableVersion;
+                    if (_cachedVarRegex != null && _lastVarVersion == curVarVersion)
                     {
-                        _cachedVarPattern = varReplace.Value;
-                        _cachedVarRegex = new Regex(_cachedVarPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant);
+                        match = _cachedVarRegex.Match(textMessage.InnerText);
                     }
-                    match = _cachedVarRegex.Match(textMessage.InnerText);
+                    else
+                    {
+                        var varReplace = rootModel.ReplaceVariables(MatchingPattern);
+                        if (!varReplace.IsAllVariables)
+                            return false;
+
+                        // Перекомпилируем только если resolved-паттерн реально изменился.
+                        if (_cachedVarRegex == null || _cachedVarPattern != varReplace.Value)
+                        {
+                            _cachedVarPattern = varReplace.Value;
+                            _cachedVarRegex = new Regex(_cachedVarPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant);
+                        }
+                        _lastVarVersion = curVarVersion;
+                        match = _cachedVarRegex.Match(textMessage.InnerText);
+                    }
                 }
 
                 if (!match.Success)
@@ -297,9 +312,28 @@
             if (!IsRegExp)
             {
                 // Не-regex: текст до первого %N
-                int wildIdx = MatchingPattern.IndexOf('%');
-                string lit = wildIdx < 0 ? MatchingPattern : MatchingPattern.Substring(0, wildIdx);
-                return lit.Length >= 2 ? lit : null;
+                // Пропускаем ведущий ^ (якорь начала строки — не буквальный символ)
+                int startIdx = (MatchingPattern.Length > 0 && MatchingPattern[0] == '^') ? 1 : 0;
+                int wildIdx = MatchingPattern.IndexOf('%', startIdx);
+                string lit = wildIdx < 0 ? MatchingPattern.Substring(startIdx) : MatchingPattern.Substring(startIdx, wildIdx - startIdx);
+                if (lit.Length >= 2) return lit;
+
+                // Паттерн начинается с %N — берём первый литерал после wildcard
+                if (wildIdx >= 0 && wildIdx + 2 < MatchingPattern.Length)
+                {
+                    int afterWild = wildIdx + 2;
+                    while (afterWild < MatchingPattern.Length &&
+                           (MatchingPattern[afterWild] == ' ' || MatchingPattern[afterWild] == ',' || MatchingPattern[afterWild] == '.'))
+                        afterWild++;
+                    int nextWild = MatchingPattern.IndexOf('%', afterWild);
+                    string afterLit = nextWild < 0
+                        ? MatchingPattern.Substring(afterWild)
+                        : MatchingPattern.Substring(afterWild, nextWild - afterWild);
+                    afterLit = afterLit.TrimEnd('.', '!', ',', ':', ';', ' ');
+                    if (afterLit.Length >= 3) return afterLit;
+                }
+
+                return null;
             }
 
             // Regex без переменных — используем скомпилированный regex
@@ -353,11 +387,11 @@
                 foreach (var p in parts)
                 {
                     var w = p.Trim();
-                    if (w.Length >= 3)
+                    if (w.Length >= 2)
                         words.Add(w);
                     else
                     {
-                        // Слишком короткое — ненадёжно для фильтрации
+                        // Слишком короткое (1 символ) — ненадёжно для фильтрации
                         allGood = false;
                         break;
                     }

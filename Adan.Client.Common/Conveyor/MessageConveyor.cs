@@ -379,7 +379,12 @@ namespace Adan.Client.Common.Conveyor
                     }
 #if DEBUG
                     if (totalMs >= 10)
-                        PerfLog.WriteTotal(msgTypeName, totalMs, slowUnits.ToString());
+                    {
+                        var textMsg = message as Common.Messages.TextMessage;
+                        var innerText = textMsg?.InnerText ?? "";
+                        if (innerText.Length > 80) innerText = innerText.Substring(0, 80) + "...";
+                        PerfLog.WriteTotal(msgTypeName, totalMs, slowUnits.ToString(), innerText);
+                    }
 #endif
                 }
 

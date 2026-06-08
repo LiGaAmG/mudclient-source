@@ -127,28 +127,16 @@
                                 <RowDefinition Height="14" />
                                 <RowDefinition Height="6" />
                             </Grid.RowDefinitions>
-                            <Border Width="60"
-                                    HorizontalAlignment="Left"
-                                    Height="14"
-                                    Grid.Row="0"
-                                    Background="{Binding HitsColor, Converter={StaticResource BackgroundTextColorToBrushConverter}}"
-                                    Panel.ZIndex="0" />
-                            <Border Width="{Binding Converter={StaticResource PercentageConverter}, ConverterParameter=60, Path=HitsPercent}"
-                                    HorizontalAlignment="Left"
-                                    Height="14"
-                                    Grid.Row="0"
-                                    Panel.ZIndex="1">
-                                <Border.Background>
-                                    <LinearGradientBrush EndPoint="0.5,1"
-                                                         StartPoint="0.5,0">
-                                        <GradientStop Color="#FF226E01" />
-                                        <GradientStop Color="White"
-                                                      Offset="0.5" />
-                                        <GradientStop Color="#FF226E01"
-                                                      Offset="1" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                            </Border>
+                            <!-- Canvas изолирует Width-binding от layout-cascade наверх.
+                                 InvalidateMeasure на Rectangle внутри Canvas не распространяется
+                                 на StackPanel/ListBox снаружи — только Canvas перемеривает себя. -->
+                            <Canvas Width="60" Height="14" Grid.Row="0" Panel.ZIndex="0" ClipToBounds="True">
+                                <Rectangle Width="60" Height="14"
+                                           Fill="{Binding HitsColor, Converter={StaticResource BackgroundTextColorToBrushConverter}}" />
+                                <Rectangle Width="{Binding HitsPercent, Converter={StaticResource PercentageConverter}, ConverterParameter=60}"
+                                           Height="14"
+                                           Fill="{StaticResource HpBarGradientBrush}" />
+                            </Canvas>
                             <TextBlock Text="{Binding HitsPercent, StringFormat=\{0\,4:##0\\%\}}"
                                        VerticalAlignment="Center"
                                        HorizontalAlignment="Center"
@@ -157,28 +145,13 @@
                                        FontSize="11"
                                        Grid.Row="0"
                                        Panel.ZIndex="1" />
-                            <Border Width="60"
-                                    HorizontalAlignment="Left"
-                                    Height="6"
-                                    Grid.Row="1"
-                                    Background="{Binding MovesColor, Converter={StaticResource BackgroundTextColorToBrushConverter}}"
-                                    Panel.ZIndex="0" />
-                            <Border Width="{Binding Converter={StaticResource PercentageConverter}, ConverterParameter=60, Path=MovesPercent}"
-                                    HorizontalAlignment="Left"
-                                    Height="6"
-                                    Grid.Row="1"
-                                    Panel.ZIndex="1">
-                                <Border.Background>
-                                    <LinearGradientBrush EndPoint="0.5,1"
-                                                         StartPoint="0.5,0">
-                                        <GradientStop Color="#FFBA0202" />
-                                        <GradientStop Color="White"
-                                                      Offset="0.5" />
-                                        <GradientStop Color="#FFBA0202"
-                                                      Offset="1" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                            </Border>
+                            <Canvas Width="60" Height="6" Grid.Row="1" Panel.ZIndex="0" ClipToBounds="True">
+                                <Rectangle Width="60" Height="6"
+                                           Fill="{Binding MovesColor, Converter={StaticResource BackgroundTextColorToBrushConverter}}" />
+                                <Rectangle Width="{Binding MovesPercent, Converter={StaticResource PercentageConverter}, ConverterParameter=60}"
+                                           Height="6"
+                                           Fill="{StaticResource MovesBarGradientBrush}" />
+                            </Canvas>
                         </Grid>
                         <Image Style="{StaticResource SmallIcon}"
                                Margin="5,0,0,0"

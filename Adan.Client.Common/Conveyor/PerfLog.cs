@@ -37,9 +37,11 @@ namespace Adan.Client.Common.Conveyor
         /// <summary>
         /// Записывает суммарное время обработки одного сообщения всеми юнитами.
         /// </summary>
-        public static void WriteTotal(string messageName, long totalMs, string slowUnits)
+        public static void WriteTotal(string messageName, long totalMs, string slowUnits, string innerText = "")
         {
-            var line = $"{DateTime.Now:HH:mm:ss.fff} | {totalMs,4}ms | *** TOTAL *** | {messageName} | [{slowUnits}]\r\n";
+            var line = string.IsNullOrEmpty(innerText)
+                ? $"{DateTime.Now:HH:mm:ss.fff} | {totalMs,4}ms | *** TOTAL *** | {messageName} | [{slowUnits}]\r\n"
+                : $"{DateTime.Now:HH:mm:ss.fff} | {totalMs,4}ms | *** TOTAL *** | [{slowUnits}] | \"{innerText}\"\r\n";
             lock (_lock)
             {
                 try { File.AppendAllText(_logPath, line, Encoding.UTF8); }
@@ -53,6 +55,19 @@ namespace Adan.Client.Common.Conveyor
         public static void WriteNet(int bytes, long parseMs)
         {
             var line = $"{DateTime.Now:HH:mm:ss.fff} |      | >>> NET {bytes}b parse={parseMs}ms\r\n";
+            lock (_lock)
+            {
+                try { File.AppendAllText(_logPath, line, Encoding.UTF8); }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Записывает задержку обновления виджета: от постановки в очередь до реального выполнения на UI-потоке.
+        /// </summary>
+        public static void WriteWidget(string widgetName, long queuedToExecuteMs, long executeMs)
+        {
+            var line = $"{DateTime.Now:HH:mm:ss.fff} |      | >>> WIDGET {widgetName} waited={queuedToExecuteMs}ms update={executeMs}ms\r\n";
             lock (_lock)
             {
                 try { File.AppendAllText(_logPath, line, Encoding.UTF8); }

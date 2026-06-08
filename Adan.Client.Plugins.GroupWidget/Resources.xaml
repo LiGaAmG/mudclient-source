@@ -3,6 +3,18 @@
                     xmlns:Utils="clr-namespace:Adan.Client.Common.Utils;assembly=Adan.Client.Common"
                     xmlns:Model="clr-namespace:Adan.Client.Common.Model;assembly=Adan.Client.Common"
                     xmlns:System="clr-namespace:System;assembly=mscorlib">
+    <!-- Shared HP/Moves bar gradient brushes — defined once, reused across all ListBox items -->
+    <LinearGradientBrush x:Key="HpBarGradientBrush" EndPoint="0.5,1" StartPoint="0.5,0">
+        <GradientStop Color="#FF226E01" />
+        <GradientStop Color="White" Offset="0.5" />
+        <GradientStop Color="#FF226E01" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="MovesBarGradientBrush" EndPoint="0.5,1" StartPoint="0.5,0">
+        <GradientStop Color="#FFBA0202" />
+        <GradientStop Color="White" Offset="0.5" />
+        <GradientStop Color="#FFBA0202" Offset="1" />
+    </LinearGradientBrush>
+
     <VisualBrush x:Key="Brush_Standing"
                  Stretch="Uniform">
         <VisualBrush.Visual>
@@ -6389,6 +6401,256 @@
             </Grid>
         </VisualBrush.Visual>
     </VisualBrush>
+    <!-- ══════════════ NEW AFFECTS ══════════════ -->
+    <!-- Calm — волна (успокоение) -->
+    <VisualBrush x:Key="Brush_Calm" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M0,10 C4,2 8,2 12,10 C16,18 20,18 24,10 L24,14 C20,22 16,22 12,14 C8,6 4,6 0,14 Z"
+                      Width="24" Height="12" Canvas.Left="1" Canvas.Top="7" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FF87CEEB" Offset="0"/>
+                            <GradientStop Color="#FF1E6FBF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- Sanctify — крест (освящение) -->
+    <VisualBrush x:Key="Brush_Sanctify" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M8,0 L16,0 L16,8 L24,8 L24,16 L16,16 L16,24 L8,24 L8,16 L0,16 L0,8 L8,8 Z"
+                      Width="24" Height="24" Canvas.Left="1" Canvas.Top="1" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FFFFF9C0" Offset="0"/>
+                            <GradientStop Color="#FFFFC800" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- MagicShield — щит со звездой (магический щит) -->
+    <VisualBrush x:Key="Brush_MagicShield" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M12,0 L22,4 L22,13 C22,19 12,24 12,24 C12,24 2,19 2,13 L2,4 Z"
+                      Width="20" Height="24" Canvas.Left="3" Canvas.Top="1" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FF9090FF" Offset="0"/>
+                            <GradientStop Color="#FF2828AA" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <Path Data="M12,6 L13.5,10 L17.7,10.2 L14.4,12.8 L15.5,16.9 L12,14.5 L8.5,16.9 L9.6,12.8 L6.3,10.2 L10.5,10 Z"
+                      Width="11.4" Height="10.9" Canvas.Left="6.3" Canvas.Top="6" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill><SolidColorBrush Color="#CCFFFFFF"/></Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- IceShield — 6-конечная звезда (ледяной щит) -->
+    <VisualBrush x:Key="Brush_IceShield" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M13,2 L15.75,8.24 L22.5,7.5 L18.5,13 L22.5,18.5 L15.75,17.76 L13,24 L10.25,17.76 L3.5,18.5 L7.5,13 L3.5,7.5 L10.25,8.24 Z"
+                      Width="19" Height="22" Canvas.Left="3.5" Canvas.Top="2" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#FFCCFFFF" Offset="0"/>
+                            <GradientStop Color="#FF00AACC" Offset="0.6"/>
+                            <GradientStop Color="#FF005577" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- SpiritAura — 8-конечная звезда (духовная аура) -->
+    <VisualBrush x:Key="Brush_SpiritAura" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M12,1 L13.7,7.8 L19.8,4.2 L16.2,10.3 L23,12 L16.2,13.7 L19.8,19.8 L13.7,16.2 L12,23 L10.3,16.2 L4.2,19.8 L7.8,13.7 L1,12 L7.8,10.3 L4.2,4.2 L10.3,7.8 Z"
+                      Width="22" Height="22" Canvas.Left="2" Canvas.Top="2" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#FFEE88FF" Offset="0"/>
+                            <GradientStop Color="#FF7700CC" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- LightProtection — 4-конечная звезда/солнце (защита от света) -->
+    <VisualBrush x:Key="Brush_LightProtection" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M12,1 L14.2,7.8 L21.5,4.5 L18.2,10.3 L25,12 L18.2,14.2 L21.5,21.5 L14.2,18.2 L12,25 L9.8,18.2 L4.5,21.5 L7.8,14.2 L1,12 L7.8,9.8 L4.5,4.5 L9.8,7.8 Z"
+                      Width="24" Height="24" Canvas.Left="1" Canvas.Top="1" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#FFFFFFF0" Offset="0"/>
+                            <GradientStop Color="#FFFFD700" Offset="0.7"/>
+                            <GradientStop Color="#FFFF8C00" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- DarkProtection — полумесяц (защита от тьмы) -->
+    <VisualBrush x:Key="Brush_DarkProtection" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Stretch="Fill" Width="22" Height="22" Canvas.Left="2" Canvas.Top="2" StrokeThickness="0">
+                    <Path.Data>
+                        <CombinedGeometry GeometryCombineMode="Exclude">
+                            <CombinedGeometry.Geometry1>
+                                <EllipseGeometry Center="11,11" RadiusX="11" RadiusY="11"/>
+                            </CombinedGeometry.Geometry1>
+                            <CombinedGeometry.Geometry2>
+                                <EllipseGeometry Center="15,11" RadiusX="8.5" RadiusY="9.5"/>
+                            </CombinedGeometry.Geometry2>
+                        </CombinedGeometry>
+                    </Path.Data>
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                            <GradientStop Color="#FFCC88FF" Offset="0"/>
+                            <GradientStop Color="#FF3D0070" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- StoneSkin — шестиугольник (каменная кожа) -->
+    <VisualBrush x:Key="Brush_StoneSkin" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M12,1 L21.5,6.5 L21.5,17.5 L12,23 L2.5,17.5 L2.5,6.5 Z"
+                      Width="19" Height="22" Canvas.Left="3.5" Canvas.Top="2" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.3,0" EndPoint="0.7,1">
+                            <GradientStop Color="#FFCCAA88" Offset="0"/>
+                            <GradientStop Color="#FF6B4F2E" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <Path Data="M12,1 L21.5,6.5 L21.5,17.5 L12,23 L2.5,17.5 L2.5,6.5 Z"
+                      Width="19" Height="22" Canvas.Left="3.5" Canvas.Top="2" Stretch="Fill"
+                      StrokeThickness="1.5" Stroke="#FF8B6540" Fill="Transparent"/>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- LifeTouch — сердце (живое прикосновение) -->
+    <VisualBrush x:Key="Brush_LifeTouch" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M12,20 C6,15 0,12 0,6 C0,2.7 3,0.5 6,0.5 C9,0.5 11,2.5 12,4 C13,2.5 15,0.5 18,0.5 C21,0.5 24,2.7 24,6 C24,12 18,15 12,20 Z"
+                      Width="24" Height="19.5" Canvas.Left="1" Canvas.Top="3" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FF88FF88" Offset="0"/>
+                            <GradientStop Color="#FF008800" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- Enlarge — 4 стрелки (увеличение) -->
+    <VisualBrush x:Key="Brush_Enlarge" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M10,0 L14,0 L14,7 L17,7 L17,6 L24,12 L17,18 L17,17 L14,17 L14,24 L10,24 L10,17 L7,17 L7,18 L0,12 L7,6 L7,7 L10,7 Z"
+                      Width="24" Height="24" Canvas.Left="1" Canvas.Top="1" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#FFFFCC00" Offset="0"/>
+                            <GradientStop Color="#FFFF6600" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- Meditation — лотос (медитация) -->
+    <VisualBrush x:Key="Brush_Meditation" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <!-- Центральный лепесток -->
+                <Path Data="M13,4 C16,4 18,7 18,11 C18,15 16,18 13,19 C10,18 8,15 8,11 C8,7 10,4 13,4 Z"
+                      StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FFAACCEE" Offset="0"/>
+                            <GradientStop Color="#FF4477AA" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <!-- Левый лепесток -->
+                <Path Data="M7,6 C4,5 2,8 3,12 C4,15 6,17 9,17 C7,15 6,12 7,9 Z"
+                      StrokeThickness="0">
+                    <Path.Fill><SolidColorBrush Color="#886699BB"/></Path.Fill>
+                </Path>
+                <!-- Правый лепесток -->
+                <Path Data="M19,6 C22,5 24,8 23,12 C22,15 20,17 17,17 C19,15 20,12 19,9 Z"
+                      StrokeThickness="0">
+                    <Path.Fill><SolidColorBrush Color="#886699BB"/></Path.Fill>
+                </Path>
+                <!-- Основание -->
+                <Rectangle Width="20" Height="3" Canvas.Left="3" Canvas.Top="19" RadiusX="1.5" RadiusY="1.5">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FF6699BB" Offset="0"/>
+                            <GradientStop Color="#FF334466" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- WaterBreath — капля воды (дыхание под водой) -->
+    <VisualBrush x:Key="Brush_WaterBreath" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M13,1 C8,6 2,11 2,17 A11,11 0 0 0 24,17 C24,11 18,6 13,1 Z"
+                      Width="22" Height="23" Canvas.Left="2" Canvas.Top="1" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.3,0" EndPoint="0.7,1">
+                            <GradientStop Color="#FF88FFEE" Offset="0"/>
+                            <GradientStop Color="#FF008080" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <!-- Блик -->
+                <Path Data="M10,6 C8,8 7,11 8,13" StrokeThickness="2" Stroke="#66FFFFFF"/>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- Pain — молния (боль) -->
+    <VisualBrush x:Key="Brush_Pain" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <Path Data="M15,1 L7,13 L13,13 L9,25 L19,11 L13,11 Z"
+                      Width="12" Height="24" Canvas.Left="7" Canvas.Top="1" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FFFF4444" Offset="0"/>
+                            <GradientStop Color="#FF660000" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- ══════════════════════════════════════════ -->
     <GeometryDrawing x:Key="Drawing_Standing"
                      Brush="{StaticResource Brush_Standing}">
         <GeometryDrawing.Geometry>
@@ -6683,6 +6945,19 @@
             <RectangleGeometry Rect="0,0,100,100" />
         </GeometryDrawing.Geometry>
     </GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Calm"         Brush="{StaticResource Brush_Calm}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Sanctify"     Brush="{StaticResource Brush_Sanctify}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_MagicShield"  Brush="{StaticResource Brush_MagicShield}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_IceShield"    Brush="{StaticResource Brush_IceShield}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_SpiritAura"   Brush="{StaticResource Brush_SpiritAura}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_LightProtection" Brush="{StaticResource Brush_LightProtection}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_DarkProtection"  Brush="{StaticResource Brush_DarkProtection}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_StoneSkin"    Brush="{StaticResource Brush_StoneSkin}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_LifeTouch"    Brush="{StaticResource Brush_LifeTouch}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Enlarge"      Brush="{StaticResource Brush_Enlarge}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Meditation"   Brush="{StaticResource Brush_Meditation}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_WaterBreath"  Brush="{StaticResource Brush_WaterBreath}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Pain"         Brush="{StaticResource Brush_Pain}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <DrawingImage x:Key="ImageSource_Standing"
                   Drawing="{StaticResource Drawing_Standing}" />
     <DrawingImage x:Key="ImageSource_Sitting"
@@ -6781,6 +7056,20 @@
                   Drawing="{StaticResource Drawing_Hunger}" />
     <DrawingImage x:Key="ImageSource_Thirst"
                   Drawing="{StaticResource Drawing_Thirst}" />
+
+    <DrawingImage x:Key="ImageSource_Calm"            Drawing="{StaticResource Drawing_Calm}" />
+    <DrawingImage x:Key="ImageSource_Sanctify"         Drawing="{StaticResource Drawing_Sanctify}" />
+    <DrawingImage x:Key="ImageSource_MagicShield"      Drawing="{StaticResource Drawing_MagicShield}" />
+    <DrawingImage x:Key="ImageSource_IceShield"        Drawing="{StaticResource Drawing_IceShield}" />
+    <DrawingImage x:Key="ImageSource_SpiritAura"       Drawing="{StaticResource Drawing_SpiritAura}" />
+    <DrawingImage x:Key="ImageSource_LightProtection"  Drawing="{StaticResource Drawing_LightProtection}" />
+    <DrawingImage x:Key="ImageSource_DarkProtection"   Drawing="{StaticResource Drawing_DarkProtection}" />
+    <DrawingImage x:Key="ImageSource_StoneSkin"        Drawing="{StaticResource Drawing_StoneSkin}" />
+    <DrawingImage x:Key="ImageSource_LifeTouch"        Drawing="{StaticResource Drawing_LifeTouch}" />
+    <DrawingImage x:Key="ImageSource_Enlarge"          Drawing="{StaticResource Drawing_Enlarge}" />
+    <DrawingImage x:Key="ImageSource_Meditation"       Drawing="{StaticResource Drawing_Meditation}" />
+    <DrawingImage x:Key="ImageSource_WaterBreath"      Drawing="{StaticResource Drawing_WaterBreath}" />
+    <DrawingImage x:Key="ImageSource_Pain"             Drawing="{StaticResource Drawing_Pain}" />
 
     <DrawingBrush Stretch="None"
                   TileMode="Tile"
@@ -6940,6 +7229,19 @@
                            Then="{StaticResource ImageSource_Hunger}" />
         <Utils:SwitchCase  When="Thirst"
                            Then="{StaticResource ImageSource_Thirst}" />
+        <Utils:SwitchCase  When="Calm"            Then="{StaticResource ImageSource_Calm}" />
+        <Utils:SwitchCase  When="Sanctify"        Then="{StaticResource ImageSource_Sanctify}" />
+        <Utils:SwitchCase  When="MagicShield"     Then="{StaticResource ImageSource_MagicShield}" />
+        <Utils:SwitchCase  When="IceShield"       Then="{StaticResource ImageSource_IceShield}" />
+        <Utils:SwitchCase  When="SpiritAura"      Then="{StaticResource ImageSource_SpiritAura}" />
+        <Utils:SwitchCase  When="LightProtection" Then="{StaticResource ImageSource_LightProtection}" />
+        <Utils:SwitchCase  When="DarkProtection"  Then="{StaticResource ImageSource_DarkProtection}" />
+        <Utils:SwitchCase  When="StoneSkin"       Then="{StaticResource ImageSource_StoneSkin}" />
+        <Utils:SwitchCase  When="LifeTouch"       Then="{StaticResource ImageSource_LifeTouch}" />
+        <Utils:SwitchCase  When="Enlarge"         Then="{StaticResource ImageSource_Enlarge}" />
+        <Utils:SwitchCase  When="Meditation"      Then="{StaticResource ImageSource_Meditation}" />
+        <Utils:SwitchCase  When="WaterBreath"     Then="{StaticResource ImageSource_WaterBreath}" />
+        <Utils:SwitchCase  When="Pain"            Then="{StaticResource ImageSource_Pain}" />
     </Utils:SwitchConverter>
 
     <Style x:Key="SmallIcon"

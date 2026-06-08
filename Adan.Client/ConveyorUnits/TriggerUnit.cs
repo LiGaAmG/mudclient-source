@@ -44,7 +44,7 @@ namespace Adan.Client.ConveyorUnits
         }
 
         private List<TriggerEntry> _orderedTriggers = null;
-        private string[] _uniqueLiterals = null;
+        private Dictionary<(char, char), string[]> _twoCharLiteralGroups = null;
         private int _lastIndexedTriggerCount = -1;
         private int _lastEnabledGroupCount = -1;
 
@@ -110,15 +110,27 @@ namespace Adan.Client.ConveyorUnits
 
             string text = textMsg?.InnerText ?? string.Empty;
 
-            // Определяем какие литералы присутствуют в тексте
+            // Определяем какие литералы присутствуют в тексте через 2-символьный индекс.
             HashSet<string> presentLiterals = null;
-            if (_uniqueLiterals != null && _uniqueLiterals.Length > 0 && text.Length > 0)
+            if (_twoCharLiteralGroups != null && text.Length >= 2)
             {
-                presentLiterals = new HashSet<string>();
-                foreach (var lit in _uniqueLiterals)
+                presentLiterals = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < text.Length - 1; i++)
                 {
-                    if (text.IndexOf(lit, System.StringComparison.OrdinalIgnoreCase) >= 0)
-                        presentLiterals.Add(lit);
+                    // Проверяем как lowercase-пару (OrdinalIgnoreCase)
+                    char c0 = char.ToLowerInvariant(text[i]);
+                    char c1 = char.ToLowerInvariant(text[i + 1]);
+                    if (_twoCharLiteralGroups.TryGetValue((c0, c1), out var candidates))
+                    {
+                        foreach (var lit in candidates)
+                        {
+                            if (!presentLiterals.Contains(lit)
+                                && text.IndexOf(lit, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                presentLiterals.Add(lit);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -193,7 +205,30 @@ namespace Adan.Client.ConveyorUnits
             }
 
             _orderedTriggers = ordered;
-            _uniqueLiterals = uniqueSet.Count > 0 ? uniqueSet.ToArray() : null;
+
+            // Строим 2-символьный индекс по lowercase-парам (т.к. OrdinalIgnoreCase).
+            if (uniqueSet.Count > 0)
+            {
+                var tempGroups = new Dictionary<(char, char), List<string>>();
+                foreach (var lit in uniqueSet)
+                {
+                    if (lit.Length >= 2)
+                    {
+                        var key = (char.ToLowerInvariant(lit[0]), char.ToLowerInvariant(lit[1]));
+                        if (!tempGroups.TryGetValue(key, out var list))
+                            tempGroups[key] = list = new List<string>();
+                        list.Add(lit);
+                    }
+                }
+                var groups2 = new Dictionary<(char, char), string[]>(tempGroups.Count);
+                foreach (var kv in tempGroups)
+                    groups2[kv.Key] = kv.Value.ToArray();
+                _twoCharLiteralGroups = groups2.Count > 0 ? groups2 : null;
+            }
+            else
+            {
+                _twoCharLiteralGroups = null;
+            }
         }
     }
 }

@@ -99,6 +99,7 @@
     </Compile>
     <Compile Include="ViewModel\SelectedMonsterParameterViewModel.cs" />
     <Compile Include="ViewModel\MonsterViewModel.cs" />
+    <Compile Include="ViewModel\BulkObservableCollection.cs" />
     <Compile Include="ViewModel\RoomMonstersViewModel.cs" />
     <Compile Include="ViewModel\GroupMateViewModel.cs" />
     <Compile Include="ViewModel\GroupStatusViewModel.cs" />

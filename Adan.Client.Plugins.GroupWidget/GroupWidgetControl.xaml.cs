@@ -30,6 +30,7 @@ namespace Adan.Client.Plugins.GroupWidget
     {
         private readonly object _stack_lock = new object();
         private readonly Stack<List<CharacterStatus>> _charactrers_stack = new Stack<List<CharacterStatus>>();
+        private bool _updatePending = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GroupWidgetControl"/> class.
@@ -108,15 +109,25 @@ namespace Adan.Client.Plugins.GroupWidget
         {
             Assert.ArgumentNotNull(characters, "characters");
 
+#if DEBUG
+            long queuedTick = System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
+
             Action actToExecute = () =>
             {
                 try
                 {
+#if DEBUG
+                    long executeTick = System.Diagnostics.Stopwatch.GetTimestamp();
+                    long waitedMs = (long)((executeTick - queuedTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+                    var updateSw = System.Diagnostics.Stopwatch.StartNew();
+#endif
                     GroupStatusViewModel viewModel = DataContext as GroupStatusViewModel;
 
                     List<CharacterStatus> list = null;
                     lock (_stack_lock)
                     {
+                        _updatePending = false;
                         if (_charactrers_stack.Count > 0)
                         {
                             list = _charactrers_stack.Pop();
@@ -128,16 +139,25 @@ namespace Adan.Client.Plugins.GroupWidget
                     {
                         viewModel.UpdateModel(list);
                     }
+#if DEBUG
+                    updateSw.Stop();
+                    if (waitedMs >= 20 || updateSw.ElapsedMilliseconds >= 5)
+                        Common.Conveyor.PerfLog.WriteWidget("GroupWidget", waitedMs, updateSw.ElapsedMilliseconds);
+#endif
                 }
                 catch (Exception) { }
             };
 
+            bool needInvoke;
             lock (_stack_lock)
             {
                 _charactrers_stack.Push(characters);
+                needInvoke = !_updatePending;
+                if (needInvoke) _updatePending = true;
             }
 
-            Application.Current.Dispatcher.BeginInvoke(actToExecute, DispatcherPriority.Background);
+            if (needInvoke)
+                Application.Current.Dispatcher.BeginInvoke(actToExecute, DispatcherPriority.Background);
         }
 
         private void CancelFocusingListBoxItem([NotNull] object sender, [NotNull] MouseButtonEventArgs e)

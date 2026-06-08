@@ -97,21 +97,32 @@ namespace Adan.Client.Plugins.GroupWidget
         }
 
         private bool _pendingIsRound = true;
+        private bool _updatePending = false;
 
         public void UpdateModel([NotNull] List<MonsterStatus> characters, bool isRound = true)
         {
             Assert.ArgumentNotNull(characters, "roomMonstersMessage");
 
+#if DEBUG
+            long queuedTick = System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
+
             Action actToExecute = () =>
             {
                 try
                 {
+#if DEBUG
+                    long executeTick = System.Diagnostics.Stopwatch.GetTimestamp();
+                    long waitedMs = (long)((executeTick - queuedTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+                    var updateSw = System.Diagnostics.Stopwatch.StartNew();
+#endif
                     RoomMonstersViewModel viewModel = DataContext as RoomMonstersViewModel;
 
                     List<MonsterStatus> list = null;
                     bool pendingIsRound;
                     lock (_stack_lock)
                     {
+                        _updatePending = false;
                         if (_monsters_stack.Count > 0)
                         {
                             list = _monsters_stack.Pop();
@@ -124,17 +135,26 @@ namespace Adan.Client.Plugins.GroupWidget
                     {
                         viewModel.UpdateModel(list, pendingIsRound);
                     }
+#if DEBUG
+                    updateSw.Stop();
+                    if (waitedMs >= 20 || updateSw.ElapsedMilliseconds >= 5)
+                        Common.Conveyor.PerfLog.WriteWidget("MonstersWidget", waitedMs, updateSw.ElapsedMilliseconds);
+#endif
                 }
                 catch (Exception) { }
             };
 
+            bool needInvoke;
             lock (_stack_lock)
             {
                 _monsters_stack.Push(characters);
                 _pendingIsRound = isRound;
+                needInvoke = !_updatePending;
+                if (needInvoke) _updatePending = true;
             }
 
-            Application.Current.Dispatcher.BeginInvoke(actToExecute, DispatcherPriority.Background);
+            if (needInvoke)
+                Application.Current.Dispatcher.BeginInvoke(actToExecute, DispatcherPriority.Background);
         }
 
         private void CancelFocusingListBoxItem([NotNull] object sender, [NotNull] MouseButtonEventArgs e)

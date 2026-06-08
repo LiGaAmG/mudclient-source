@@ -44,6 +44,10 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
         private string _lastShownObjectName = string.Empty;
 
+        // Подсветка лор-предметов жёлтым цветом. Можно отключить командой "лор цвет выкл".
+        private bool _loreHighlightEnabled = true;
+        private static readonly string LoreColorConfigFileName = "_color.cfg";
+
         // Volatile: фоновый таймер атомарно заменяет весь словарь новой версией.
         // Горячий путь (MarkKnownLoreItems) только читает — никогда не трогает диск.
         private volatile Dictionary<string, LoreTooltip> _loreTooltipsByObjectName = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
@@ -89,6 +93,9 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
         public StuffDatabaseUnit(MessageConveyor conveyor) : base(conveyor)
         {
+            // Загрузить настройку цвета
+            LoadLoreColorConfig();
+
             // Первичная загрузка кэша сразу в фоне
             System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
             // Периодическая проверка изменений папки каждые 10 секунд — только в фоне
@@ -294,6 +301,18 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                                       ? string.Empty
                                       : commandText.Remove(0, Resources.LoreCommand.Length + 1).Trim().Replace(" ", "_").Replace("\"", string.Empty);
 
+                // "лор цвет вкл" / "лор цвет выкл"
+                if (searchQuery.Equals("цвет_вкл", StringComparison.CurrentCultureIgnoreCase)
+                    || searchQuery.Equals("цвет_выкл", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    _loreHighlightEnabled = searchQuery.Equals("цвет_вкл", StringComparison.CurrentCultureIgnoreCase);
+                    SaveLoreColorConfig();
+                    PushMessageToConveyor(new InfoMessage(
+                        _loreHighlightEnabled ? "Подсветка лор-предметов включена." : "Подсветка лор-предметов выключена.",
+                        TextColor.BrightYellow));
+                    return;
+                }
+
                 // "лор" / "lore" без аргументов или с "?" / "help" / "справка" — показать список команд
                 if (string.IsNullOrEmpty(searchQuery)
                     || searchQuery.Equals("?", StringComparison.CurrentCultureIgnoreCase)
@@ -466,7 +485,34 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             PushMessageToConveyor(new InfoMessage("    пример: лорд небольшой крысы, Свалка в Минас-Моргуле", TextColor.Cyan));
             PushMessageToConveyor(new InfoMessage("  лорд удалить N              — удалить место дропа по номеру", TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage("    пример: лорд удалить 2", TextColor.Cyan));
+            PushMessageToConveyor(new InfoMessage(string.Format("  лор цвет вкл/выкл           — подсветка [предметов] жёлтым (сейчас: {0})", _loreHighlightEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage("──────────────────────────────────────────────────────────", TextColor.BrightWhite));
+        }
+
+        private void LoadLoreColorConfig()
+        {
+            try
+            {
+                var path = Path.Combine(GetStuffDbFolder(), LoreColorConfigFileName);
+                if (File.Exists(path))
+                {
+                    var val = File.ReadAllText(path).Trim();
+                    _loreHighlightEnabled = !val.Equals("выкл", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch { }
+        }
+
+        private void SaveLoreColorConfig()
+        {
+            try
+            {
+                if (!Directory.Exists(GetStuffDbFolder()))
+                    Directory.CreateDirectory(GetStuffDbFolder());
+                File.WriteAllText(Path.Combine(GetStuffDbFolder(), LoreColorConfigFileName),
+                    _loreHighlightEnabled ? "вкл" : "выкл");
+            }
+            catch { }
         }
 
         private void SaveLoreFile([NotNull] string fileName, [NotNull] LoreMessage loreMessage)
@@ -659,12 +705,12 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     var styleBlock = GetBlockForCharIndex(spans, match.Index + 1) ?? GetBlockForCharIndex(spans, match.Index);
                     if (styleBlock != null)
                     {
-                        resultBlocks.Add(new TextMessageBlock("[" + objectName + "]", TextColor.BrightYellow, styleBlock.Background, loreTooltip.PlainText, loreTooltip.Lines));
+                        resultBlocks.Add(new TextMessageBlock("[" + objectName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreTooltip.PlainText, loreTooltip.Lines));
                         isChanged = true;
                     }
                     else
                     {
-                        resultBlocks.Add(new TextMessageBlock("[" + objectName + "]", TextColor.BrightYellow, TextColor.None, loreTooltip.PlainText, loreTooltip.Lines));
+                        resultBlocks.Add(new TextMessageBlock("[" + objectName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : TextColor.None, TextColor.None, loreTooltip.PlainText, loreTooltip.Lines));
                         isChanged = true;
                     }
 
@@ -863,7 +909,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             AppendRangeAsStyledBlocks(resultBlocks, spans, 0, loreMatch.Start);
 
             var styleBlock = GetBlockForCharIndex(spans, loreMatch.Start) ?? sourceBlocks[0];
-            resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", TextColor.BrightYellow, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
+            resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
 
             AppendRangeAsStyledBlocks(resultBlocks, spans, loreMatch.End, sourceText.Length);
             textMessage.UpdateMessageBlocks(resultBlocks);
@@ -898,7 +944,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             AppendRangeAsStyledBlocks(resultBlocks, spans, 0, loreMatch.Start);
 
             var styleBlock = GetBlockForCharIndex(spans, loreMatch.Start) ?? sourceBlocks[0];
-            resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", TextColor.BrightYellow, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
+            resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
 
             AppendRangeAsStyledBlocks(resultBlocks, spans, loreMatch.End, sourceText.Length);
             textMessage.UpdateMessageBlocks(resultBlocks);
@@ -1093,19 +1139,60 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 return true;
             }
 
-            if (trimmed.StartsWith("Вы ", StringComparison.CurrentCultureIgnoreCase)
-                || trimmed.StartsWith("Вещь:", StringComparison.CurrentCultureIgnoreCase)
+            if (trimmed.StartsWith("Вещь:", StringComparison.CurrentCultureIgnoreCase)
                 || trimmed.StartsWith("Объект ", StringComparison.CurrentCultureIgnoreCase))
             {
                 return true;
             }
 
-            if (trimmed.Length > 4 && char.IsLetter(trimmed[0]))
+            // Только строки с заглавной буквы могут быть NPC-действиями.
+            // Описания комнат часто начинаются с маленькой (продолжение абзаца) — пропускаем.
+            if (trimmed.Length > 4 && char.IsUpper(trimmed[0]))
             {
-                var words = _wordRx.Matches(trimmed);
-                if (IsLikelyThirdPersonActionLine(words))
+                // Строки присутствия NPC в комнате ("Орк стоит здесь", "Орк сидит здесь")
+                // не содержат лор-предметов — пропускаем до дорогого pipeline.
+                bool isRoomPresence =
+                    trimmed.IndexOf(" здесь", StringComparison.Ordinal) >= 0 ||
+                    trimmed.IndexOf(" тут,", StringComparison.Ordinal) >= 0 ||
+                    (trimmed.EndsWith(" тут.", StringComparison.Ordinal) || trimmed.EndsWith(" тут", StringComparison.Ordinal));
+
+                // Строки вида "Орк ударил вас на 47 урона" — атака на игрока,
+                // не могут содержать лор-предмет. Пропускаем до дорогого pipeline.
+                bool targetedAtPlayer =
+                    trimmed.IndexOf(" вас", StringComparison.Ordinal) >= 0 ||
+                    trimmed.IndexOf(" тебя", StringComparison.Ordinal) >= 0;
+
+                if (!isRoomPresence && !targetedAtPlayer)
                 {
-                    return true;
+                    // Для строк "Вы ..." пропускаем глаголы не связанные с предметами:
+                    // "Вы стоите/находитесь/передвигаетесь/не можете/вернулись/вышли" и т.п.
+                    // Подбор/экипировка предметов ("Вы взяли/надели/сняли") — пропускаем через pipeline.
+                    bool runThirdPersonCheck = true;
+                    if (trimmed.StartsWith("Вы ", StringComparison.Ordinal))
+                    {
+                        // Быстрый pre-check: глагол стоит вторым словом
+                        var spaceIdx = trimmed.IndexOf(' ', 3); // после "Вы "
+                        var verbEnd = spaceIdx >= 0 ? spaceIdx : trimmed.Length;
+                        var v2 = trimmed.Substring(3, verbEnd - 3).Trim('.', ',', ':', ';').ToLowerInvariant();
+                        runThirdPersonCheck = v2 == "взял" || v2 == "взяла" || v2 == "взяли"
+                            || v2 == "поднял" || v2 == "подняла" || v2 == "подняли"
+                            || v2 == "подобрал" || v2 == "подобрала" || v2 == "подобрали"
+                            || v2 == "надел" || v2 == "надела" || v2 == "надели"
+                            || v2 == "снял" || v2 == "сняла" || v2 == "сняли"
+                            || v2 == "получил" || v2 == "получила" || v2 == "получили"
+                            || v2 == "купил" || v2 == "купила" || v2 == "купили"
+                            || v2 == "нашёл" || v2 == "нашла" || v2 == "нашли"
+                            || v2 == "выбросил" || v2 == "выбросила" || v2 == "выбросили";
+                    }
+
+                    if (runThirdPersonCheck)
+                    {
+                        var words = _wordRx.Matches(trimmed);
+                        if (IsLikelyThirdPersonActionLine(words))
+                        {
+                            return true;
+                        }
+                    }
                 }
             }
 

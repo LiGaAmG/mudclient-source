@@ -27,6 +27,8 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
     public class GroupMateViewModel : ViewModelBase
     {
         private readonly List<AffectViewModel> _notProcessedAffects = new List<AffectViewModel>();
+        // Словарь нормализованное-имя-аффекта → VM: O(1) lookup вместо O(slots) scan.
+        private Dictionary<string, AffectViewModel> _affectVmByName;
         private DateTime _last_timer_update = DateTime.Now;
 
         private bool _isDeleting;
@@ -53,10 +55,13 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
                 priority++;
             }
 
-            var affectsSortedAndFiltered = (ICollectionViewLiveShaping)CollectionViewSource.GetDefaultView(Affects);
-            affectsSortedAndFiltered.IsLiveSorting = true;
-            ((ICollectionView)affectsSortedAndFiltered).SortDescriptions.Add(new SortDescription() { Direction = ListSortDirection.Ascending, PropertyName = "Priority" });
-            AffectsSortedAndFiltered = (ICollectionView)affectsSortedAndFiltered;
+            // Строим обратный индекс: нормализованное имя аффекта → VM для O(1) lookup в UpdateAffects.
+            _affectVmByName = new Dictionary<string, AffectViewModel>(
+                Affects.Count * 2, StringComparer.OrdinalIgnoreCase);
+            foreach (var vm in Affects)
+                foreach (var name in vm.AffectDescription.AffectNames)
+                    _affectVmByName[AffectDescription.NormalizeAffectName(name)] = vm;
+
             AffectsPanelWidth = affectsPanelWidth;
 
             UpdateCharacter(groupMate, number);
@@ -343,10 +348,41 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             private set;
         }
 
+        private ICollectionView _affectsSortedAndFiltered;
+
+        // Lazy: CollectionViewSource.GetDefaultView дорог (создаёт ListCollectionView с live-sorting,
+        // подписывается на PropertyChanged всех элементов). Для 30+ монстров при входе в комнату
+        // создавать в конструкторе — это 30+ вызовов = ~70ms в update=.
+        // WPF обращается к этому свойству через binding при рендере, уже после того как update= замерен.
         [NotNull]
-        public ICollectionView AffectsSortedAndFiltered { get; private set; }
+        public ICollectionView AffectsSortedAndFiltered
+        {
+            get
+            {
+                if (_affectsSortedAndFiltered == null)
+                {
+                    var view = (ICollectionViewLiveShaping)CollectionViewSource.GetDefaultView(Affects);
+                    view.IsLiveSorting = true;
+                    ((ICollectionView)view).SortDescriptions.Add(new SortDescription() { Direction = ListSortDirection.Ascending, PropertyName = "Priority" });
+                    _affectsSortedAndFiltered = (ICollectionView)view;
+                }
+
+                return _affectsSortedAndFiltered;
+            }
+        }
 
         public bool MemTimeVisibleSetting { get; set; }
+
+        /// <summary>
+        /// Reassigns this VM to a completely different character, bypassing the name-equality guard.
+        /// Used for VM pooling: instead of destroying the old VM and creating a new one,
+        /// we reuse the same object so WPF keeps the same container/DataTemplate and avoids
+        /// a full Reset → container-destroy cycle on every room entry.
+        /// </summary>
+        public void Reassign([NotNull] CharacterStatus status, int position)
+        {
+            UpdateCharacter(status, position);
+        }
 
         /// <summary>
         /// Updates this view model from model.
@@ -360,8 +396,26 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
                 return;
             }
 
+            // Быстрая проверка: если ключевые данные не изменились — пропускаем полный update.
+            // Аффекты проверяем по количеству (смена состава) плюс HP/position для основных свойств.
+            bool dataChanged =
+                characterStatus.HitsPercent != _hits_percent
+                || characterStatus.MovesPercent != _moves_percent
+                || characterStatus.Position != _position
+                || characterStatus.IsAttacked != _is_attacked
+                || characterStatus.InSameRoom != _in_same_room
+                || position != _number
+                || characterStatus.Affects.Count != _lastAffectsCount
+                || characterStatus.WaitState != _wait_state
+                || (MemTimeVisibleSetting && characterStatus.MemTime != _lastServerMemTime);
+
+            if (!dataChanged)
+                return;
+
             UpdateCharacter(characterStatus, position);
         }
+
+        private int _lastAffectsCount = -1;
 
         private void UpdateCharacter([NotNull] CharacterStatus characterStatus, int position)
         {
@@ -378,6 +432,7 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             HitsColor = GetColor(HitsPercent);
             MovesColor = GetColor(MovesPercent);
 
+            _lastAffectsCount = characterStatus.Affects.Count;
             UpdateAffects(characterStatus);
 
             if (MemTimeVisibleSetting && _lastServerMemTime != characterStatus.MemTime)
@@ -405,13 +460,26 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
 
             foreach (var affect in characterStatus.Affects)
             {
-                foreach (var affectViewModel in Affects)
+                // O(1) lookup вместо O(slots) линейного поиска с аллокациями строк
+                AffectViewModel affectViewModel;
+                var normalizedName = AffectDescription.NormalizeAffectName(affect.Name);
+                if (_affectVmByName != null
+                    && _affectVmByName.TryGetValue(normalizedName, out affectViewModel))
                 {
-                    if (affectViewModel.AffectDescription.Matches(affect.Name))
+                    affectViewModel.UpdateFromModel(affect);
+                    _notProcessedAffects.Remove(affectViewModel);
+                }
+                else
+                {
+                    // Fallback: линейный поиск если словарь не построен
+                    foreach (var vm in Affects)
                     {
-                        affectViewModel.UpdateFromModel(affect);
-                        _notProcessedAffects.Remove(affectViewModel);
-                        break;
+                        if (vm.AffectDescription.Matches(affect.Name))
+                        {
+                            vm.UpdateFromModel(affect);
+                            _notProcessedAffects.Remove(vm);
+                            break;
+                        }
                     }
                 }
             }

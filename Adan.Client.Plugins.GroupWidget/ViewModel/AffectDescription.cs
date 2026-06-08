@@ -41,6 +41,8 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             Icons = new List<string> { icon };
             Name = name;
             DisplayName = displayName;
+            _normalizedNameSet = BuildNormalizedSet(AffectNames);
+            _normalizedNameIndex = BuildNormalizedIndex(AffectNames);
         }
 
         /// <summary>
@@ -61,6 +63,8 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             Icons = new List<string>(icons);
             Name = name;
             DisplayName = displayName;
+            _normalizedNameSet = BuildNormalizedSet(AffectNames);
+            _normalizedNameIndex = BuildNormalizedIndex(AffectNames);
         }
 
         /// <summary>
@@ -102,11 +106,17 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             private set;
         }
 
-        public bool Matches([NotNull] string affectName)
-        {
-            Assert.ArgumentNotNull(affectName, "affectName");
+        // Кэш нормализованных имён: вычисляется один раз, используется в горячем пути.
+        // Matches() вызывается O(monsters × affects × slots) раз за тик — без кэша
+        // каждый вызов создаёт 2 строковых аллокации.
+        private readonly HashSet<string> _normalizedNameSet;
+        // Индекс нормализованного имени → позиция в AffectNames/Icons
+        private readonly Dictionary<string, int> _normalizedNameIndex;
 
-            return AffectNames.Any(name => AreAffectNamesEqual(name, affectName));
+        public bool Matches(string affectName)
+        {
+            if (affectName == null) return false;
+            return _normalizedNameSet.Contains(NormalizeAffectName(affectName));
         }
 
         [NotNull]
@@ -114,14 +124,9 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
         {
             Assert.ArgumentNotNull(affectName, "affectName");
 
-            for (var i = 0; i < AffectNames.Count; i++)
-            {
-                if (AreAffectNamesEqual(AffectNames[i], affectName))
-                {
-                    return Icons[i];
-                }
-            }
-
+            int idx;
+            if (_normalizedNameIndex.TryGetValue(NormalizeAffectName(affectName), out idx))
+                return Icons[idx];
             return string.Empty;
         }
 
@@ -149,15 +154,25 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             set;
         }
 
-        private static bool AreAffectNamesEqual([NotNull] string left, [NotNull] string right)
-        {
-            return string.Equals(NormalizeAffectName(left), NormalizeAffectName(right), StringComparison.OrdinalIgnoreCase);
-        }
-
         [NotNull]
-        private static string NormalizeAffectName([NotNull] string value)
+        public static string NormalizeAffectName([NotNull] string value)
         {
             return value.Trim().Replace('_', ' ');
+        }
+
+        private static HashSet<string> BuildNormalizedSet(IList<string> names)
+        {
+            var set = new HashSet<string>(names.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var n in names) set.Add(NormalizeAffectName(n));
+            return set;
+        }
+
+        private static Dictionary<string, int> BuildNormalizedIndex(IList<string> names)
+        {
+            var dict = new Dictionary<string, int>(names.Count, StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < names.Count; i++)
+                dict[NormalizeAffectName(names[i])] = i;
+            return dict;
         }
     }
 }
