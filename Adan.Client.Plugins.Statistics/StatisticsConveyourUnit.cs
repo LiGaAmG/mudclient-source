@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading.Tasks;
     using Common.Commands;
     using Common.Conveyor;
     using Common.ConveyorUnits;
@@ -123,26 +124,49 @@
 
             if (checkForRound || !_isFighting)
             {
-                TextMessage nextMessage = null;
-                bool messagesProcessed = false;
-                while (_messageStack.Count > 0)
+                if (_messageStack.Count > 0)
                 {
-                    if (_currentZoneId != _lastZoneId)
+                    var flushSw = System.Diagnostics.Stopwatch.StartNew();
+
+                    // Вытаскиваем стек на конвейерном потоке (быстро), обрабатываем в фоне.
+                    // Так конвейерный поток не блокируется на 20–30ms.
+                    var msgs = new TextMessage[_messageStack.Count];
+                    for (int i = 0; i < msgs.Length; i++)
+                        msgs[i] = _messageStack.Pop();
+                    var zoneId = _currentZoneId;
+                    var holder = _statisticsHolder;
+                    flushSw.Stop();
+                    if (flushSw.ElapsedMilliseconds >= 2 || msgs.Length >= 20)
                     {
-                        _statisticsHolder.ResetStats(StatisticTypes.Zone);
-                        _lastZoneId = _currentZoneId;
+                        PerfLog.WriteStatistics("FLUSH", msgs.Length, flushSw.ElapsedMilliseconds,
+                            $"fight={_isFighting} round={checkForRound} zone={zoneId}");
                     }
 
-                    var currentMessage = _messageStack.Pop();
-
-                    _statisticsHolder.ProcessMessage(currentMessage, nextMessage, _messageStack.Count > 0 ? _messageStack.Peek() : null);
-                    nextMessage = currentMessage;
-                    messagesProcessed = true;
-                }
-
-                if (messagesProcessed)
-                {
-                    _statisticsHolder.RoundCompleted();
+                    Task.Run(() =>
+                    {
+                        var workerSw = System.Diagnostics.Stopwatch.StartNew();
+                        if (zoneId != _lastZoneId)
+                        {
+                            holder.ResetStats(StatisticTypes.Zone);
+                            _lastZoneId = zoneId;
+                        }
+                        TextMessage nextMsg = null;
+                        for (int i = 0; i < msgs.Length; i++)
+                        {
+                            holder.ProcessMessage(
+                                msgs[i],
+                                nextMsg,
+                                i + 1 < msgs.Length ? msgs[i + 1] : null);
+                            nextMsg = msgs[i];
+                        }
+                        holder.RoundCompleted();
+                        workerSw.Stop();
+                        if (workerSw.ElapsedMilliseconds >= 5 || msgs.Length >= 20)
+                        {
+                            PerfLog.WriteStatistics("WORKER", msgs.Length, workerSw.ElapsedMilliseconds,
+                                $"fight={_isFighting} round={checkForRound} zone={zoneId}");
+                        }
+                    });
                 }
             }
         }

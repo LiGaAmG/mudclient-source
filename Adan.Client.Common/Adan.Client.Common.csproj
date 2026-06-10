@@ -108,6 +108,8 @@
     <Compile Include="Conveyor\MessageConveyor.cs" />
     <Compile Include="Conveyor\MessageReceivedEventArgs.cs" />
     <Compile Include="Conveyor\PerfLog.cs" />
+    <Compile Include="Conveyor\PerfStats.cs" />
+    <Compile Include="Controls\PerfDecorator.cs" />
     <Compile Include="Dialogs\OkDialog.xaml.cs">
       <DependentUpon>OkDialog.xaml</DependentUpon>
     </Compile>
@@ -265,3 +267,4 @@
   -->
   <Import Project="$(SolutionDir)MSBuild\Common.targets" />
 </Project>
+

@@ -79,6 +79,57 @@
                 return;
             }
 
+            // Быстрый выход: строки без цвета (не боевые) могут содержать только опыт/славу.
+            // Цветные (жёлтый/красный) — боевые линии, идут в полный цикл.
+            bool isColoredLine = textBlock.Foreground == TextColor.BrightYellow
+                                 || textBlock.Foreground == TextColor.BrightRed;
+            if (!isColoredLine)
+            {
+                // Только проверяем опыт/славу — скипаем дорогой цикл из 30 скиллов
+                var innerText = currentMessage.InnerText;
+                if (innerText.StartsWith("Вы получили ", StringComparison.Ordinal))
+                {
+                    _matchingResults[1] = string.Empty;
+                    if (SlavaToken.Match(innerText, 0, _matchingResults).IsSuccess)
+                    {
+                        int slava;
+                        if (int.TryParse(_matchingResults[1], out slava))
+                        { _sessionStats.TotalSlava += slava; _fightStats.TotalSlava += slava; _zoneStats.TotalSlava += slava; }
+                    }
+                    _matchingResults[1] = string.Empty;
+                    if (SlavaToken1.Match(innerText, 0, _matchingResults).IsSuccess)
+                    {
+                        int slava;
+                        if (int.TryParse(_matchingResults[1], out slava))
+                        { _sessionStats.TotalSlava += slava; _fightStats.TotalSlava += slava; _zoneStats.TotalSlava += slava; }
+                    }
+                    _matchingResults[1] = string.Empty;
+                    if (ExpToken.Match(innerText, 0, _matchingResults).IsSuccess)
+                    {
+                        int exp;
+                        if (int.TryParse(_matchingResults[1], out exp))
+                        { _sessionStats.TotalExp += exp; _fightStats.TotalExp += exp; _zoneStats.TotalExp += exp; }
+                    }
+                    _matchingResults[1] = string.Empty;
+                    if (ExpToken1.Match(innerText, 0, _matchingResults).IsSuccess)
+                    {
+                        int exp;
+                        if (int.TryParse(_matchingResults[1], out exp))
+                        { _sessionStats.TotalExp += exp; _fightStats.TotalExp += exp; _zoneStats.TotalExp += exp; }
+                    }
+                }
+                else if (innerText.StartsWith("Вы произнесли магические слова:", StringComparison.Ordinal))
+                {
+                    _sessionStats.TotalCasts++; _fightStats.TotalCasts++; _zoneStats.TotalCasts++;
+                }
+                else if (innerText.StartsWith("Вам не удалось сконцентрироваться!", StringComparison.Ordinal))
+                {
+                    _sessionStats.FailedCasts++; _fightStats.FailedCasts++; _zoneStats.FailedCasts++;
+                    _sessionStats.TotalCasts++; _fightStats.TotalCasts++; _zoneStats.TotalCasts++;
+                }
+                return;
+            }
+
             var textWithoutDamage = textBlock.Text;
             var nextMessageText = nextMessage?.InnerText ?? string.Empty;
             var previousMessageText = previousMessage?.InnerText ?? string.Empty;

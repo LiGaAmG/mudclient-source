@@ -130,29 +130,23 @@ namespace Adan.Client.ConveyorUnits
                 }
             }
 
-#if DEBUG
             var _subSw = System.Diagnostics.Stopwatch.StartNew();
             int _subRunCount = 0;
-#endif
             // Запускаем сабсы в правильном порядке, пропуская те, чья константа не найдена
             foreach (var entry in _orderedSubs)
             {
                 bool run = entry.Constant == null
                     || (presentConstants != null && presentConstants.Contains(entry.Constant));
                 if (!run) continue;
-#if DEBUG
                 _subRunCount++;
-#endif
                 entry.Sub.HandleMessage(textMessage, rootModel);
             }
-#if DEBUG
             _subSw.Stop();
             if (_subSw.ElapsedMilliseconds >= 10)
             {
                 var logText = text.Length > 80 ? text.Substring(0, 80) + "..." : text;
                 Common.Conveyor.PerfLog.Write("SubstitutionUnit [ran=" + _subRunCount + "/" + (_orderedSubs != null ? _orderedSubs.Count : 0) + "]", logText, _subSw.ElapsedMilliseconds);
             }
-#endif
         }
 
         #endregion

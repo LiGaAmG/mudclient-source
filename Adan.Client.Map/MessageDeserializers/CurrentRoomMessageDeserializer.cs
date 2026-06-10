@@ -59,9 +59,14 @@
                 _builder.Clear();
                 try
                 {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     using (var stringReader = new StringReader(str))
                     {
                         var message = (CurrentRoomMessage)_serializer.Deserialize(stringReader);
+                        sw.Stop();
+                        // Маячок пути шага: комната распознана клиентом
+                        PerfLog.WriteTotal("ROOMMSG", sw.ElapsedMilliseconds,
+                            string.Format("room={0} zone={1}", message.RoomId, message.ZoneId));
                         PushMessageToConveyor(message);
                     }
                 }

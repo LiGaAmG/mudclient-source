@@ -186,6 +186,9 @@
 
             _isUpdateInProgress = true;
 
+            // Маячок пути шага: маршрут получил комнату и думает над следующим шагом
+            var routeSw = System.Diagnostics.Stopwatch.StartNew();
+
             UpdateCurrentRoomInternal(newCurrentZone, newCurrentRoom);
 
             while (_pendingUpdates.Count > 0)
@@ -195,6 +198,10 @@
             }
 
             _isUpdateInProgress = false;
+
+            routeSw.Stop();
+            Common.Conveyor.PerfLog.WriteTotal("ROUTE_THINK", routeSw.ElapsedMilliseconds,
+                string.Format("room={0}", newCurrentRoom != null ? newCurrentRoom.RoomId : -1));
         }
 
         public void UpdateCurrentRoomWithNoRoute([NotNull] ZoneViewModel newCurrentZone, [CanBeNull] RoomViewModel newCurrentRoom)
@@ -822,6 +829,11 @@
 
         private void GotoDirection(ExitDirection exitDirection)
         {
+            // Маячок пути шага: маршрут решил и отправляет направление
+            Common.Conveyor.PerfLog.WriteTotal("ROUTE_STEP", 0, exitDirection.ToString());
+            // Живой замер ожидания комнаты (светофор "шаг")
+            Common.Conveyor.PerfStats.RoomWaitStarted();
+
             switch (exitDirection)
             {
                 case ExitDirection.North:

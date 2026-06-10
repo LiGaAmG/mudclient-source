@@ -15,7 +15,7 @@
         <GradientStop Color="#FFBA0202" Offset="1" />
     </LinearGradientBrush>
 
-    <VisualBrush x:Key="Brush_Standing"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Standing"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -181,7 +181,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Resting"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Resting"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -233,7 +233,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Dying"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Dying"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -403,7 +403,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Sitting"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Sitting"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -587,7 +587,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Sleeping"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Sleeping"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -821,7 +821,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Riding"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Riding"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -894,7 +894,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Fighting">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Fighting">
         <VisualBrush.Visual>
             <Grid Width="26"
                   Height="26">
@@ -1059,7 +1059,7 @@
             </Grid>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Attacked">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Attacked">
         <VisualBrush.Visual>
             <Canvas Height="26"
                     Width="26">
@@ -1124,7 +1124,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Near"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Near"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -1334,7 +1334,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_NotNear"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_NotNear"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -1544,7 +1544,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Blessing"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Blessing"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -1727,7 +1727,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Flying"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Flying"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -1861,7 +1861,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Poison"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Poison"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -2098,7 +2098,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Protection"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Protection"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -2314,7 +2314,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Acceleration"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Acceleration"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -2647,7 +2647,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Blindness"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Blindness"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -2771,7 +2771,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_LightHealing"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_LightHealing"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -2815,7 +2815,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_SeriousHealing"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_SeriousHealing"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -2879,7 +2879,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_CriticalHealing"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_CriticalHealing"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -2929,7 +2929,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Healing"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Healing"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -2952,7 +2952,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_LightRenewal"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_LightRenewal"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -3017,7 +3017,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_CriticalRenewal"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_CriticalRenewal"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -3083,7 +3083,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_SeriousRenewal"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_SeriousRenewal"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -3147,7 +3147,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Curse"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Curse"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -3509,7 +3509,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_ArmorCurse"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_ArmorCurse"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -3830,7 +3830,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Fear"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Fear"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -3925,7 +3925,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Power"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Power"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -4067,7 +4067,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Fresh"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Fresh"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -4207,7 +4207,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Hold"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Hold"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -4446,7 +4446,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Disease"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Disease"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -4646,7 +4646,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Invisibility"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Invisibility"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -4749,7 +4749,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Paralysis"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Paralysis"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -5015,7 +5015,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Shock"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Shock"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -5166,7 +5166,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Silence"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Silence"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -5253,7 +5253,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Slowness"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Slowness"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -5590,7 +5590,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_StoneCurse"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_StoneCurse"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -5631,7 +5631,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_EntsPower"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_EntsPower"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -5721,7 +5721,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Stun"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Stun"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -5875,7 +5875,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Weakness"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Weakness"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -5933,7 +5933,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Accuracy"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Accuracy"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -6044,7 +6044,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Empty"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Empty"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26"
@@ -6057,7 +6057,7 @@
                 ImageSource="Images/tornado.png" />
     <ImageBrush x:Key="Brush_StunImmune"
                 ImageSource="Images/stun-immune.png" />
-    <VisualBrush x:Key="Brush_Fog"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Fog"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -6108,7 +6108,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_SimpleFog"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_SimpleFog"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -6159,7 +6159,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_DarkWord"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_DarkWord"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -6203,7 +6203,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Ossification"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Ossification"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -6260,7 +6260,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_GroupAccuracy"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_GroupAccuracy"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Width="26"
@@ -6313,7 +6313,7 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Hunger"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Hunger"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Grid Height="20"
@@ -6361,7 +6361,7 @@
             </Grid>
         </VisualBrush.Visual>
     </VisualBrush>
-    <VisualBrush x:Key="Brush_Thirst"
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Thirst"
                  Stretch="Uniform">
         <VisualBrush.Visual>
             <Grid Height="20"
@@ -6403,7 +6403,7 @@
     </VisualBrush>
     <!-- ══════════════ NEW AFFECTS ══════════════ -->
     <!-- Calm — волна (успокоение) -->
-    <VisualBrush x:Key="Brush_Calm" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Calm" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M0,10 C4,2 8,2 12,10 C16,18 20,18 24,10 L24,14 C20,22 16,22 12,14 C8,6 4,6 0,14 Z"
@@ -6419,7 +6419,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- Sanctify — крест (освящение) -->
-    <VisualBrush x:Key="Brush_Sanctify" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Sanctify" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M8,0 L16,0 L16,8 L24,8 L24,16 L16,16 L16,24 L8,24 L8,16 L0,16 L0,8 L8,8 Z"
@@ -6435,7 +6435,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- MagicShield — щит со звездой (магический щит) -->
-    <VisualBrush x:Key="Brush_MagicShield" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_MagicShield" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M12,0 L22,4 L22,13 C22,19 12,24 12,24 C12,24 2,19 2,13 L2,4 Z"
@@ -6455,7 +6455,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- IceShield — 6-конечная звезда (ледяной щит) -->
-    <VisualBrush x:Key="Brush_IceShield" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_IceShield" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M13,2 L15.75,8.24 L22.5,7.5 L18.5,13 L22.5,18.5 L15.75,17.76 L13,24 L10.25,17.76 L3.5,18.5 L7.5,13 L3.5,7.5 L10.25,8.24 Z"
@@ -6472,7 +6472,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- SpiritAura — 8-конечная звезда (духовная аура) -->
-    <VisualBrush x:Key="Brush_SpiritAura" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_SpiritAura" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M12,1 L13.7,7.8 L19.8,4.2 L16.2,10.3 L23,12 L16.2,13.7 L19.8,19.8 L13.7,16.2 L12,23 L10.3,16.2 L4.2,19.8 L7.8,13.7 L1,12 L7.8,10.3 L4.2,4.2 L10.3,7.8 Z"
@@ -6488,7 +6488,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- LightProtection — 4-конечная звезда/солнце (защита от света) -->
-    <VisualBrush x:Key="Brush_LightProtection" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_LightProtection" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M12,1 L14.2,7.8 L21.5,4.5 L18.2,10.3 L25,12 L18.2,14.2 L21.5,21.5 L14.2,18.2 L12,25 L9.8,18.2 L4.5,21.5 L7.8,14.2 L1,12 L7.8,9.8 L4.5,4.5 L9.8,7.8 Z"
@@ -6505,7 +6505,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- DarkProtection — полумесяц (защита от тьмы) -->
-    <VisualBrush x:Key="Brush_DarkProtection" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_DarkProtection" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Stretch="Fill" Width="22" Height="22" Canvas.Left="2" Canvas.Top="2" StrokeThickness="0">
@@ -6530,7 +6530,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- StoneSkin — шестиугольник (каменная кожа) -->
-    <VisualBrush x:Key="Brush_StoneSkin" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_StoneSkin" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M12,1 L21.5,6.5 L21.5,17.5 L12,23 L2.5,17.5 L2.5,6.5 Z"
@@ -6549,7 +6549,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- LifeTouch — сердце (живое прикосновение) -->
-    <VisualBrush x:Key="Brush_LifeTouch" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_LifeTouch" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M12,20 C6,15 0,12 0,6 C0,2.7 3,0.5 6,0.5 C9,0.5 11,2.5 12,4 C13,2.5 15,0.5 18,0.5 C21,0.5 24,2.7 24,6 C24,12 18,15 12,20 Z"
@@ -6565,7 +6565,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- Enlarge — 4 стрелки (увеличение) -->
-    <VisualBrush x:Key="Brush_Enlarge" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Enlarge" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M10,0 L14,0 L14,7 L17,7 L17,6 L24,12 L17,18 L17,17 L14,17 L14,24 L10,24 L10,17 L7,17 L7,18 L0,12 L7,6 L7,7 L10,7 Z"
@@ -6581,7 +6581,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- Meditation — лотос (медитация) -->
-    <VisualBrush x:Key="Brush_Meditation" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Meditation" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <!-- Центральный лепесток -->
@@ -6617,7 +6617,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- WaterBreath — капля воды (дыхание под водой) -->
-    <VisualBrush x:Key="Brush_WaterBreath" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_WaterBreath" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M13,1 C8,6 2,11 2,17 A11,11 0 0 0 24,17 C24,11 18,6 13,1 Z"
@@ -6635,7 +6635,7 @@
         </VisualBrush.Visual>
     </VisualBrush>
     <!-- Pain — молния (боль) -->
-    <VisualBrush x:Key="Brush_Pain" Stretch="Uniform">
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Pain" Stretch="Uniform">
         <VisualBrush.Visual>
             <Canvas Height="26" Width="26">
                 <Path Data="M15,1 L7,13 L13,13 L9,25 L19,11 L13,11 Z"
@@ -7250,11 +7250,6 @@
                 Value="20" />
         <Setter Property="Height"
                 Value="20" />
-        <Setter Property="CacheMode">
-            <Setter.Value>
-                <BitmapCache EnableClearType="False" SnapsToDevicePixels="False" RenderAtScale="1"/>
-            </Setter.Value>
-        </Setter>
     </Style>
     <Style x:Key="MediumIcon"
            TargetType="Image">
@@ -7262,11 +7257,6 @@
                 Value="40" />
         <Setter Property="Height"
                 Value="40" />
-        <Setter Property="CacheMode">
-            <Setter.Value>
-                <BitmapCache EnableClearType="False" SnapsToDevicePixels="False" RenderAtScale="1"/>
-            </Setter.Value>
-        </Setter>
     </Style>
     <DataTemplate x:Key="AffectDescriptionTemplate">
         <StackPanel Orientation="Horizontal"

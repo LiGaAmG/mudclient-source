@@ -29,8 +29,6 @@ namespace Adan.Client.Common.Settings
         private bool _autoClearInput;
         private bool _autoReconnect;
         private int _minLengthHistory;
-        private string _socks5ProxyHost;
-        private int _socks5ProxyPort;
         private int? _mudFontSize;
         private string _mudFontName;
         private string _mudFontWeight;
@@ -79,39 +77,6 @@ namespace Adan.Client.Common.Settings
                 SettingsChanged("ConnectHostName", value);
             }
         }
-        /// <summary>
-        /// Gets or sets the SOCKS5 proxy hostname.
-        /// </summary>
-        [NotNull]
-        public string Socks5ProxyHost
-        {
-            get
-            {
-                return _socks5ProxyHost ?? string.Empty;
-            }
-            set
-            {
-                _socks5ProxyHost = value;
-                SettingsChanged("Socks5ProxyHost", value);
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets the SOCKS5 proxy port.
-        /// </summary>
-        public int Socks5ProxyPort
-        {
-            get
-            {
-                return _socks5ProxyPort;
-            }
-            set
-            {
-                _socks5ProxyPort = value;
-                SettingsChanged("Socks5ProxyPort", value);
-            }
-        }
-
         /// <summary>
         /// Gets or sets the name of the connect host.
         /// </summary>

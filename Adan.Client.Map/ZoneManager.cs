@@ -74,6 +74,58 @@
             }
 
             MapDownloader.UpgradeComplete += MapDownloader_UpgradeComplete;
+
+            StartBackgroundZonePreload();
+        }
+
+        /// <summary>
+        /// Фоновый прогрев всех зон при старте. Загрузка зоны (чтение + AES-расшифровка +
+        /// XML) занимает 1-2 секунды и раньше происходила синхронно при первом пересечении
+        /// границы зоны — маршрут вставал на эти 2 секунды. Прогреваем заранее,
+        /// по одной зоне, с низшим приоритетом — игре не мешает.
+        /// </summary>
+        private void StartBackgroundZonePreload()
+        {
+            var preloadThread = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    // Короткая пауза, чтобы не толкаться с инициализацией плагинов
+                    System.Threading.Thread.Sleep(2000);
+
+                    var folder = GetZonesFolder();
+                    if (!Directory.Exists(folder)) return;
+
+                    int loaded = 0;
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    foreach (var file in Directory.GetFiles(folder, "*.xml"))
+                    {
+                        int zoneId;
+                        if (!int.TryParse(Path.GetFileNameWithoutExtension(file), out zoneId))
+                            continue;
+
+                        if (_loadedZones.ContainsKey(zoneId))
+                            continue;
+
+                        GetZone(zoneId);
+                        loaded++;
+                    }
+
+                    Common.Conveyor.PerfLog.WriteTotal("ZONES_PRELOAD", sw.ElapsedMilliseconds,
+                        string.Format("loaded={0}", loaded));
+                }
+                catch
+                {
+                    // Прогрев — best effort; при любой ошибке зоны просто
+                    // продолжат грузиться по требованию, как раньше.
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "ZonePreload",
+                Priority = System.Threading.ThreadPriority.BelowNormal
+            };
+            preloadThread.Start();
         }
 
         private void MapDownloader_UpgradeComplete(object sender, EventArgs e)
@@ -300,12 +352,23 @@
             var room = zone?.AllRooms.FirstOrDefault(r => r.RoomId == zoneHolder.RoomId);
             if (room != null && room.AdditionalRoomParameters.ActionsToExecuteOnRoomEntry.Any())
             {
+                // Маячок: действия, повешенные на ячейку карты (отдельная система триггеров).
+                // Логируем каждое срабатывание с типами действий и временем исполнения.
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var names = new System.Text.StringBuilder();
+
                 foreach (var action in room.AdditionalRoomParameters.ActionsToExecuteOnRoomEntry)
                 {
+                    if (names.Length > 0) names.Append(",");
+                    names.Append(action.GetType().Name);
                     action.Execute(zoneHolder.RootModel, ActionExecutionContext.Empty);
                 }
 
                 zoneHolder.RootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
+
+                sw.Stop();
+                Common.Conveyor.PerfLog.WriteTotal("ROOMACT", sw.ElapsedMilliseconds,
+                    string.Format("room={0} actions=[{1}]", zoneHolder.RoomId, names));
             }
         }
 

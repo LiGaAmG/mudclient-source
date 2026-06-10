@@ -168,7 +168,6 @@ namespace Adan.Client.ConveyorUnits
                 if (!shouldRun)
                     continue;
 
-#if DEBUG
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 entry.Trigger.HandleMessage(message, Conveyor.RootModel);
                 sw.Stop();
@@ -182,9 +181,6 @@ namespace Adan.Client.ConveyorUnits
                         logText,
                         sw.ElapsedMilliseconds);
                 }
-#else
-                entry.Trigger.HandleMessage(message, Conveyor.RootModel);
-#endif
             }
         }
 

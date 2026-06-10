@@ -37,7 +37,8 @@ namespace Adan.Client.Plugins.GroupWidget
         /// </summary>
         public GroupWidgetControl()
         {
-            InitializeComponent();            
+            InitializeComponent();
+            IconRasterizer.RasterizeIcons(Resources);
         }
 
         /// <summary>
@@ -109,19 +110,15 @@ namespace Adan.Client.Plugins.GroupWidget
         {
             Assert.ArgumentNotNull(characters, "characters");
 
-#if DEBUG
             long queuedTick = System.Diagnostics.Stopwatch.GetTimestamp();
-#endif
 
             Action actToExecute = () =>
             {
                 try
                 {
-#if DEBUG
                     long executeTick = System.Diagnostics.Stopwatch.GetTimestamp();
                     long waitedMs = (long)((executeTick - queuedTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
                     var updateSw = System.Diagnostics.Stopwatch.StartNew();
-#endif
                     GroupStatusViewModel viewModel = DataContext as GroupStatusViewModel;
 
                     List<CharacterStatus> list = null;
@@ -139,11 +136,9 @@ namespace Adan.Client.Plugins.GroupWidget
                     {
                         viewModel.UpdateModel(list);
                     }
-#if DEBUG
                     updateSw.Stop();
                     if (waitedMs >= 20 || updateSw.ElapsedMilliseconds >= 5)
                         Common.Conveyor.PerfLog.WriteWidget("GroupWidget", waitedMs, updateSw.ElapsedMilliseconds);
-#endif
                 }
                 catch (Exception) { }
             };

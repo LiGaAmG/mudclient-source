@@ -2,7 +2,6 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Collections.ObjectModel;
     using System.Linq;
     using System.Windows.Threading;
 
@@ -26,13 +25,6 @@
         private bool _displayNumber = Settings.Default.MonsterDisplayNumber;
         private MonsterViewModel _selectedMonster;
         private bool _moreItemsAvailable;
-        private int _nextMonsterId = 1;
-
-        // Пул VM которые больше не в Monsters (WPF уже отвязал их после ReplaceAll).
-        // Reassign на unbound VM = PropertyChanged с 0 подписчиков = бесплатно.
-        // Цель: убрать аллокации 300+ объектов на каждую комнату → меньше GC gen2 пауз.
-        private const int StandbyPoolMaxSize = 60;
-        private readonly List<MonsterViewModel> _standbyPool = new List<MonsterViewModel>(StandbyPoolMaxSize);
 
 
         /// <summary>
@@ -40,7 +32,7 @@
         /// </summary>
         public RoomMonstersViewModel()
         {
-            Monsters = new BulkObservableCollection<MonsterViewModel>();
+            Monsters = new System.Collections.ObjectModel.ObservableCollection<MonsterViewModel>();
 
             _tickingTimer = new DispatcherTimer(DispatcherPriority.Background);
             _tickingTimer.Interval = TimeSpan.FromSeconds(1);
@@ -110,7 +102,7 @@
         /// Gets the group mates of current player.
         /// </summary>
         [NotNull]
-        public BulkObservableCollection<MonsterViewModel> Monsters
+        public System.Collections.ObjectModel.ObservableCollection<MonsterViewModel> Monsters
         {
             get;
             private set;
@@ -155,169 +147,93 @@
         /// Updates the model.
         /// </summary>
         /// <param name="monsters">The monsters.</param>
-        public void UpdateModel([NotNull] IEnumerable<MonsterStatus> monsters, bool isRound = true)
+        public void UpdateModel([NotNull] IEnumerable<MonsterStatus> monsters)
         {
             Assert.ArgumentNotNull(monsters, "monsters");
 
-            var monsterList = monsters.ToList();
-            if (monsterList.Count == 0 || !isRound)
-            {
-                _nextMonsterId = 1;
-                MoreItemsAvailable = false;
-                if (monsterList.Count == 0)
-                {
-                    foreach (var old in Monsters)
-                        if (_standbyPool.Count < StandbyPoolMaxSize)
-                            _standbyPool.Add(old);
-                    Monsters.ReplaceAll(System.Array.Empty<MonsterViewModel>());
-                    return;
-                }
-            }
-
-            // Group existing VMs by name for HP-based matching
-            var existingByName = new Dictionary<string, List<MonsterViewModel>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var existing in Monsters)
-            {
-                List<MonsterViewModel> list;
-                if (!existingByName.TryGetValue(existing.Name, out list))
-                {
-                    list = new List<MonsterViewModel>();
-                    existingByName[existing.Name] = list;
-                }
-                list.Add(existing);
-            }
-
-            // Group new monsters by name for HP-based matching
-            var newByName = new Dictionary<string, List<MonsterStatus>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var monster in monsterList)
-            {
-                List<MonsterStatus> list;
-                if (!newByName.TryGetValue(monster.Name, out list))
-                {
-                    list = new List<MonsterStatus>();
-                    newByName[monster.Name] = list;
-                }
-                list.Add(monster);
-            }
-
-            // Build ID mapping per same-name group:
-            // - New monsters always arrive at the FRONT of the list
-            // - So when count grew: existing ones are at the TAIL → tail-match
-            // - When count shrank (deaths): use HP matching to find survivors
-            var vmForMonster = new Dictionary<MonsterStatus, MonsterViewModel>();
-            foreach (var name in existingByName.Keys)
-            {
-                List<MonsterStatus> newGroup;
-                if (!newByName.TryGetValue(name, out newGroup) || newGroup.Count == 0)
-                    continue;
-
-                var oldGroup = existingByName[name];
-
-                if (newGroup.Count >= oldGroup.Count)
-                {
-                    // Arrivals: new ones at front, existing ones at tail
-                    int offset = newGroup.Count - oldGroup.Count;
-                    for (int i = 0; i < oldGroup.Count; i++)
-                        vmForMonster[newGroup[offset + i]] = oldGroup[i];
-                }
-                else
-                {
-                    // Deaths/departures: find minimum-cost HP matching (optimal, not greedy)
-                    var oldHps = oldGroup.Select(vm => vm.MonsterStatus.HitsPercent).ToList();
-                    var newHps = newGroup.Select(m => m.HitsPercent).ToList();
-                    var assignment = MinCostAssignment(oldHps, newHps);
-                    for (int i = 0; i < newGroup.Count; i++)
-                        vmForMonster[newGroup[i]] = oldGroup[assignment[i]];
-                }
-            }
-
-            // Pre-compute affects list once — avoids O(monsters × affects × allAffects) linear scans inside the loop
-            var affectsForNewMonsters = _displayedAffectPriorities
-                .Select(af => Constants.AllAffects.First(a => a.Name == af))
-                .ToList();
-
-            var newList = new List<MonsterViewModel>();
+            int position = 0;
             bool moreItemsAvailable = false;
-            int position = 1;
-            foreach (var monster in monsterList)
+            foreach (var monster in monsters)
             {
-                if (position > DisplayedItemLimit)
+                if (position >= DisplayedItemLimit)
                 {
                     moreItemsAvailable = true;
                     break;
                 }
 
-                MonsterViewModel vm;
-                if (vmForMonster.TryGetValue(monster, out vm))
+                if (position < Monsters.Count)
                 {
-                    vm.UpdateFromModel(monster, position);
-                    if (SelectedMonster != null && SelectedMonster == vm && RootModel != null)
-                        RootModel.SelectedRoomMonster = monster;
-                }
-                else if (_standbyPool.Count > 0)
-                {
-                    // Reuse unbound VM from pool — Reassign is cheap (0 WPF subscribers).
-                    // Avoids allocating 300+ new objects per room → reduces gen2 GC pressure.
-                    vm = _standbyPool[_standbyPool.Count - 1];
-                    _standbyPool.RemoveAt(_standbyPool.Count - 1);
-                    vm.Reassign(monster, position);
-                    vm.DisplayNumber = DisplayNumber;
-                    vm.MonsterId = _nextMonsterId++;
+                    // Пул: переиспользуем существующую VM вместо пересоздания.
+                    // WPF сохраняет контейнер/шаблон элемента — без этого каждая смена
+                    // комнаты пересоздавала всё визуальное дерево виджета (кадры по 300+ мс).
+                    var existing = Monsters[position];
+                    if (existing.IsActive && existing.Name == monster.Name)
+                    {
+                        existing.UpdateFromModel(monster, position + 1);
+                        if (SelectedMonster != null && SelectedMonster == existing && RootModel != null)
+                        {
+                            RootModel.SelectedRoomMonster = monster;
+                        }
+                    }
+                    else
+                    {
+                        // Другой монстр на этой позиции (или строка из спящего запаса) —
+                        // VM переключаем на него. Если строка была выбрана, выбор сбрасываем.
+                        if (SelectedMonster == existing)
+                        {
+                            SelectedMonster = null;
+                        }
+
+                        existing.Reassign(monster, position + 1);
+                        existing.IsActive = true;
+                    }
+
+                    existing.MonsterId = position + 1;
                 }
                 else
                 {
-                    vm = new MonsterViewModel(monster, affectsForNewMonsters, position, AffectsPanelWidth) { DisplayNumber = DisplayNumber };
-                    vm.MonsterId = _nextMonsterId++;
+                    var affectsList = _displayedAffectPriorities.Select(af => Constants.AllAffects.First(a => a.Name == af));
+                    var vm = new MonsterViewModel(monster, affectsList, position + 1, AffectsPanelWidth) { DisplayNumber = DisplayNumber };
+                    vm.MonsterId = position + 1;
+                    Monsters.Add(vm);
                 }
 
-                newList.Add(vm);
                 position++;
             }
 
-            MoreItemsAvailable = moreItemsAvailable;
-
-            // Проверяем: изменился ли набор VM-объектов (новые монстры / смерти)?
-            // Если набор тот же — vm.UpdateFromModel уже обновил свойства in-place,
-            // ReplaceAll (Reset notification) не нужен → WPF не перестраивает весь ListBox.
-            bool collectionChanged = newList.Count != Monsters.Count;
-            if (!collectionChanged)
+            // Лишние строки НЕ удаляем, а прячем (IsActive=false → Collapsed в XAML):
+            // контейнер и шаблон переживают смену комнаты, и при следующем заходе
+            // в многолюдную комнату строки переиспользуются без пересоздания элементов.
+            for (int i = position; i < Monsters.Count; i++)
             {
-                for (int i = 0; i < newList.Count; i++)
+                var spare = Monsters[i];
+                if (!spare.IsActive)
                 {
-                    if (!ReferenceEquals(newList[i], Monsters[i]))
+                    continue;
+                }
+
+                if (SelectedMonster == spare)
+                {
+                    SelectedMonster = null;
+                }
+
+                spare.IsActive = false;
+                spare.MonsterId = 0;
+            }
+
+            if (RootModel != null)
+            {
+                RootModel.MonsterIdMap.Clear();
+                foreach (var vm in Monsters)
+                {
+                    if (vm.IsActive && vm.MonsterId > 0)
                     {
-                        collectionChanged = true;
-                        break;
+                        RootModel.MonsterIdMap[vm.MonsterId] = vm.MonsterStatus;
                     }
                 }
             }
 
-            if (collectionChanged)
-            {
-                if (SelectedMonster != null && !newList.Contains(SelectedMonster))
-                    SelectedMonster = null;
-
-                // Collect old VMs that won't be in the new list into standby pool
-                // BEFORE ReplaceAll — we need the old list while it's still in Monsters.
-                // After ReplaceAll WPF unbinds them, making future Reassign calls cheap.
-                var newListSet = new HashSet<MonsterViewModel>(newList);
-                foreach (var old in Monsters)
-                    if (!newListSet.Contains(old) && _standbyPool.Count < StandbyPoolMaxSize)
-                        _standbyPool.Add(old);
-
-                Monsters.ReplaceAll(newList);
-            }
-
-            // Update MonsterIdMap so $monsteridN variables resolve correctly
-            if (RootModel != null)
-            {
-                RootModel.MonsterIdMap.Clear();
-                foreach (var vm in newList)
-                {
-                    if (vm.MonsterId > 0)
-                        RootModel.MonsterIdMap[vm.MonsterId] = vm.MonsterStatus;
-                }
-            }
+            MoreItemsAvailable = moreItemsAvailable;
         }
 
         /// <summary>
@@ -326,7 +242,6 @@
         public void ReloadDisplayedAffects()
         {
             Monsters.Clear();
-            _nextMonsterId = 1;
             _displayedAffectPriorities = new List<string>(Settings.Default.MonsterAffects);
             DisplayNumber = Settings.Default.GroupWidgetDisplayNumber;
             DisplayedAffectCount = Settings.Default.MonsterDisplayAffectsCount;
@@ -346,48 +261,21 @@
             OnPropertyChanged("Width");
         }
 
-        // Finds minimum-cost assignment: newHps[i] → oldHps[result[i]]
-        // Brute-force, works correctly for N≤6 (typical monster group size)
-        private static int[] MinCostAssignment(IList<float> oldHps, IList<float> newHps)
-        {
-            int n = newHps.Count;
-            int m = oldHps.Count;
-            var best = new int[n];
-            for (int i = 0; i < n; i++) best[i] = i;
-            float bestCost = float.MaxValue;
-            var cur = new int[n];
-            var used = new bool[m];
-
-            Assign(0, 0f);
-
-            return best;
-
-            void Assign(int idx, float cost)
-            {
-                if (cost >= bestCost) return;
-                if (idx == n)
-                {
-                    bestCost = cost;
-                    System.Array.Copy(cur, best, n);
-                    return;
-                }
-                for (int i = 0; i < m; i++)
-                {
-                    if (used[i]) continue;
-                    used[i] = true;
-                    cur[idx] = i;
-                    Assign(idx + 1, cost + Math.Abs(newHps[idx] - oldHps[i]));
-                    used[i] = false;
-                }
-            }
-        }
-
         private void UpdateTimings()
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             foreach (var monster in Monsters)
             {
-                monster.UpdateTimings(DateTime.Now);
+                if (monster.IsActive)
+                {
+                    monster.UpdateTimings(DateTime.Now);
+                }
             }
+
+            sw.Stop();
+            if (sw.ElapsedMilliseconds >= 20)
+                Common.Conveyor.PerfLog.WriteTotal("MONSTER_TIMINGS", sw.ElapsedMilliseconds,
+                    string.Format("monsters={0}", Monsters.Count));
         }
     }
 }

@@ -50,6 +50,23 @@
                 <MenuItem Header="About" Click="HandleAbout"/>
             </MenuItem>
         </Menu>
+        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal"
+                    HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
+            <TextBlock Name="_timersIndicator" FontSize="11" Foreground="Gray" Text=""
+                       Margin="0,0,10,0"
+                       ToolTip="Активные игровые таймеры: #timer + отложенные команды #wait, по всем табам"/>
+            <TextBlock Name="_msgRateIndicator" FontSize="11" Foreground="Gray" Text=""
+                       Margin="0,0,10,0"
+                       ToolTip="Сколько сообщений в секунду проходит через конвейер (по всем табам)"/>
+            <TextBlock Name="_convIndicator" FontSize="11" Foreground="Gray" Text=""
+                       Margin="0,0,10,0"
+                       ToolTip="Самый загруженный обработчик за последнюю секунду и доля времени, которую он съел"/>
+            <TextBlock Name="_uiLatencyIndicator" FontSize="11" Foreground="LimeGreen" Text=""
+                       Margin="0,0,10,0"
+                       ToolTip="Отзывчивость UI-потока: зелёный — норма, жёлтый — заметные задержки, красный — клиент захлёбывается"/>
+            <TextBlock Name="_pingIndicator" FontSize="11" Foreground="Gray" Text=""
+                       ToolTip="Отклик игры: от отправки команды до первого ответа сервера (по живому соединению). Если при лаге UI зелёный, а rtt красный — думает сервер или сеть."/>
+        </StackPanel>
         <AvalonDock:DockingManager Grid.Row="1" x:Name="_dockManager" Loaded="HandleDockManagerLoaded" Grid.ColumnSpan="2">
             <AvalonDock:DockingManager.LayoutItemContainerStyleSelector>
                 <Client:LayoutContainerStyleSelector>

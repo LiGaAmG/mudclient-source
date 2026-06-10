@@ -15,7 +15,9 @@ namespace Adan.Client.Common.Conveyor
 
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
+    using System.Text;
     using Model;
     using Utils;
     using Commands;
@@ -51,6 +53,8 @@ namespace Adan.Client.Common.Conveyor
 
         #region Constants and Fields
 
+        private const string PluginToggleConfigFileName = "plugin-toggles.conf";
+
         private readonly IDictionary<int, IList<ConveyorUnit>> _conveyorUnitsByMessageType = new Dictionary<int, IList<ConveyorUnit>>();
         private readonly IDictionary<int, IList<ConveyorUnit>> _conveyorUnitsByCommandType = new Dictionary<int, IList<ConveyorUnit>>();
         private readonly IList<ConveyorUnit> _allConveyorUnits = new List<ConveyorUnit>();
@@ -63,6 +67,12 @@ namespace Adan.Client.Common.Conveyor
         private readonly ControlCodeAnalyser _analyzer = new ControlCodeAnalyser();
 
         private int _currentMessageType = BuiltInMessageTypes.TextMessage;
+
+        // Метка последней неотвеченной отправки (Stopwatch ticks); 0 = ответ получен
+        private long _rttSendTimestamp;
+
+        // Общий троттлинг авто-зонда (по всем соединениям)
+        private static long _lastProbeTimestamp;
 
         #endregion
 
@@ -261,18 +271,11 @@ namespace Adan.Client.Common.Conveyor
 
             try
             {
-                // Apply proxy settings from global settings
-                var settings = SettingsHolder.Instance.Settings;
-                if (settings != null)
-                {
-                    _mccpClient.Socks5Host = settings.Socks5ProxyHost;
-                    _mccpClient.Socks5Port = settings.Socks5ProxyPort;
-                }
-
                 _mccpClient.Connect(host, port);
 
                 LastConnectHost = host;
                 LastConnectPort = port;
+                PerfStats.ServerHost = host;
             }
             catch (Exception)
             {
@@ -285,6 +288,10 @@ namespace Adan.Client.Common.Conveyor
         /// </summary>
         public void Disconnect()
         {
+            // Сбрасываем висящую отправку, чтобы индикатор не краснел после отключения
+            System.Threading.Interlocked.Exchange(ref _rttSendTimestamp, 0);
+            PerfStats.ClearPendingSend(RootModel != null ? RootModel.Uid : null);
+
             try
             {
                 _mccpClient.Disconnect();
@@ -305,6 +312,28 @@ namespace Adan.Client.Common.Conveyor
         public void PushCommand([NotNull] Command command)
         {
             Assert.ArgumentNotNull(command, "command");
+
+            // Встроенная команда статистики производительности — перехватываем до юнитов,
+            // чтобы парсер клиентских команд не ругался на неизвестную команду.
+            var perfCommand = command as TextCommand;
+            if (perfCommand != null)
+            {
+                var perfText = perfCommand.CommandText.Trim();
+                if (perfText.Equals("#perf", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var line in PerfStats.BuildReport())
+                        PushMessage(new InfoMessage(line));
+                    command.Handled = true;
+                    return;
+                }
+                if (perfText.Equals("#perf reset", StringComparison.OrdinalIgnoreCase))
+                {
+                    PerfStats.Reset();
+                    PushMessage(new InfoMessage("Статистика производительности сброшена."));
+                    command.Handled = true;
+                    return;
+                }
+            }
 
             try
             {
@@ -348,19 +377,18 @@ namespace Adan.Client.Common.Conveyor
 
             try
             {
+                PerfStats.RecordMessage();
                 if (ConveyorUnitsByMessageType.ContainsKey(message.MessageType))
                 {
-#if DEBUG
                     long totalMs = 0;
                     string msgTypeName = message.GetType().Name;
                     var slowUnits = new System.Text.StringBuilder();
-#endif
                     foreach (var conveyorUnit in ConveyorUnitsByMessageType[message.MessageType])
                     {
-#if DEBUG
                         var sw = System.Diagnostics.Stopwatch.StartNew();
                         conveyorUnit.HandleMessage(message);
                         sw.Stop();
+                        PerfStats.RecordUnit(conveyorUnit.GetType().Name, sw.ElapsedTicks);
                         long elapsed = sw.ElapsedMilliseconds;
                         totalMs += elapsed;
                         if (elapsed >= 2)
@@ -369,15 +397,11 @@ namespace Adan.Client.Common.Conveyor
                             if (slowUnits.Length > 0) slowUnits.Append(", ");
                             slowUnits.Append(conveyorUnit.GetType().Name).Append(':').Append(elapsed).Append("ms");
                         }
-#else
-                        conveyorUnit.HandleMessage(message);
-#endif
                         if (message.Handled)
                         {
                             break;
                         }
                     }
-#if DEBUG
                     if (totalMs >= 10)
                     {
                         var textMsg = message as Common.Messages.TextMessage;
@@ -385,7 +409,6 @@ namespace Adan.Client.Common.Conveyor
                         if (innerText.Length > 80) innerText = innerText.Substring(0, 80) + "...";
                         PerfLog.WriteTotal(msgTypeName, totalMs, slowUnits.ToString(), innerText);
                     }
-#endif
                 }
 
                 if (message.Handled)
@@ -417,6 +440,32 @@ namespace Adan.Client.Common.Conveyor
             try
             {
                 _mccpClient.Send(data, offset, bytesToSend);
+
+                // Расшифровываем отправляемую команду для лога (KOI8-R),
+                // чтобы было видно, КТО спамит сервер.
+                string sentText;
+                try
+                {
+                    sentText = Encoding.GetEncoding(20866)
+                        .GetString(data, offset, Math.Min(bytesToSend, 60))
+                        .Replace("\r", "").Replace("\n", "\\n");
+                }
+                catch
+                {
+                    sentText = "?";
+                }
+
+                PerfLog.WriteSend(bytesToSend, RootModel != null ? RootModel.Uid : null, sentText);
+
+                // Пассивный замер RTT: метка отправки; погасится первым же ответом сервера.
+                // ICMP-пинг у части машин режется фаерволом, а этот замер идёт по живому
+                // игровому соединению — это и есть настоящий "пинг игры".
+                var nowStamp = System.Diagnostics.Stopwatch.GetTimestamp();
+                if (System.Threading.Interlocked.CompareExchange(ref _rttSendTimestamp, nowStamp, 0) == 0)
+                {
+                    // Новая неотвеченная отправка — регистрируем для живого индикатора
+                    PerfStats.SetPendingSend(RootModel != null ? RootModel.Uid : null, nowStamp);
+                }
             }
             catch (Exception)
             {
@@ -451,9 +500,7 @@ namespace Adan.Client.Common.Conveyor
             
             try
             {
-#if DEBUG
                 var _netSw = System.Diagnostics.Stopwatch.StartNew();
-#endif
                 int offset = e.Offset;
                 int actualBytesReceived = 0;
                 int end =  e.Offset + e.BytesReceived;
@@ -508,11 +555,37 @@ namespace Adan.Client.Common.Conveyor
 
                 if (actualBytesReceived > 0)
                     FlushBufferToDeserializer(actualBytesReceived, false);
-#if DEBUG
                 _netSw.Stop();
                 if (e.BytesReceived > 0)
-                    PerfLog.WriteNet(e.BytesReceived, _netSw.ElapsedMilliseconds);
-#endif
+                {
+                    PerfLog.WriteNet(e.BytesReceived, _netSw.ElapsedMilliseconds, RootModel != null ? RootModel.Uid : null);
+
+                    // Закрываем замер RTT, если была неотвеченная отправка
+                    var sendStamp = System.Threading.Interlocked.Exchange(ref _rttSendTimestamp, 0);
+                    if (sendStamp != 0)
+                    {
+                        PerfStats.ClearPendingSend(RootModel != null ? RootModel.Uid : null);
+                        long rttMs = (System.Diagnostics.Stopwatch.GetTimestamp() - sendStamp) * 1000 / System.Diagnostics.Stopwatch.Frequency;
+                        PerfStats.RecordPing(rttMs);
+                        if (rttMs >= 1000)
+                            PerfLog.WriteTotal("GAME_RTT", rttMs, RootModel != null ? RootModel.Uid : "?");
+
+                        // Авто-зонд: команда шла дольше 700мс — проверяем остальные окна.
+                        // Их SEND/NET в логе покажут, общая это "медленная полоса" или
+                        // персональная. Не чаще раза в 30 секунд.
+                        if (rttMs >= 700 && RootModel != null)
+                        {
+                            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                            long last = System.Threading.Interlocked.Read(ref _lastProbeTimestamp);
+                            if (now - last > 30L * System.Diagnostics.Stopwatch.Frequency &&
+                                System.Threading.Interlocked.CompareExchange(ref _lastProbeTimestamp, now, last) == last)
+                            {
+                                PerfLog.WriteTotal("PROBE", rttMs, "slow rtt detected, probing other windows");
+                                RootModel.ProbeOtherWindows("время");
+                            }
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -556,6 +629,77 @@ namespace Adan.Client.Common.Conveyor
             Assert.ArgumentNotNull(e, "e");
 
             PushMessage(new NetworkErrorMessageEx(e.Exception));
+        }
+
+        private static bool IsConfigFlagEnabled(string flagName)
+        {
+            try
+            {
+                var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, PluginToggleConfigFileName);
+                if (!File.Exists(configPath))
+                {
+                    return true;
+                }
+
+                foreach (var rawLine in File.ReadAllLines(configPath))
+                {
+                    var line = rawLine == null ? string.Empty : rawLine.Trim();
+                    if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";"))
+                    {
+                        continue;
+                    }
+
+                    var separatorIndex = line.IndexOf('=');
+                    if (separatorIndex <= 0 || separatorIndex == line.Length - 1)
+                    {
+                        continue;
+                    }
+
+                    var name = line.Substring(0, separatorIndex).Trim();
+                    if (!name.Equals(flagName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var value = line.Substring(separatorIndex + 1).Trim();
+                    bool isEnabled;
+                    if (TryParseBoolean(value, out isEnabled))
+                    {
+                        return isEnabled;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.Instance.Write(string.Format("Failed to read config flag {0}: {1}\r\n{2}", flagName, ex.Message, ex.StackTrace));
+            }
+
+            return true;
+        }
+
+        private static bool TryParseBoolean(string value, out bool result)
+        {
+            if (bool.TryParse(value, out result))
+            {
+                return true;
+            }
+
+            switch (value.ToLowerInvariant())
+            {
+                case "1":
+                case "on":
+                case "yes":
+                    result = true;
+                    return true;
+                case "0":
+                case "off":
+                case "no":
+                    result = false;
+                    return true;
+                default:
+                    result = true;
+                    return false;
+            }
         }
 
         #endregion

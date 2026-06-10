@@ -12,8 +12,51 @@
              MinHeight="22"
              Width="{Binding Width}">
     <UserControl.Resources>
-        <ResourceDictionary Source="Resources.xaml"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <!-- Ленивый тултип аффекта — см. MonstersWidgetControl. -->
+            <DataTemplate x:Key="AffectToolTipTemplate">
+                <StackPanel Orientation="Horizontal">
+                    <Image Style="{StaticResource MediumIcon}"
+                           SnapsToDevicePixels="True"
+                           Source="{Binding DisplayIcon, Converter={StaticResource AffectToIconConverter}}" />
+                    <Grid Margin="5,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition />
+                            <RowDefinition />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="{x:Static Properties:Resources.Affect}"
+                                   Grid.Row="0"
+                                   Grid.Column="0" />
+                        <TextBlock Text="{x:Static Properties:Resources.Duration}"
+                                   Grid.Row="1"
+                                   Grid.Column="0" />
+                        <TextBlock Text="{Binding RealAffectName}"
+                                   Grid.Row="0"
+                                   Grid.Column="1"
+                                   Margin="5,0,0,0" />
+                        <TextBlock Text="{Binding SecondsLeft, Converter={StaticResource SecondsToTimeSpanConverter}, StringFormat=\{0:mm\\:ss\}}"
+                                   Visibility="{Binding AffectDescription.IsRoundBased, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
+                                   Grid.Row="1"
+                                   Grid.Column="1"
+                                   Margin="5,0,0,0" />
+                        <TextBlock Text="{Binding StringFormat=\{0\} round(s), Path=RoundsLeft}"
+                                   Visibility="{Binding AffectDescription.IsRoundBased, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                   Grid.Row="1"
+                                   Grid.Column="1"
+                                   Margin="5,0,0,0" />
+                    </Grid>
+                </StackPanel>
+            </DataTemplate>
+        </ResourceDictionary>
     </UserControl.Resources>
+    <CommonControls:PerfDecorator Tag="GroupWidget" xmlns:CommonControls="clr-namespace:Adan.Client.Common.Controls;assembly=Adan.Client.Common">
     <StackPanel>
         <ListBox ItemsSource="{Binding GroupMates}"
                  Focusable="False"
@@ -145,7 +188,9 @@
                                SnapsToDevicePixels="True"
                                Source="{Binding IsAttacked, Converter={StaticResource AttackedToIconConverter}, NotifyOnTargetUpdated=True}">
                         </Image>
-                        <ItemsControl ItemsSource="{Binding Path=AffectsSortedAndFiltered}"
+                        <!-- Панель аффектов без live-sorting и с ленивым тултипом —
+                             см. комментарий в MonstersWidgetControl. -->
+                        <ItemsControl ItemsSource="{Binding Path=Affects}"
                                       VerticalAlignment="Stretch"
                                       Width="{Binding AffectsPanelWidth}">
                             <ItemsControl.ItemsPanel>
@@ -155,71 +200,19 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <DataTemplate.Triggers>
-                                        <DataTrigger Binding="{Binding IsBlinking}"
-                                                     Value="true">
-                                            <DataTrigger.EnterActions>
-                                                <BeginStoryboard Name="BlinkingAnimation">
-                                                    <Storyboard>
-                                                        <DoubleAnimation From="1"
-                                                                         To="0"
-                                                                         RepeatBehavior="Forever"
-                                                                         AutoReverse="True"
-                                                                         Duration="0:0:0.1"
-                                                                         Storyboard.TargetProperty="Opacity"
-                                                                         Storyboard.TargetName="AffectImage" />
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </DataTrigger.EnterActions>
-                                            <DataTrigger.ExitActions>
-                                                <StopStoryboard BeginStoryboardName="BlinkingAnimation" />
-                                            </DataTrigger.ExitActions>
-                                        </DataTrigger>
-                                    </DataTemplate.Triggers>
                                     <Grid Width="20"
                                           Height="20"
-                                          Margin="3,0,0,0">
+                                          Margin="3,0,0,0"
+                                          Name="AffectCell">
                                         <Grid.ToolTip>
-                                            <StackPanel Orientation="Horizontal">
-                                                <Image Style="{StaticResource MediumIcon}"
-                                                       SnapsToDevicePixels="True"
-                                                       Source="{Binding DisplayIcon, Converter={StaticResource AffectToIconConverter}, NotifyOnTargetUpdated=True}" />
-                                                <Grid Margin="5,0,0,0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition />
-                                                        <ColumnDefinition />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition />
-                                                        <RowDefinition />
-                                                    </Grid.RowDefinitions>
-                                                    <TextBlock Text="{x:Static Properties:Resources.Affect}"
-                                                               Grid.Row="0"
-                                                               Grid.Column="0" />
-                                                    <TextBlock Text="{x:Static Properties:Resources.Duration}"
-                                                               Grid.Row="1"
-                                                               Grid.Column="0" />
-                                                    <TextBlock Text="{Binding RealAffectName}"
-                                                               Grid.Row="0"
-                                                               Grid.Column="1"
-                                                               Margin="5,0,0,0" />
-                                                    <TextBlock Text="{Binding SecondsLeft, Converter={StaticResource SecondsToTimeSpanConverter}, StringFormat=\{0:mm\\:ss\}}"
-                                                               Visibility="{Binding AffectDescription.IsRoundBased, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
-                                                               Grid.Row="1"
-                                                               Grid.Column="1"
-                                                               Margin="5,0,0,0" />
-                                                    <TextBlock Text="{Binding StringFormat=\{0\} round(s), Path=RoundsLeft}"
-                                                               Visibility="{Binding AffectDescription.IsRoundBased, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                                               Grid.Row="1"
-                                                               Grid.Column="1"
-                                                               Margin="5,0,0,0" />
-                                                </Grid>
-                                            </StackPanel>
+                                            <ToolTip Content="{Binding}"
+                                                     ContentTemplate="{StaticResource AffectToolTipTemplate}" />
                                         </Grid.ToolTip>
                                         <Image SnapsToDevicePixels="True"
                                                Source="{Binding DisplayIcon, Converter={StaticResource AffectToIconConverter}, NotifyOnTargetUpdated=True}"
                                                HorizontalAlignment="Right"
                                                Name="AffectImage"
+                                               Opacity="{Binding BlinkOpacity}"
                                                Style="{StaticResource SmallIcon}" />
 
                                         <TextBlock Text="{Binding SecondsLeft, StringFormat=\{0:#\}}"
@@ -235,6 +228,14 @@
                                                 Background="{StaticResource RoundIndicatorBrush}"
                                                 Visibility="{Binding RoundsLeftVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                     </Grid>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding DisplayIcon}" Value="{x:Null}">
+                                            <Setter TargetName="AffectCell" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding DisplayIcon}" Value="">
+                                            <Setter TargetName="AffectCell" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -265,4 +266,5 @@
                 Text="..."/>
         </Border>
     </StackPanel>
+    </CommonControls:PerfDecorator>
 </UserControl>

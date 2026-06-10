@@ -553,13 +553,7 @@ namespace Adan.Client.Common.Controls
                 _selectionSettings.SelectedMessages.Add(_messages[lineNumber - 1]);
                 _selectionSettings.SelectionStartCharacterNumber = 0;
                 _selectionSettings.SelectionEndCharacterNumber = _messages[lineNumber - 1].InnerText.Length;
-                try
-                {
-                    Clipboard.SetText(_messages[lineNumber - 1].InnerText);
-                }
-                catch
-                {
-                }
+                SetClipboardTextAsync(_messages[lineNumber - 1].InnerText);
 
                 _doubleClickTimer.Start();
             }
@@ -672,6 +666,7 @@ namespace Adan.Client.Common.Controls
         {
             Assert.ArgumentNotNull(drawingContext, "drawingContext");
 
+            var renderSw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 if (Visibility != Visibility.Visible)
@@ -758,7 +753,12 @@ namespace Adan.Client.Common.Controls
                 ClearTextSelection();
                 ErrorLogger.Instance.Write(string.Format("Error rendering text {0}", ex));
             }
-
+            finally
+            {
+                renderSw.Stop();
+                if (renderSw.ElapsedMilliseconds >= 10)
+                    Conveyor.PerfLog.WriteOnRender(_currentNumberOfLinesInView, renderSw.ElapsedMilliseconds);
+            }
         }
 
         /// <summary>
@@ -1136,13 +1136,44 @@ namespace Adan.Client.Common.Controls
                     result += text.Substring(0, length);
                 }
 
-                Clipboard.SetText(result);
+                SetClipboardTextAsync(result);
             }
             catch (Exception ex)
             {
                 ClearTextSelection();
                 ErrorLogger.Instance.Write(string.Format("Error copying text {0}", ex));
             }
+        }
+
+        /// <summary>
+        /// Кладёт текст в буфер обмена из отдельного STA-потока.
+        /// Clipboard.SetText при занятом буфере (менеджеры буфера, RDP и т.п.)
+        /// ретраит до ~секунды, блокируя UI-поток — это давало "невидимые"
+        /// фризы 0.5-1с при случайном выделении текста во время игры.
+        /// </summary>
+        private static void SetClipboardTextAsync(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            var thread = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    Clipboard.SetText(text);
+                }
+                catch
+                {
+                    // Буфер занят другим приложением — копирование молча не удалось
+                }
+            })
+            {
+                IsBackground = true
+            };
+            thread.SetApartmentState(System.Threading.ApartmentState.STA);
+            thread.Start();
         }
 
         private void CheckMessagesOverflow()

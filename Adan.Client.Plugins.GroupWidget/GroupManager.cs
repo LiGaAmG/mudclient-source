@@ -73,7 +73,16 @@ namespace Adan.Client.Plugins.GroupWidget
                 }
                 groupViewModel.RootModel = _groupHolders[uid].RootModel;
                 _groupWidget.ViewModelUid = uid;
-                _groupWidget.UpdateModel(_groupHolders[uid].Characters);
+
+                // Tab switch выполняется на UI-потоке — обновляем VM напрямую (update=0ms).
+                // Раньше BeginInvoke(Background) заставлял виджет ждать 645-1298ms пока
+                // AvalonDock завершит layout всех переключений. Теперь данные обновляются сразу.
+                var characters = _groupHolders[uid].Characters;
+                if (characters != null)
+                    groupViewModel.UpdateModel(characters);
+                // Коалесцирующий BeginInvoke в _groupWidget.UpdateModel тоже уведомим,
+                // чтобы он мог обработать следующее фоновое обновление корректно.
+                _groupWidget.ViewModelUid = uid;
             }
         }
 

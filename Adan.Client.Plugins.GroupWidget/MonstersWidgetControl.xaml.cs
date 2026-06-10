@@ -37,6 +37,40 @@ namespace Adan.Client.Plugins.GroupWidget
         public MonstersWidgetControl()
         {
             InitializeComponent();
+            IconRasterizer.RasterizeIcons(Resources);
+
+            // Скрытый виджет не обновляем (зря пересоздавали VM и дёргали layout).
+            // Отложенный список лежит в стеке; при показе применяем самый свежий.
+            IsVisibleChanged += (s, e) =>
+            {
+                if ((bool)e.NewValue)
+                    ProcessPendingUpdate();
+            };
+        }
+
+        private void ProcessPendingUpdate()
+        {
+            try
+            {
+                RoomMonstersViewModel viewModel = DataContext as RoomMonstersViewModel;
+                if (viewModel == null) return;
+
+                List<MonsterStatus> list = null;
+                lock (_stack_lock)
+                {
+                    if (_monsters_stack.Count > 0)
+                    {
+                        list = _monsters_stack.Pop();
+                        _monsters_stack.Clear();
+                    }
+                }
+
+                if (list != null)
+                {
+                    viewModel.UpdateModel(list);
+                }
+            }
+            catch (Exception) { }
         }
 
         /// <summary>
@@ -58,14 +92,16 @@ namespace Adan.Client.Plugins.GroupWidget
                 if (this.DataContext != null)
                 {
                     RoomMonstersViewModel _roomMonstersViewModel = (RoomMonstersViewModel)this.DataContext;
-                    if (_roomMonstersViewModel.SelectedMonster == null || _roomMonstersViewModel.Monsters.IndexOf(_roomMonstersViewModel.SelectedMonster) == _roomMonstersViewModel.Monsters.Count - 1)
+                    // Спящие строки пула в переборе не участвуют
+                    var active = _roomMonstersViewModel.Monsters.Where(m => m.IsActive).ToList();
+                    if (_roomMonstersViewModel.SelectedMonster == null || active.IndexOf(_roomMonstersViewModel.SelectedMonster) == active.Count - 1)
                     {
-                        _roomMonstersViewModel.SelectedMonster = _roomMonstersViewModel.Monsters.FirstOrDefault();
+                        _roomMonstersViewModel.SelectedMonster = active.FirstOrDefault();
                         return;
                     }
 
-                    var index = _roomMonstersViewModel.Monsters.IndexOf(_roomMonstersViewModel.SelectedMonster);
-                    _roomMonstersViewModel.SelectedMonster = _roomMonstersViewModel.Monsters[index + 1];
+                    var index = active.IndexOf(_roomMonstersViewModel.SelectedMonster);
+                    _roomMonstersViewModel.SelectedMonster = active[index + 1];
                 }
             };
 
@@ -73,7 +109,7 @@ namespace Adan.Client.Plugins.GroupWidget
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         public void PreviousMonster()
         {
@@ -82,79 +118,39 @@ namespace Adan.Client.Plugins.GroupWidget
                 if (this.DataContext != null)
                 {
                     RoomMonstersViewModel _roomMonstersViewModel = (RoomMonstersViewModel)this.DataContext;
-                    if (_roomMonstersViewModel.SelectedMonster == null || _roomMonstersViewModel.Monsters.IndexOf(_roomMonstersViewModel.SelectedMonster) == 0)
+                    var active = _roomMonstersViewModel.Monsters.Where(m => m.IsActive).ToList();
+                    if (_roomMonstersViewModel.SelectedMonster == null || active.IndexOf(_roomMonstersViewModel.SelectedMonster) <= 0)
                     {
-                        _roomMonstersViewModel.SelectedMonster = _roomMonstersViewModel.Monsters.LastOrDefault();
+                        _roomMonstersViewModel.SelectedMonster = active.LastOrDefault();
                         return;
                     }
 
-                    var index = _roomMonstersViewModel.Monsters.IndexOf(_roomMonstersViewModel.SelectedMonster);
-                    _roomMonstersViewModel.SelectedMonster = _roomMonstersViewModel.Monsters[index - 1];
+                    var index = active.IndexOf(_roomMonstersViewModel.SelectedMonster);
+                    _roomMonstersViewModel.SelectedMonster = active[index - 1];
                 }
             };
 
             Application.Current.Dispatcher.BeginInvoke(executeToAct, DispatcherPriority.Background);
         }
 
-        private bool _pendingIsRound = true;
-        private bool _updatePending = false;
-
-        public void UpdateModel([NotNull] List<MonsterStatus> characters, bool isRound = true)
+        public void UpdateModel([NotNull] List<MonsterStatus> characters)
         {
-            Assert.ArgumentNotNull(characters, "roomMonstersMessage");
-
-#if DEBUG
-            long queuedTick = System.Diagnostics.Stopwatch.GetTimestamp();
-#endif
+            Assert.ArgumentNotNull(characters, "characters");
 
             Action actToExecute = () =>
             {
-                try
-                {
-#if DEBUG
-                    long executeTick = System.Diagnostics.Stopwatch.GetTimestamp();
-                    long waitedMs = (long)((executeTick - queuedTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
-                    var updateSw = System.Diagnostics.Stopwatch.StartNew();
-#endif
-                    RoomMonstersViewModel viewModel = DataContext as RoomMonstersViewModel;
-
-                    List<MonsterStatus> list = null;
-                    bool pendingIsRound;
-                    lock (_stack_lock)
-                    {
-                        _updatePending = false;
-                        if (_monsters_stack.Count > 0)
-                        {
-                            list = _monsters_stack.Pop();
-                            _monsters_stack.Clear();
-                        }
-                        pendingIsRound = _pendingIsRound;
-                    }
-
-                    if (list != null)
-                    {
-                        viewModel.UpdateModel(list, pendingIsRound);
-                    }
-#if DEBUG
-                    updateSw.Stop();
-                    if (waitedMs >= 20 || updateSw.ElapsedMilliseconds >= 5)
-                        Common.Conveyor.PerfLog.WriteWidget("MonstersWidget", waitedMs, updateSw.ElapsedMilliseconds);
-#endif
-                }
-                catch (Exception) { }
+                // Виджет скрыт — список остаётся в стеке и применится при показе
+                // (IsVisibleChanged) или со следующим обновлением, когда виджет видим.
+                if (!IsVisible) return;
+                ProcessPendingUpdate();
             };
 
-            bool needInvoke;
             lock (_stack_lock)
             {
                 _monsters_stack.Push(characters);
-                _pendingIsRound = isRound;
-                needInvoke = !_updatePending;
-                if (needInvoke) _updatePending = true;
             }
 
-            if (needInvoke)
-                Application.Current.Dispatcher.BeginInvoke(actToExecute, DispatcherPriority.Background);
+            Application.Current.Dispatcher.BeginInvoke(actToExecute, DispatcherPriority.Background);
         }
 
         private void CancelFocusingListBoxItem([NotNull] object sender, [NotNull] MouseButtonEventArgs e)

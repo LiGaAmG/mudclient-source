@@ -80,6 +80,10 @@ namespace Adan.Client.Map.ConveyorUnits
 
             // "Клевер растет здесь." / "Земляной корень виднеется здесь."
             if (text.IndexOf("здесь", StringComparison.OrdinalIgnoreCase) < 0) return;
+            // Быстрый pre-check: без нужного глагола regex не запускаем.
+            // Отсекает "Вы не видите 'ящик' здесь." и прочие строки без трав.
+            if (text.IndexOf("растет", StringComparison.OrdinalIgnoreCase) < 0
+                && text.IndexOf("виднеется", StringComparison.OrdinalIgnoreCase) < 0) return;
             var herbMatch = _herbRoomRegex.Match(text);
             if (herbMatch.Success)
             {

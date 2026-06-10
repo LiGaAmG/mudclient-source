@@ -58,7 +58,228 @@ namespace Adan.Client
         private const int ICON_SMALL = 0;
         private const int ICON_BIG = 1;
 
+        private System.Threading.Timer _uiLatencyTimer;
+        private int _lastGen0, _lastGen1, _lastGen2;
+        private Dictionary<string, long[]> _perfSnapshot;
+        private long _perfMsgSnapshot;
+        private System.Diagnostics.Stopwatch _perfIntervalSw;
+
         #endregion
+
+        /// <summary>
+        /// Раз в секунду меряет, сколько BeginInvoke ждёт в очереди диспетчера —
+        /// это и есть «отзывчивость» UI. Результат — в индикатор справа от меню и в PerfStats (#perf).
+        /// </summary>
+        private void StartUiLatencyMonitor()
+        {
+            _uiLatencyTimer = new System.Threading.Timer(_ =>
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try
+                {
+                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Normal, new Action(() =>
+                    {
+                        sw.Stop();
+                        long ms = sw.ElapsedMilliseconds;
+                        Adan.Client.Common.Conveyor.PerfStats.RecordUiLatency(ms);
+                        if (ms >= 100)
+                        {
+                            // Дельты GC с прошлого тика: если фриз совпал со всплеском сборок —
+                            // виновник GC, а не код на UI-потоке.
+                            int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1), g2 = GC.CollectionCount(2);
+                            Adan.Client.Common.Conveyor.PerfLog.WriteTotal("UI_LATENCY", ms,
+                                string.Format("dispatcher queue wait; GC delta g0={0} g1={1} g2={2}",
+                                    g0 - _lastGen0, g1 - _lastGen1, g2 - _lastGen2));
+                        }
+                        _lastGen0 = GC.CollectionCount(0);
+                        _lastGen1 = GC.CollectionCount(1);
+                        _lastGen2 = GC.CollectionCount(2);
+
+                        _uiLatencyIndicator.Text = string.Format("UI: {0} ms", ms);
+                        _uiLatencyIndicator.Foreground =
+                            ms < 50 ? System.Windows.Media.Brushes.LimeGreen :
+                            ms < 150 ? System.Windows.Media.Brushes.Orange :
+                            System.Windows.Media.Brushes.Red;
+
+                        UpdateConveyorIndicators();
+
+                        int timers = Adan.Client.Common.Conveyor.PerfStats.ActiveGameTimers;
+                        _timersIndicator.Text = string.Format("⏱{0}", timers);
+                        _timersIndicator.Foreground =
+                            timers == 0 ? System.Windows.Media.Brushes.Gray :
+                            timers < 10 ? System.Windows.Media.Brushes.LimeGreen :
+                            System.Windows.Media.Brushes.Orange;
+                    }));
+                }
+                catch
+                {
+                    // Окно закрывается — молча выходим
+                }
+            }, null, 2000, 1000);
+        }
+
+        private System.Threading.Timer _pingTimer;
+
+        /// <summary>
+        /// Встроенный пинг до игрового сервера раз в 3 секунды (ICMP).
+        /// Отделяет "думает сервер" (пинг норм, игра молчит) от "лагает сеть"
+        /// (пинг прыгнул). Результат — в индикатор, #perf и perf-лог (спайки).
+        /// </summary>
+        private void StartServerPingMonitor()
+        {
+            _pingTimer = new System.Threading.Timer(_ =>
+            {
+                // Пассивный RTT по игровому соединению (SEND -> первый ответ сервера).
+                // Если команда ВИСИТ без ответа — показываем её возраст живьём (">N"),
+                // не дожидаясь ответа: яма видна в момент попадания, а не задним числом.
+                long ms = Adan.Client.Common.Conveyor.PerfStats.PingLastMs;
+                long pending = Adan.Client.Common.Conveyor.PerfStats.OldestPendingMs;
+                long roomWait = Adan.Client.Common.Conveyor.PerfStats.RoomWaitMs;
+                if (roomWait > pending) pending = roomWait;
+
+                string text;
+                long effective;
+                if (pending >= 300)
+                {
+                    text = string.Format("rtt: >{0}", pending);
+                    effective = pending;
+                }
+                else
+                {
+                    text = ms >= 0 ? string.Format("rtt: {0}", ms) : "rtt: ?";
+                    effective = ms;
+                }
+
+                var brush =
+                    effective < 0 ? System.Windows.Media.Brushes.Gray :
+                    effective < 300 ? System.Windows.Media.Brushes.LimeGreen :
+                    effective < 800 ? System.Windows.Media.Brushes.Orange :
+                    System.Windows.Media.Brushes.Red;
+
+                try
+                {
+                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+                    {
+                        _pingIndicator.Text = text;
+                        _pingIndicator.Foreground = brush;
+                    }));
+                }
+                catch
+                {
+                }
+            }, null, 5000, 500);
+        }
+
+        private long _dispatcherOpStartTimestamp;
+
+        /// <summary>
+        /// Трассировка операций диспетчера: любая операция на UI-потоке дольше 50 мс
+        /// пишется в perf-лог вместе с именем метода — чтобы найти, кто блокирует интерфейс.
+        /// Операции диспетчера не вкладываются друг в друга, поэтому достаточно одного поля.
+        /// </summary>
+        private void StartDispatcherOpTracing()
+        {
+            var hooks = Dispatcher.Hooks;
+            hooks.OperationStarted += (s, e) =>
+            {
+                _dispatcherOpStartTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+            };
+            hooks.OperationCompleted += (s, e) =>
+            {
+                long start = _dispatcherOpStartTimestamp;
+                if (start == 0) return;
+                long ms = (System.Diagnostics.Stopwatch.GetTimestamp() - start) * 1000 / System.Diagnostics.Stopwatch.Frequency;
+                if (ms >= 50)
+                    Adan.Client.Common.Conveyor.PerfLog.WriteTotal("UI_OP", ms, DescribeDispatcherOperation(e.Operation));
+            };
+        }
+
+        private static string DescribeDispatcherOperation(System.Windows.Threading.DispatcherOperation op)
+        {
+            try
+            {
+                var field = typeof(System.Windows.Threading.DispatcherOperation)
+                    .GetField("_method", BindingFlags.NonPublic | BindingFlags.Instance);
+                var del = field != null ? field.GetValue(op) as Delegate : null;
+                if (del != null && del.Method != null)
+                {
+                    var declaring = del.Method.DeclaringType != null ? del.Method.DeclaringType.FullName : "?";
+                    var targetType = del.Target != null ? del.Target.GetType().FullName : "";
+                    return declaring + "." + del.Method.Name + (targetType.Length > 0 ? " (target: " + targetType + ")" : "");
+                }
+            }
+            catch
+            {
+            }
+            return "unknown";
+        }
+
+        /// <summary>
+        /// Считает дельту статистики конвейера с прошлого тика (≈1 сек):
+        /// самый загруженный юнит (% времени) и поток сообщений (сообщ/с).
+        /// </summary>
+        private void UpdateConveyorIndicators()
+        {
+            var current = Adan.Client.Common.Conveyor.PerfStats.Snapshot();
+            long currentMsgs = Adan.Client.Common.Conveyor.PerfStats.TotalMessages;
+
+            if (_perfSnapshot != null && _perfIntervalSw != null)
+            {
+                long intervalTicks = _perfIntervalSw.ElapsedTicks;
+                if (intervalTicks > 0)
+                {
+                    string topName = null;
+                    long topDeltaTicks = 0;
+
+                    foreach (var kv in current)
+                    {
+                        long prevTicks = 0;
+                        long[] prev;
+                        if (_perfSnapshot.TryGetValue(kv.Key, out prev))
+                            prevTicks = prev[0];
+
+                        long deltaTicks = kv.Value[0] - prevTicks;
+                        if (deltaTicks > topDeltaTicks)
+                        {
+                            topDeltaTicks = deltaTicks;
+                            topName = kv.Key;
+                        }
+                    }
+
+                    double topPercent = 100.0 * topDeltaTicks / intervalTicks;
+                    double msgsPerSec = (double)(currentMsgs - _perfMsgSnapshot) * System.Diagnostics.Stopwatch.Frequency / intervalTicks;
+
+                    if (topName != null && topPercent >= 0.5)
+                    {
+                        // Убираем шумные суффиксы для компактности: TriggersConveyorUnit -> Triggers
+                        var shortName = topName.Replace("ConveyorUnit", "").Replace("Unit", "");
+                        _convIndicator.Text = string.Format("{0}: {1:0}%", shortName, topPercent);
+                        _convIndicator.Foreground =
+                            topPercent < 10 ? System.Windows.Media.Brushes.LimeGreen :
+                            topPercent < 30 ? System.Windows.Media.Brushes.Orange :
+                            System.Windows.Media.Brushes.Red;
+                    }
+                    else
+                    {
+                        _convIndicator.Text = "конв: ~0%";
+                        _convIndicator.Foreground = System.Windows.Media.Brushes.Gray;
+                    }
+
+                    _msgRateIndicator.Text = string.Format("{0:0}/с", msgsPerSec);
+                    _msgRateIndicator.Foreground =
+                        msgsPerSec < 300 ? System.Windows.Media.Brushes.Gray :
+                        msgsPerSec < 1000 ? System.Windows.Media.Brushes.Orange :
+                        System.Windows.Media.Brushes.Red;
+                }
+            }
+
+            _perfSnapshot = current;
+            _perfMsgSnapshot = currentMsgs;
+            if (_perfIntervalSw == null)
+                _perfIntervalSw = System.Diagnostics.Stopwatch.StartNew();
+            else
+                _perfIntervalSw.Restart();
+        }
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
@@ -91,6 +312,10 @@ namespace Adan.Client
             catch
             {
             }
+
+            StartUiLatencyMonitor();
+            StartDispatcherOpTracing();
+            StartServerPingMonitor();
 
             //Load all types for deserialization
             var types = new List<Type>
@@ -777,8 +1002,6 @@ namespace Adan.Client
             {
                 HostName = SettingsHolder.Instance.Settings.ConnectHostName,
                 Port = SettingsHolder.Instance.Settings.ConnectPort,
-                ProxyHost = SettingsHolder.Instance.Settings.Socks5ProxyHost,
-                ProxyPort = SettingsHolder.Instance.Settings.Socks5ProxyPort,
             };
 
             var dialog = new ConnectionDialog { DataContext = connectionDialogViewModel, Owner = this };
@@ -788,8 +1011,6 @@ namespace Adan.Client
             {
                 SettingsHolder.Instance.Settings.ConnectHostName = connectionDialogViewModel.HostName;
                 SettingsHolder.Instance.Settings.ConnectPort = connectionDialogViewModel.Port;
-                SettingsHolder.Instance.Settings.Socks5ProxyHost = connectionDialogViewModel.ProxyHost;
-                SettingsHolder.Instance.Settings.Socks5ProxyPort = connectionDialogViewModel.ProxyPort;
             }
         }
 

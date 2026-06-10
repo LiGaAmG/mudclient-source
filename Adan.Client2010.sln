@@ -9,6 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adan.Client", "Adan.Client\
 		{95218378-19CB-419E-92F1-0D6E2A2897A6} = {95218378-19CB-419E-92F1-0D6E2A2897A6}
 		{108164C7-EB17-4478-AD2C-7E54025FF9C5} = {108164C7-EB17-4478-AD2C-7E54025FF9C5}
 		{E1E4B8FA-4655-4AE3-AC7A-A244BA887C5C} = {E1E4B8FA-4655-4AE3-AC7A-A244BA887C5C}
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF} = {7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adan.Client.Common", "Adan.Client.Common\Adan.Client.Common.csproj", "{B9D6E795-44B4-4998-AAE5-EA3CB547563D}"
@@ -18,6 +19,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adan.Client.Plugins.StuffDatabase", "Adan.Client.Plugins.StuffDatabase\Adan.Client.Plugins.StuffDatabase.csproj", "{E1E4B8FA-4655-4AE3-AC7A-A244BA887C5C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adan.Client.Plugins.GroupWidget", "Adan.Client.Plugins.GroupWidget\Adan.Client.Plugins.GroupWidget.csproj", "{95218378-19CB-419E-92F1-0D6E2A2897A6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adan.Client.Plugins.SpellManager", "Adan.Client.Plugins.SpellManager\Adan.Client.Plugins.SpellManager.csproj", "{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}"
 EndProject
 Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Adan.Client.Setup", "Adan.Client.Setup\Adan.Client.Setup.vdproj", "{0C13F056-F3E1-4B85-B072-BD3AD8828293}"
 EndProject
@@ -73,6 +76,14 @@ Global
 		{95218378-19CB-419E-92F1-0D6E2A2897A6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{95218378-19CB-419E-92F1-0D6E2A2897A6}.Release|x86.ActiveCfg = Release|Any CPU
 		{95218378-19CB-419E-92F1-0D6E2A2897A6}.Release|x86.Build.0 = Release|Any CPU
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}.Debug|x86.Build.0 = Debug|Any CPU
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}.Release|x86.ActiveCfg = Release|Any CPU
+		{7F3A2B19-C6D8-4E5F-A012-3B456789CDEF}.Release|x86.Build.0 = Release|Any CPU
 		{0C13F056-F3E1-4B85-B072-BD3AD8828293}.Debug|Any CPU.ActiveCfg = Debug
 		{0C13F056-F3E1-4B85-B072-BD3AD8828293}.Debug|x86.ActiveCfg = Debug
 		{0C13F056-F3E1-4B85-B072-BD3AD8828293}.Release|Any CPU.ActiveCfg = Release

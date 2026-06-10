@@ -45,6 +45,28 @@
             if (textCommand != null)
             {
                 textCommand.Handled = true;
+
+                // Диагностика: пустые команды забивают очередь сервера (каждая = пульс).
+                // Логируем, КТО их кладёт.
+                if (string.IsNullOrWhiteSpace(textCommand.CommandText))
+                {
+                    var frames = new System.Diagnostics.StackTrace(1, false).GetFrames();
+                    var sb = new StringBuilder();
+                    if (frames != null)
+                    {
+                        int count = 0;
+                        foreach (var f in frames)
+                        {
+                            var m = f.GetMethod();
+                            if (m == null || m.DeclaringType == null) continue;
+                            if (sb.Length > 0) sb.Append(" <- ");
+                            sb.Append(m.DeclaringType.Name).Append('.').Append(m.Name);
+                            if (++count >= 8) break;
+                        }
+                    }
+
+                    Common.Conveyor.PerfLog.WriteTotal("EMPTY_CMD", 0, sb.ToString());
+                }
                 _currentBufferPosition += _encoding.GetBytes(textCommand.CommandText, 0, textCommand.CommandText.Length, _buffer, _currentBufferPosition);
                 _buffer[_currentBufferPosition] = 0x0A;
                 _currentBufferPosition++;

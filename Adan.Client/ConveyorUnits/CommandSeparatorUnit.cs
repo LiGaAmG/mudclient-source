@@ -91,15 +91,24 @@ namespace Adan.Client.ConveyorUnits
 
                 if (i < commandText.Length)
                 {
-                    PushCommandToConveyor(new TextCommand(commandText.Substring(startIndex, i - startIndex)) { IsSeparated = true });
+                    // Пустые сегменты (пустые строки в алиасах/триггерах, ";;" и т.п.)
+                    // не отправляем: каждая пустая команда занимает пульс сервера
+                    // и копит очередь — это давало "вязкие" шаги на маршрутах.
+                    var segment = commandText.Substring(startIndex, i - startIndex);
+                    if (!string.IsNullOrWhiteSpace(segment))
+                        PushCommandToConveyor(new TextCommand(segment) { IsSeparated = true });
                     i++;
                     startIndex = i;
                     textCommand.Handled = true;
                 }
             }
 
-            if(startIndex != 0)
-                PushCommandToConveyor(new TextCommand(commandText.Substring(startIndex, i - startIndex)) { IsSeparated = true });
+            if (startIndex != 0)
+            {
+                var tail = commandText.Substring(startIndex, i - startIndex);
+                if (!string.IsNullOrWhiteSpace(tail))
+                    PushCommandToConveyor(new TextCommand(tail) { IsSeparated = true });
+            }
         }
 
         #endregion

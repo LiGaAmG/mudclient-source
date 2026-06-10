@@ -1,0 +1,12 @@
+# Rename this file to plugin-toggles.conf to override plugin startup.
+# Missing entries default to enabled.
+#
+# Examples:
+# Statistics=false
+# StuffDatabase=false
+# SpellManager=false
+# Proxy=false
+# Map=false
+# Herb=false
+# Group=false
+# Monsters=false

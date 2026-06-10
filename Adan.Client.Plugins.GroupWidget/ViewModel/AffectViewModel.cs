@@ -175,8 +175,34 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
                 {
                     _isBlinking = value;
                     OnPropertyChanged("IsBlinking");
+
+                    // Мигание через общий пульс вместо WPF-сторибоардов
+                    if (value)
+                    {
+                        BlinkPulse.EnsureStarted();
+                        BlinkPulse.Tick += OnBlinkTick;
+                    }
+                    else
+                    {
+                        BlinkPulse.Tick -= OnBlinkTick;
+                    }
+
+                    OnPropertyChanged("BlinkOpacity");
                 }
             }
+        }
+
+        /// <summary>
+        /// Прозрачность иконки: мигающие аффекты притухают в такт общему пульсу.
+        /// </summary>
+        public double BlinkOpacity
+        {
+            get { return _isBlinking && !BlinkPulse.PhaseOn ? 0.25 : 1.0; }
+        }
+
+        private void OnBlinkTick(object sender, EventArgs e)
+        {
+            OnPropertyChanged("BlinkOpacity");
         }
 
         /// <summary>
@@ -278,10 +304,12 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
         {
             if (!AffectDescription.IsRoundBased)
             {
-                if (SecondsLeft > 0)
+                if (_secondsLeft > 0)
                 {
-                    SecondsLeft -= (float)(now - _lastTimerUpdate).TotalSeconds;
-                    if (SecondsLeft < 0)
+                    var newValue = _secondsLeft - (float)(now - _lastTimerUpdate).TotalSeconds;
+                    _lastTimerUpdate = now;
+
+                    if (newValue < 0)
                     {
                         DisplayIcon = string.Empty;
                         SecondsLeftVisible = false;
@@ -289,11 +317,16 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
                     }
                     else
                     {
-                        SecondsLeftVisible = SecondsLeft < 10.0f;
-                        IsBlinking = SecondsLeft <= 5.0f;
+                        // Значение обновляем всегда (тултип должен тикать), а вот
+                        // видимость счётчика и мигание трогаем только у "догорающих"
+                        // аффектов — это дорогие визуальные изменения.
+                        SecondsLeft = newValue;
+                        if (newValue < 10.0f || _secondsLeftVisible)
+                        {
+                            SecondsLeftVisible = newValue < 10.0f;
+                            IsBlinking = newValue <= 5.0f;
+                        }
                     }
-
-                    _lastTimerUpdate = now;
                 }
             }
         }

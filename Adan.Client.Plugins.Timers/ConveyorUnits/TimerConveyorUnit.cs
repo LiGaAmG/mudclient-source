@@ -240,6 +240,7 @@ namespace Adan.Client.Plugins.Timers.ConveyorUnits
                         string name = _waitTimers.AddTimer(new Tuple<TimeSpan, TimeSpan>(TimeSpan.FromSeconds(period), TimeSpan.FromSeconds(period)), true,
                                                 (timer) =>
                                                 {
+                                                    Adan.Client.Common.Conveyor.PerfLog.WriteTotal("WAIT_FIRE", 0, args[1]);
                                                     base.PushCommandToConveyor(new TextCommand(args[1]));
                                                     Conveyor.RootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
                                                 });
@@ -251,6 +252,7 @@ namespace Adan.Client.Plugins.Timers.ConveyorUnits
                         string name = _waitTimers.AddTimer(new Tuple<TimeSpan, TimeSpan>(TimeSpan.FromSeconds(period), TimeSpan.FromSeconds(period)), true,
                                                 (timer) =>
                                                 {
+                                                    Adan.Client.Common.Conveyor.PerfLog.WriteTotal("WAIT_FIRE", 0, args[1]);
                                                     base.PushCommandToConveyor(new TextCommand(args[1]));
                                                     Conveyor.RootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
                                                 });

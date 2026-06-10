@@ -75,6 +75,11 @@ namespace Adan.Client.Map.Model
                 var mapMessage = e.Message as CurrentRoomMessage;
                 if (RoomId != mapMessage.RoomId || ZoneId != mapMessage.ZoneId)
                 {
+                    // Комната доехала — гасим живой замер ожидания шага
+                    Adan.Client.Common.Conveyor.PerfStats.RoomWaitEnded();
+
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+
                     RoomId = mapMessage.RoomId;
                     ZoneId = mapMessage.ZoneId;
 
@@ -85,6 +90,12 @@ namespace Adan.Client.Map.Model
 
                     _zoneManager.ExecuteRoomAction(this);
                     _zoneManager.UpdateControl(this);
+
+                    sw.Stop();
+                    // Маячок пути шага: вся обработка смены комнаты (зона+травник+маршрут+карта)
+                    Adan.Client.Common.Conveyor.PerfLog.WriteTotal("ROOMPROC", sw.ElapsedMilliseconds,
+                        string.Format("room={0} zone={1} uid={2}", RoomId, ZoneId,
+                            Uid != null && Uid.Length > 8 ? Uid.Substring(0, 8) : Uid));
                 }
             }
         }

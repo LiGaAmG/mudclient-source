@@ -131,7 +131,7 @@
                 }
 
                 if (IsRegExp && (value.IndexOf("$") == -1 || value.IndexOf("$") == value.Length - 1))
-                    _compiledRegex = new Regex(_matchingPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant);
+                    _compiledRegex = new Regex(_matchingPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(5));
                 else
                     _compiledRegex = null;
 
@@ -196,32 +196,44 @@
                 }
 
                 Match match;
-                if (_compiledRegex != null)
-                    match = _compiledRegex.Match(textMessage.InnerText);
-                else
+                try
                 {
-                    // Оптимизация: если переменные не менялись с последней компиляции,
-                    // пропускаем дорогой ReplaceVariables и используем кэшированный regex напрямую.
-                    int curVarVersion = rootModel.VariableVersion;
-                    if (_cachedVarRegex != null && _lastVarVersion == curVarVersion)
-                    {
-                        match = _cachedVarRegex.Match(textMessage.InnerText);
-                    }
+                    if (_compiledRegex != null)
+                        match = _compiledRegex.Match(textMessage.InnerText);
                     else
                     {
-                        var varReplace = rootModel.ReplaceVariables(MatchingPattern);
-                        if (!varReplace.IsAllVariables)
-                            return false;
-
-                        // Перекомпилируем только если resolved-паттерн реально изменился.
-                        if (_cachedVarRegex == null || _cachedVarPattern != varReplace.Value)
+                        // Оптимизация: если переменные не менялись с последней компиляции,
+                        // пропускаем дорогой ReplaceVariables и используем кэшированный regex напрямую.
+                        int curVarVersion = rootModel.VariableVersion;
+                        if (_cachedVarRegex != null && _lastVarVersion == curVarVersion)
                         {
-                            _cachedVarPattern = varReplace.Value;
-                            _cachedVarRegex = new Regex(_cachedVarPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant);
+                            match = _cachedVarRegex.Match(textMessage.InnerText);
                         }
-                        _lastVarVersion = curVarVersion;
-                        match = _cachedVarRegex.Match(textMessage.InnerText);
+                        else
+                        {
+                            var varReplace = rootModel.ReplaceVariables(MatchingPattern);
+                            if (!varReplace.IsAllVariables)
+                                return false;
+
+                            // Перекомпилируем только если resolved-паттерн реально изменился.
+                            if (_cachedVarRegex == null || _cachedVarPattern != varReplace.Value)
+                            {
+                                _cachedVarPattern = varReplace.Value;
+                                _cachedVarRegex = new Regex(_cachedVarPattern, RegexOptions.Compiled | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(5));
+                            }
+                            _lastVarVersion = curVarVersion;
+                            match = _cachedVarRegex.Match(textMessage.InnerText);
+                        }
                     }
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    // Catastrophic backtracking — триггер не должен блокировать конвейер.
+                    // Логируем и пропускаем как несовпадение.
+                    var pat = MatchingPattern;
+                    if (pat != null && pat.Length > 60) pat = pat.Substring(0, 60) + "...";
+                    Adan.Client.Common.Conveyor.PerfLog.Write("  REGEX_TIMEOUT Trigger[" + pat + "]", textMessage.InnerText, 30);
+                    return false;
                 }
 
                 if (!match.Success)

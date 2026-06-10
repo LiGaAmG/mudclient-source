@@ -58,6 +58,8 @@
   <ItemGroup>
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="GroupManager.cs" />
+    <Compile Include="IconRasterizer.cs" />
+    <Compile Include="BlinkPulse.cs" />
     <Compile Include="Model\ActionParameters\SelectedMonsterParameter.cs" />
     <Compile Include="Model\GroupHolder.cs" />
     <Compile Include="Model\MonsterHolder.cs" />
@@ -164,3 +166,4 @@
   -->
   <Import Project="$(SolutionDir)MSBuild\Common.targets" />
 </Project>
+

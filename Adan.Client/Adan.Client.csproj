@@ -281,6 +281,7 @@
     <Compile Include="Model\ParameterDescriptions\TriggerOrCommandParameterDescription.cs" />
     <Compile Include="Model\ParameterDescriptions\VariableReferenceParameterDescription.cs" />
     <Compile Include="OutputWindow.cs" />
+    <Compile Include="PluginToggleSettings.cs" />
     <Compile Include="PluginHost.cs" />
     <Compile Include="Resources\AvalonDock\AvalonDockDarkTheme.cs" />
     <Compile Include="Settings\WidgetLayout.cs" />
@@ -484,6 +485,9 @@
     </EmbeddedResource>
     <None Include="app.config" />
     <None Include="packages.config" />
+    <None Include="plugin-toggles.conf.example">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>

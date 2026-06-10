@@ -101,7 +101,7 @@ namespace Adan.Client.ConveyorUnits
             
             if (TriggerCheck(commandText, isImport) || AliasCheck(commandText, isImport)
                 || HighLightCheck(commandText, isImport) || HotkeyCheck(commandText, isImport)
-                || StatusCheck(commandText) || SubstitutionCheck(commandText, isImport)
+                || SubstitutionCheck(commandText, isImport)
                 || UndoCheck(commandText, isImport))
             {
                 if (!isImport)
@@ -113,10 +113,11 @@ namespace Adan.Client.ConveyorUnits
                 return;
             }
 
+            // StatusCheck не требует сохранения профиля — это runtime-команда, не изменение настроек
             if (VariableCheck(commandText, isImport) || ZapCheck(commandText, isImport)
                 || ConnectCheck(commandText, isImport) || GroupCheck(commandText, isImport)
                 || LogCheck(commandText) || ShowmeCheck(commandText, isImport)
-                || TestCheck(commandText, isImport))
+                || StatusCheck(commandText) || TestCheck(commandText, isImport))
             {
                 command.Handled = true;
             }

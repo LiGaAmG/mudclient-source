@@ -38,9 +38,9 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private const int MaxNegativeLoreLookupKeyLength = 160;
         // Кэш строк, которые были проверены и не содержат lore-предметов.
         // Ключ = нормализованная строка (цифровые последовательности → "#").
-        // Позволяет мгновенно пропускать повторяющиеся боевые строки.
+        // СТАТИЧЕСКИЙ: все табы шарят один кэш — первый промах сразу помогает всем.
         private const int MaxNegativeLineCacheSize = 2048;
-        private HashSet<string> _negativeLineCache = new HashSet<string>(StringComparer.Ordinal);
+        private static volatile HashSet<string> _negativeLineCache = new HashSet<string>(StringComparer.Ordinal);
 
         private string _lastShownObjectName = string.Empty;
 
@@ -50,16 +50,18 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
         // Volatile: фоновый таймер атомарно заменяет весь словарь новой версией.
         // Горячий путь (MarkKnownLoreItems) только читает — никогда не трогает диск.
-        private volatile Dictionary<string, LoreTooltip> _loreTooltipsByObjectName = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
-        private volatile HashSet<string> _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
-        private DateTime _loreFolderStampUtc = DateTime.MinValue;
-        private System.Threading.Timer _cacheRefreshTimer;
+        // СТАТИЧЕСКИЕ: все табы читают один и тот же лор-кэш, загруженный один раз.
+        private static volatile Dictionary<string, LoreTooltip> _loreTooltipsByObjectName = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
+        private static volatile HashSet<string> _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        private static DateTime _loreFolderStampUtc = DateTime.MinValue;
+        private static readonly object _cacheLock = new object();
+        private static System.Threading.Timer _cacheRefreshTimer;
 
         private static readonly Regex _whiteSpaceRx = new Regex(@" {2,}", RegexOptions.Compiled);
         private static readonly Regex _anyWhiteSpaceRx = new Regex(@"\s+", RegexOptions.Compiled);
         private static readonly Regex _multiSpaceSplitRx = new Regex(@"\s{2,}", RegexOptions.Compiled);
         private static readonly Regex _quotedItemNameRegex = new Regex("'([^'\\r\\n]+)'", RegexOptions.Compiled);
-        private static readonly Regex _countSuffixRx = new Regex(@"\s+(?:\(x\d+\)|\[\d+\])\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _countSuffixRx = new Regex(@"\s+(?:\(x?\d+\)|\[\d+\])\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex _qualitySuffixRx = new Regex(@"\s+\[(?:ужасное|очень плохое|плохое|среднее|хорошее|очень хорошее|великолепное)\]\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         // Parenthetical property suffixes like "(невидимый)", "(заряженный)" etc.
         private static readonly Regex _propSuffixRx = new Regex(@"\s+\(\p{L}+\)\s*$", RegexOptions.Compiled);
@@ -68,7 +70,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private static readonly Regex _ellipsisTailRx = new Regex(@"\s*(?:\.{3,}|…)\s*$", RegexOptions.Compiled);
         private static readonly Regex _glowTailRx = new Regex(@"\s+\.{3,}\p{L}[^\r\n]*$", RegexOptions.Compiled);
         private static readonly Regex _zoneRx = new Regex(@"Вы находитесь в зоне (.+?)\.", RegexOptions.Compiled);
-        private static readonly Regex _pickupFromCorpseRx = new Regex(@"(?:Вы|[А-ЯЁ]\S+)\s+взял[аи]?\s+(.+?)\s+из трупа\s+([а-яё].+?)[\.\!]?\s*$", RegexOptions.Compiled | RegexOptions.Multiline);
+        private static readonly Regex _pickupFromCorpseRx = new Regex(@"(?:Вы|[А-ЯЁ]\S+)\s+взял[аи]?\s+(.+?)\s+из трупа\s+([а-яё].+?)[\.\!]?\s*$", RegexOptions.Compiled);
 
         private string CurrentZone
         {
@@ -96,17 +98,21 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             // Загрузить настройку цвета
             LoadLoreColorConfig();
 
-            // Первичная загрузка кэша сразу в фоне
-            System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
-            // Периодическая проверка изменений папки каждые 10 секунд — только в фоне
-            _cacheRefreshTimer = new System.Threading.Timer(_ => RefreshLoreCache(), null,
-                TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+            // Таймер и кэш — статические, создаём только один раз для всех табов
+            lock (_cacheLock)
+            {
+                if (_cacheRefreshTimer == null)
+                {
+                    System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
+                    _cacheRefreshTimer = new System.Threading.Timer(_ => RefreshLoreCache(), null,
+                        TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+                }
+            }
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
-                _cacheRefreshTimer?.Dispose();
+            // Таймер статический — не диспозим при закрытии таба
             base.Dispose(disposing);
         }
 
@@ -620,7 +626,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                         _currentZoneFromText = zoneMatch.Groups[1].Value.Trim();
                 }
 
-                // Record drop location — быстрый pre-check перед тяжёлым multiline regex
+                // Record drop location — быстрый pre-check перед regex
                 if (rawText.IndexOf("из трупа", StringComparison.Ordinal) >= 0)
                 {
                     var pickupMatch = _pickupFromCorpseRx.Match(rawText);
@@ -642,6 +648,27 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
             var sourceText = textMessage.InnerText;
             if (string.IsNullOrEmpty(sourceText))
+            {
+                return;
+            }
+
+            // Быстрый выход для частых боевых/служебных строк, которые гарантированно не
+            // содержат lore-предметов. IndexOf на короткой строке (~200 симв) — несколько мкс,
+            // полный lore-pipeline — 20–47 ms на каждый уникальный ключ кэша.
+            // "сопротивляться" → дебафф "понизил способность X сопротивляться магии"
+            // "в мир иной"     → убийство "послал X в мир иной"
+            // " последней"     → "стрела была для него последней"
+            // "поровну"        → дележ монет "поделила N монет поровну; вам досталось N монет"
+            // " группе:"       → чат группы "Имя сказал группе: «текст»"
+            // "набросился на " → таунт "Имя оскорбил X и он с бешенной яростью набросился на Имя"
+            if (sourceText.IndexOf("сопротивляться", StringComparison.Ordinal) >= 0
+                || sourceText.IndexOf("в мир иной", StringComparison.Ordinal) >= 0
+                || sourceText.IndexOf(" последней", StringComparison.Ordinal) >= 0
+                || sourceText.IndexOf("поровну", StringComparison.Ordinal) >= 0
+                || sourceText.IndexOf(" группе:", StringComparison.Ordinal) >= 0
+                || sourceText.IndexOf("набросился на ", StringComparison.Ordinal) >= 0
+                // "пустая ячейка" — незанятые слоты экипировки (<в правой руке>, <на голове> и т.п.)
+                || sourceText.IndexOf("пустая ячейка", StringComparison.Ordinal) >= 0)
             {
                 return;
             }
@@ -742,10 +769,13 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             }
         }
 
-        // Вызывается только из фонового потока (таймер + конструктор).
+        // Вызывается из фонового потока (таймер + конструктор).
         // Горячий путь MarkKnownLoreItems никогда не трогает диск.
-        private void RefreshLoreCache()
+        // Защищён _cacheLock от одновременного запуска из нескольких табов.
+        private static void RefreshLoreCache()
         {
+            lock (_cacheLock)
+            {
             try
             {
                 var stuffFolder = GetStuffDbFolder();
@@ -793,9 +823,11 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 // Атомарная замена: горячий путь увидит либо старый, либо новый словарь целиком
                 _loreTooltipsByObjectName = newCache;
                 _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+                _negativeLineCache = new HashSet<string>(StringComparer.Ordinal);
                 _loreFolderStampUtc = folderStamp;
             }
             catch { }
+            } // lock
         }
 
         [NotNull]
@@ -1123,6 +1155,13 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 return true;
             }
 
+            // Строки "X взял Y из трупа Z" — имя монстра в конце ломает lore pipeline,
+            // а quoted items ('...') уже обработаны выше. Пропускаем standalone detection.
+            if (sourceText.IndexOf("из трупа", StringComparison.Ordinal) >= 0)
+            {
+                return false;
+            }
+
             var trimmed = sourceText.TrimStart();
             if (trimmed.Length < 3)
             {
@@ -1184,6 +1223,39 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                             || v2 == "нашёл" || v2 == "нашла" || v2 == "нашли"
                             || v2 == "выбросил" || v2 == "выбросила" || v2 == "выбросили";
                     }
+                    else
+                    {
+                        // Для "X <глагол> Y" — третье лицо. Боевые глаголы (атака, нокдаун, убийство)
+                        // никогда не предшествуют lore-предмету — пропускаем.
+                        var spaceIdx = trimmed.IndexOf(' ');
+                        if (spaceIdx > 0)
+                        {
+                            var spaceIdx2 = trimmed.IndexOf(' ', spaceIdx + 1);
+                            var verbEnd = spaceIdx2 >= 0 ? spaceIdx2 : trimmed.Length;
+                            var v2 = trimmed.Substring(spaceIdx + 1, verbEnd - spaceIdx - 1)
+                                           .Trim('.', ',', ':', ';', '!').ToLowerInvariant();
+                            // Глаголы атаки/убийства/нокдауна/промаха — однозначно не lore-контекст
+                            if (v2 == "ударил" || v2 == "ударила" || v2 == "ударили"
+                                || v2 == "атаковал" || v2 == "атаковала" || v2 == "атаковали"
+                                || v2 == "завалил" || v2 == "завалила" || v2 == "завалили"
+                                || v2 == "промахнулся" || v2 == "промахнулась" || v2 == "промахнулись"
+                                || v2 == "попытался" || v2 == "попыталась" || v2 == "попытались"
+                                || v2 == "убил" || v2 == "убила" || v2 == "убили")
+                            {
+                                runThirdPersonCheck = false;
+                            }
+
+                            // "Магический/Меткий/Смертельный выстрел Verb..." — v2 = "выстрел" (существительное).
+                            // "Сильный удар Verb..." — v2 = "удар".
+                            // Настоящий глагол стоит на позиции v3. Если v2 — боевое существительное,
+                            // строка не может содержать lore-предмет в позиции объекта.
+                            if (runThirdPersonCheck
+                                && (v2 == "выстрел" || v2 == "удар" || v2 == "выстрела" || v2 == "удара"))
+                            {
+                                runThirdPersonCheck = false;
+                            }
+                        }
+                    }
 
                     if (runThirdPersonCheck)
                     {
@@ -1233,6 +1305,23 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             }
 
             if (char.IsDigit(trimmed[0]))
+            {
+                return false;
+            }
+
+            // Строки, начинающиеся с местоимений "Вы/Ваш/Ваша" — всегда боевые действия игрока,
+            // а не названия предметов. "Вы смертельно огрели X" не может быть лор-строкой.
+            if (trimmed.StartsWith("Вы ", StringComparison.Ordinal)
+                || trimmed.StartsWith("Ваш ", StringComparison.Ordinal)
+                || trimmed.StartsWith("Ваша ", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            // Строки, начинающиеся с предлога "По " — описания комнат/переходов в Adamant MUD.
+            // "По широкому коридору", "По тёмному тоннелю" — пространственные фразы,
+            // никогда не встречаются как названия lore-предметов.
+            if (trimmed.StartsWith("По ", StringComparison.Ordinal))
             {
                 return false;
             }
@@ -1794,6 +1883,34 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             return -1;
         }
 
+        // Белый список глаголов взаимодействия с предметами.
+        // Только строки, где второе слово — один из этих глаголов, могут содержать
+        // название lore-предмета в позиции объекта. Все остальные глаголы прошедшего
+        // времени (заморозила, оскорбил, поделила, набросился и т.п.) предметов не содержат.
+        private static readonly HashSet<string> _itemInteractionVerbs = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // подбор
+            "взял", "взяла", "взяли",
+            "поднял", "подняла", "подняли",
+            "подобрал", "подобрала", "подобрали",
+            // выброс / положить
+            "бросил", "бросила", "бросили",
+            "выбросил", "выбросила", "выбросили",
+            "положил", "положила", "положили",
+            // экипировка
+            "надел", "надела", "надели",
+            "снял", "сняла", "сняли",
+            "одел", "одела", "одели",
+            // передача / торговля
+            "дал", "дала", "дали",
+            "получил", "получила", "получили",
+            "купил", "купила", "купили",
+            "продал", "продала", "продали",
+            // попытка надеть/снять ("попробовал надеть X", "прекратил носить X")
+            "попробовал", "попробовала", "попробовали",
+            "прекратил", "прекратила", "прекратили",
+        };
+
         private static bool IsLikelyThirdPersonActionLine([NotNull] MatchCollection words)
         {
             Assert.ArgumentNotNull(words, "words");
@@ -1804,36 +1921,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             }
 
             var verb = words[1].Value.Trim('.', ',', ':', ';').ToLowerInvariant();
-            if (verb.Length == 0)
-            {
-                return false;
-            }
-
-            return verb.EndsWith("л")
-                   || verb.EndsWith("ла")
-                   || verb.EndsWith("ли")
-                   || verb.EndsWith("ло")
-                   || verb.EndsWith("лся")
-                   || verb.EndsWith("лась")
-                   || verb.EndsWith("лись")
-                   || verb.Equals("попробовал")
-                   || verb.Equals("попробовала")
-                   || verb.Equals("попробовали")
-                   || verb.Equals("прекратил")
-                   || verb.Equals("прекратила")
-                   || verb.Equals("прекратили")
-                   || verb.Equals("выбросил")
-                   || verb.Equals("выбросила")
-                   || verb.Equals("выбросили")
-                   || verb.Equals("взял")
-                   || verb.Equals("взяла")
-                   || verb.Equals("взяли")
-                   || verb.Equals("надел")
-                   || verb.Equals("надела")
-                   || verb.Equals("надели")
-                   || verb.Equals("снял")
-                   || verb.Equals("сняла")
-                   || verb.Equals("сняли");
+            return verb.Length > 0 && _itemInteractionVerbs.Contains(verb);
         }
 
         private bool TryResolveLoreTooltip(

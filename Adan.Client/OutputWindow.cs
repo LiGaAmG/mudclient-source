@@ -22,10 +22,11 @@ namespace Adan.Client
         private readonly MainWindow _mainWindow;
         private readonly Queue<TextMessage> _messageQueue = new Queue<TextMessage>();
         private readonly object _messageQueueLockObject = new object();
-#if DEBUG
+        // Флаг: в очереди диспетчера уже есть один ProcessMessageQueue — не добавлять ещё.
+        // Хранится внутри _messageQueueLockObject — отдельный lock не нужен.
+        private bool _dispatchPending = false;
         // Время постановки первого сообщения в текущий батч (для замера задержки рендера)
         private long _firstEnqueueTick = 0;
-#endif
         private RootModel _rootModel;
         private readonly MainOutputWindow _window;
 
@@ -144,16 +145,17 @@ namespace Adan.Client
 
             if (message != null)
             {
+                bool needDispatch;
                 lock (_messageQueueLockObject)
                 {
-#if DEBUG
                     if (_messageQueue.Count == 0)
                         _firstEnqueueTick = System.Diagnostics.Stopwatch.GetTimestamp();
-#endif
                     _messageQueue.Enqueue(message);
+                    needDispatch = !_dispatchPending;
+                    if (needDispatch) _dispatchPending = true;
                 }
 
-                if (Application.Current != null)
+                if (needDispatch && Application.Current != null)
                 {
                     if (_window?.IsVisible == true)
                         Application.Current.Dispatcher.BeginInvoke((Action)ProcessMessageQueue, DispatcherPriority.Normal);
@@ -180,60 +182,45 @@ namespace Adan.Client
             var showStatusBarMessage = e.Message as ShowStatusBarMessage;
             if (showStatusBarMessage != null)
             {
-                // for some reason, if called from a trigger, we'll have an exception thrown
-                // due to not being on the UI thread
-                var context = System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext();
-                var token = System.Threading.Tasks.Task.Factory.CancellationToken;
-                System.Threading.Tasks.Task.Factory.StartNew(() =>
-                {
-                    _window.DisplayStatusBar(showStatusBarMessage.State, true);
-                }, token, System.Threading.Tasks.TaskCreationOptions.None, context);
+                if (Application.Current != null)
+                    Application.Current.Dispatcher.BeginInvoke(
+                        (Action)(() => _window.DisplayStatusBar(showStatusBarMessage.State, true)),
+                        DispatcherPriority.Normal);
             }
 
             var setStatusMessage = e.Message as SetStatusMessage;
             if (setStatusMessage != null)
             {
-                // for some reason, if called from a trigger, we'll have an exception thrown
-                // due to not being on the UI thread
-                var context = System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext();
-                var token = System.Threading.Tasks.Task.Factory.CancellationToken;
-                System.Threading.Tasks.Task.Factory.StartNew(() =>
-                {
-                    _window.SetStatusBar(setStatusMessage.Id, setStatusMessage.Msg, setStatusMessage.Color);
-                }, token, System.Threading.Tasks.TaskCreationOptions.None, context);
+                if (Application.Current != null)
+                    Application.Current.Dispatcher.BeginInvoke(
+                        (Action)(() => _window.SetStatusBar(setStatusMessage.Id, setStatusMessage.Msg, setStatusMessage.Color)),
+                        DispatcherPriority.Normal);
             }
         }
 
         private void ProcessMessageQueue()
         {
             IList<TextMessage> messages;
-#if DEBUG
             long firstTick;
-#endif
             lock (_messageQueueLockObject)
             {
                 messages = _messageQueue.ToList();
                 _messageQueue.Clear();
-#if DEBUG
+                _dispatchPending = false;
                 firstTick = _firstEnqueueTick;
                 _firstEnqueueTick = 0;
-#endif
             }
 
             if (messages.Count > 0)
             {
-#if DEBUG
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-#endif
                 _window.AddMessages(messages);
-#if DEBUG
                 sw.Stop();
                 long waitMs = firstTick > 0
                     ? (long)((System.Diagnostics.Stopwatch.GetTimestamp() - firstTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency)
                     : 0;
                 if (messages.Count > 1 || sw.ElapsedMilliseconds >= 5 || waitMs >= 20)
                     Common.Conveyor.PerfLog.WriteRender(messages.Count, waitMs, sw.ElapsedMilliseconds);
-#endif
             }
         }
     }

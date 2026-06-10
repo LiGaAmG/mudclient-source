@@ -24,6 +24,7 @@
 
         private readonly AggregateCatalog _catalog;
         private readonly CompositionContainer _container;
+        private readonly PluginToggleSettings _pluginToggleSettings;
 
         private string _currentOutputWindow = string.Empty;
 
@@ -37,6 +38,7 @@
 
             try
             {
+                _pluginToggleSettings = PluginToggleSettings.Load();
                 _catalog = new AggregateCatalog();
                 _catalog.Catalogs.Add(new DirectoryCatalog("Plugins"));
 
@@ -128,6 +130,7 @@
         {
             if (rootModel.Uid != _currentOutputWindow)
             {
+                PerfLog.WriteTabSwitch(rootModel.Uid);
                 foreach (var plugin in Plugins)
                 {
                     try
@@ -188,6 +191,12 @@
 
             foreach (var plugin in AllPlugins)
             {
+                if (!IsPluginEnabled(plugin))
+                {
+                    ErrorLogger.Instance.Write(string.Format("Plugin disabled by config: {0}", plugin.Name));
+                    continue;
+                }
+
                 try
                 {
                     plugin.Initialize(initializationStatusModel, mainWindow);
@@ -214,10 +223,16 @@
 
         public void InitializeConveyor(MessageConveyor conveyor)
         {
-            foreach (var plugin in AllPlugins)
+            foreach (var plugin in Plugins)
             {
                 plugin.InitializeConveyor(conveyor);
             }
+        }
+
+        private bool IsPluginEnabled([NotNull] PluginBase plugin)
+        {
+            Assert.ArgumentNotNull(plugin, "plugin");
+            return _pluginToggleSettings == null || _pluginToggleSettings.IsEnabled(plugin.Name);
         }
         /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.

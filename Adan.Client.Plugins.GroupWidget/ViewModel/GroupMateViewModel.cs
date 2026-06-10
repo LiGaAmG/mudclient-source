@@ -35,6 +35,7 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
         private TextColor _movesColor;
         private TextColor _hitsColor;
         private int _number;
+        private string _name;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GroupMateViewModel"/> class.
@@ -100,14 +101,37 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
 
         public bool DisplayNumber { get; set; }
 
+        // Пул строк: вместо удаления из коллекции строка деактивируется (скрывается),
+        // а её контейнер/шаблон переживают смену комнаты — без пересоздания элементов.
+        private bool _isActive = true;
+        public bool IsActive
+        {
+            get { return _isActive; }
+            set
+            {
+                if (_isActive != value)
+                {
+                    _isActive = value;
+                    OnPropertyChanged("IsActive");
+                }
+            }
+        }
+
         /// <summary>
         /// Gets the name of group mate.
         /// </summary>
         [NotNull]
         public string Name
         {
-            get;
-            private set;
+            get { return _name; }
+            private set
+            {
+                if (_name != value)
+                {
+                    _name = value;
+                    OnPropertyChanged("Name");
+                }
+            }
         }
 
         public TextColor TextColor
@@ -397,7 +421,8 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             }
 
             // Быстрая проверка: если ключевые данные не изменились — пропускаем полный update.
-            // Аффекты проверяем по количеству (смена состава) плюс HP/position для основных свойств.
+            // Аффекты сравниваем контрольной суммой (имя+раунды+длительность): простое
+            // сравнение количества пропускало тики раундов и обновления длительности.
             bool dataChanged =
                 characterStatus.HitsPercent != _hits_percent
                 || characterStatus.MovesPercent != _moves_percent
@@ -405,7 +430,7 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
                 || characterStatus.IsAttacked != _is_attacked
                 || characterStatus.InSameRoom != _in_same_room
                 || position != _number
-                || characterStatus.Affects.Count != _lastAffectsCount
+                || ComputeAffectsStamp(characterStatus) != _lastAffectsStamp
                 || characterStatus.WaitState != _wait_state
                 || (MemTimeVisibleSetting && characterStatus.MemTime != _lastServerMemTime);
 
@@ -415,7 +440,23 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             UpdateCharacter(characterStatus, position);
         }
 
-        private int _lastAffectsCount = -1;
+        private static int ComputeAffectsStamp(CharacterStatus status)
+        {
+            int stamp = 17;
+            foreach (var affect in status.Affects)
+            {
+                unchecked
+                {
+                    stamp = stamp * 31 + (affect.Name != null ? affect.Name.GetHashCode() : 0);
+                    stamp = stamp * 31 + affect.Rounds;
+                    stamp = stamp * 31 + (int)affect.Duration;
+                }
+            }
+
+            return stamp;
+        }
+
+        private int _lastAffectsStamp = -1;
 
         private void UpdateCharacter([NotNull] CharacterStatus characterStatus, int position)
         {
@@ -432,7 +473,7 @@ namespace Adan.Client.Plugins.GroupWidget.ViewModel
             HitsColor = GetColor(HitsPercent);
             MovesColor = GetColor(MovesPercent);
 
-            _lastAffectsCount = characterStatus.Affects.Count;
+            _lastAffectsStamp = ComputeAffectsStamp(characterStatus);
             UpdateAffects(characterStatus);
 
             if (MemTimeVisibleSetting && _lastServerMemTime != characterStatus.MemTime)

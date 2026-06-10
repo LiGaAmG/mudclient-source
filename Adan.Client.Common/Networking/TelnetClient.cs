@@ -7,10 +7,8 @@
 namespace Adan.Client.Common.Networking
 {
     using System;
-    using System.Collections.Generic;
     using System.Net;
     using System.Net.Sockets;
-    using System.Text;
     using CSLib.Net.Annotations;
     using CSLib.Net.Diagnostics;
 
@@ -25,11 +23,8 @@ namespace Adan.Client.Common.Networking
         private readonly AsyncCallback _receiveDataCallback;
         private readonly AsyncCallback _connectedCallback;
         private readonly AsyncCallback _dataSentCallback;
-        private AsyncCallback _proxyConnectedCallback;
         private Socket _theSocket;
         private SocketError _error;
-        private string _targetHost;
-        private int _targetPort;
 
         #endregion
 
@@ -44,7 +39,6 @@ namespace Adan.Client.Common.Networking
             _receiveDataCallback = new AsyncCallback(ReceiveData);
             _connectedCallback = new AsyncCallback(OnConnected);
             _dataSentCallback = new AsyncCallback(OnDataSent);
-            _proxyConnectedCallback = new AsyncCallback(OnConnectedToProxy);
         }
 
         #endregion
@@ -76,32 +70,6 @@ namespace Adan.Client.Common.Networking
         #region Properties
 
         /// <summary>
-        /// Gets or sets the SOCKS5 proxy hostname. If null or empty, proxy is not used.
-        /// </summary>
-        public string Socks5Host
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the SOCKS5 proxy port.
-        /// </summary>
-        public int Socks5Port
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets whether a SOCKS5 proxy is configured.
-        /// </summary>
-        public bool UseProxy
-        {
-            get { return !string.IsNullOrWhiteSpace(Socks5Host) && Socks5Port > 0; }
-        }
-
-        /// <summary>
         /// Gets the last error.
         /// </summary>
         /// <value>The last error.</value>
@@ -115,94 +83,6 @@ namespace Adan.Client.Common.Networking
         #region Public Methods
 
         /// <summary>
-        /// Tests a SOCKS5 proxy by connecting and performing a handshake to the specified target.
-        /// Returns null on success, or an error message on failure.
-        /// </summary>
-        public static string TestSocks5Proxy(string proxyHost, int proxyPort, string testHost, int testPort, int timeoutMs = 5000)
-        {
-            try
-            {
-                using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
-                {
-                    var result = socket.BeginConnect(proxyHost, proxyPort, null, null);
-                    if (!result.AsyncWaitHandle.WaitOne(timeoutMs, false))
-                    {
-                        socket.Close();
-                        return "Connection to proxy timed out";
-                    }
-
-                    socket.EndConnect(result);
-
-                    socket.ReceiveTimeout = timeoutMs;
-                    socket.SendTimeout = timeoutMs;
-
-                    // SOCKS5 greeting: [ver=5, nmethods=1, method=0 (no auth)]
-                    var greeting = new byte[] { 5, 1, 0 };
-                    socket.Send(greeting);
-
-                    var response = new byte[2];
-                    if (socket.Receive(response) != 2)
-                        return "No greeting response from proxy";
-
-                    if (response[0] != 5)
-                        return "Invalid SOCKS version: " + response[0];
-
-                    if (response[1] != 0)
-                        return "Proxy requires authentication (method=" + response[1] + ")";
-
-                    // Build connect request with domain name
-                    var domainBytes = Encoding.ASCII.GetBytes(testHost);
-                    var request = new byte[7 + domainBytes.Length];
-                    request[0] = 5; // ver
-                    request[1] = 1; // cmd: connect
-                    request[2] = 0; // rsv
-                    request[3] = 3; // atyp: domain name
-                    request[4] = (byte)domainBytes.Length;
-                    Array.Copy(domainBytes, 0, request, 5, domainBytes.Length);
-                    request[5 + domainBytes.Length] = (byte)((testPort >> 8) & 0xFF);
-                    request[6 + domainBytes.Length] = (byte)(testPort & 0xFF);
-
-                    socket.Send(request);
-
-                    var connectResponse = new byte[10];
-                    int bytesRead = socket.Receive(connectResponse);
-                    if (bytesRead < 4)
-                        return "No connect response from proxy";
-
-                    if (connectResponse[0] != 5)
-                        return "Invalid SOCKS version in connect response: " + connectResponse[0];
-
-                    if (connectResponse[1] != 0)
-                    {
-                        var errorCodes = new Dictionary<byte, string>
-                        {
-                            {1, "General SOCKS server failure"},
-                            {2, "Connection not allowed by ruleset"},
-                            {3, "Network unreachable"},
-                            {4, "Host unreachable"},
-                            {5, "Connection refused by proxy"},
-                            {6, "TTL expired"},
-                            {7, "Command not supported"},
-                            {8, "Address type not supported"},
-                        };
-
-                        string errorMsg;
-                        if (!errorCodes.TryGetValue(connectResponse[1], out errorMsg))
-                            errorMsg = "Unknown SOCKS error code " + connectResponse[1];
-
-                        return errorMsg;
-                    }
-
-                    return null; // success
-                }
-            }
-            catch (Exception ex)
-            {
-                return ex.Message;
-            }
-        }
-
-        /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
         public virtual void Dispose()
@@ -213,7 +93,6 @@ namespace Adan.Client.Common.Networking
 
         /// <summary>
         /// Connects to the specified host and port.
-        /// If <see cref="Socks5Host"/> is set, connects via SOCKS5 proxy.
         /// </summary>
         /// <param name="host">
         /// The host to connect to.
@@ -228,6 +107,11 @@ namespace Adan.Client.Common.Networking
 
             _theSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
+            // Отключаем алгоритм Нейгла: команды игрока — крошечные пакеты (2-5 байт),
+            // и Nagle придерживает их в ожидании ACK предыдущих, что в связке с
+            // delayed ACK сервера даёт сотни мс задержки на каждый шаг.
+            _theSocket.NoDelay = true;
+
             // Set and change keep alive
             _theSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
             int size = 4;
@@ -238,16 +122,7 @@ namespace Adan.Client.Common.Networking
 
             _theSocket.IOControl(IOControlCode.KeepAliveValues, keepAliveArr, null);
 
-            if (UseProxy)
-            {
-                _targetHost = host;
-                _targetPort = port;
-                _theSocket.BeginConnect(Socks5Host, Socks5Port, _proxyConnectedCallback, null);
-            }
-            else
-            {
-                _theSocket.BeginConnect(host, port, _connectedCallback, null);
-            }
+            _theSocket.BeginConnect(host, port, _connectedCallback, null);
         }
 
         /// <summary>
@@ -275,6 +150,9 @@ namespace Adan.Client.Common.Networking
             {
                 if (_theSocket != null)
                 {
+                    // Метка постановки в сокет: в OnDataSent посчитаем, сколько
+                    // байты реально ехали до провода (диагностика затора отправки)
+                    System.Threading.Interlocked.Exchange(ref _sendStartTimestamp, System.Diagnostics.Stopwatch.GetTimestamp());
                     _theSocket.BeginSend(buffer, offset, length, SocketFlags.None, out _error, _dataSentCallback, null);
                 }
             }
@@ -283,6 +161,8 @@ namespace Adan.Client.Common.Networking
                 HandleSockedException(exception);
             }
         }
+
+        private long _sendStartTimestamp;
 
         #endregion
 
@@ -374,80 +254,6 @@ namespace Adan.Client.Common.Networking
             }
         }
 
-        private void OnConnectedToProxy([NotNull] IAsyncResult ar)
-        {
-            Assert.ArgumentNotNull(ar, "ar");
-            try
-            {
-                if (_theSocket == null)
-                    return;
-
-                _theSocket.EndConnect(ar);
-
-                // Perform SOCKS5 handshake synchronously
-                PerformSocks5Handshake();
-
-                Initialize();
-                if (Connected != null)
-                {
-                    Connected(this, EventArgs.Empty);
-                }
-            }
-            catch (SocketException exception)
-            {
-                HandleSockedException(exception);
-            }
-            catch (Exception exception)
-            {
-                HandleException(new NetworkErrorEventArgs(exception));
-            }
-        }
-
-        private void PerformSocks5Handshake()
-        {
-            // SOCKS5 greeting: [ver=5, nmethods=1, method=0 (no auth)]
-            byte[] greeting = { 5, 1, 0 };
-            _theSocket.Send(greeting);
-
-            byte[] response = new byte[2];
-            int bytesRead = _theSocket.Receive(response);
-            if (bytesRead != 2)
-                throw new SocketException((int)SocketError.ConnectionRefused);
-
-            if (response[0] != 5)
-                throw new SocketException((int)SocketError.ProtocolNotSupported);
-
-            if (response[1] != 0)
-                throw new SocketException((int)SocketError.AccessDenied);
-
-            // Build connect request with domain name
-            byte[] domainBytes = Encoding.ASCII.GetBytes(_targetHost);
-            byte[] request = new byte[7 + domainBytes.Length];
-            request[0] = 5; // SOCKS version
-            request[1] = 1; // CONNECT command
-            request[2] = 0; // reserved
-            request[3] = 3; // address type: domain name
-            request[4] = (byte)domainBytes.Length;
-            Array.Copy(domainBytes, 0, request, 5, domainBytes.Length);
-            request[5 + domainBytes.Length] = (byte)((_targetPort >> 8) & 0xFF);
-            request[6 + domainBytes.Length] = (byte)(_targetPort & 0xFF);
-
-            _theSocket.Send(request);
-
-            byte[] connectResponse = new byte[10];
-            bytesRead = _theSocket.Receive(connectResponse);
-            if (bytesRead < 4)
-                throw new SocketException((int)SocketError.ConnectionRefused);
-
-            if (connectResponse[0] != 5)
-                throw new SocketException((int)SocketError.ProtocolNotSupported);
-
-            if (connectResponse[1] != 0)
-            {
-                throw new SocketException((int)SocketError.ConnectionRefused);
-            }
-        }
-
         private void OnConnected([NotNull] IAsyncResult ar)
         {
             Assert.ArgumentNotNull(ar, "ar");
@@ -479,6 +285,16 @@ namespace Adan.Client.Common.Networking
                 if (_theSocket != null)
                 {
                     _theSocket.EndSend(ar);
+
+                    // Если отправка реально завершилась сильно позже постановки —
+                    // сокет/канал подзабит, команда ушла в провод с опозданием
+                    var start = System.Threading.Interlocked.Exchange(ref _sendStartTimestamp, 0);
+                    if (start != 0)
+                    {
+                        long ms = (System.Diagnostics.Stopwatch.GetTimestamp() - start) * 1000 / System.Diagnostics.Stopwatch.Frequency;
+                        if (ms >= 30)
+                            Conveyor.PerfLog.WriteTotal("SEND_LAG", ms, "socket egress delay");
+                    }
                 }
             }
             catch (SocketException exception)

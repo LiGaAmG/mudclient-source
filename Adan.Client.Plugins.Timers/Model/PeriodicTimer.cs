@@ -92,6 +92,8 @@ namespace Adan.Client.Plugins.Timers
         public void Clear()
         {
             ForEachTimer((timer) => timer.Dispose());
+            for (int i = 0; i < _timers.Count; i++)
+                Adan.Client.Common.Conveyor.PerfStats.GameTimerRemoved();
             _timers.Clear();
         }
 
@@ -117,6 +119,7 @@ namespace Adan.Client.Plugins.Timers
                                     Once = once,
                                     Action = action
                                 });
+            Adan.Client.Common.Conveyor.PerfStats.GameTimerAdded();
         }
 
         public string AddTimer(Tuple<TimeSpan, TimeSpan> span, bool once, Action<TimerItem> action)
@@ -132,6 +135,7 @@ namespace Adan.Client.Plugins.Timers
             {
                 _timers[name].Dispose();
                 _timers.Remove(name);
+                Adan.Client.Common.Conveyor.PerfStats.GameTimerRemoved();
             }
         }
 
@@ -149,11 +153,19 @@ namespace Adan.Client.Plugins.Timers
         private void Timer_Elapsed(object sender)
         {
             TimerItem item = sender as TimerItem;
+
+            // Маячок: срабатывание игрового таймера + время исполнения его действия
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             item.Action(item);
+            sw.Stop();
+            Adan.Client.Common.Conveyor.PerfLog.WriteTotal("TIMER_FIRE", sw.ElapsedMilliseconds,
+                string.Format("name={0} once={1}", item.Name, item.Once));
+
             if (item.Once)
             {
                 item.Dispose();
                 _timers.Remove(item.Name);
+                Adan.Client.Common.Conveyor.PerfStats.GameTimerRemoved();
             }
         }
     }
