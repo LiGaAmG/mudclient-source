@@ -285,9 +285,9 @@ namespace Adan.Client.Common.Conveyor
         /// </summary>
         public void Disconnect()
         {
-            // Сбрасываем висящую отправку, чтобы индикатор не краснел после отключения
+            // Удаляем uid из RTT-индикатора — закрытый таб не должен торчать в списке
             System.Threading.Interlocked.Exchange(ref _rttSendTimestamp, 0);
-            PerfStats.ClearPendingSend(RootModel != null ? RootModel.Uid : null);
+            PerfStats.RemoveUid(RootModel != null ? RootModel.Uid : null);
 
             try
             {

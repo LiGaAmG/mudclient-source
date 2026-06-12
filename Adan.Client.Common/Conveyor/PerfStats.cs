@@ -82,6 +82,14 @@ namespace Adan.Client.Common.Conveyor
             if (uid != null) _pendingSends.TryRemove(uid, out dummy);
         }
 
+        public static void RemoveUid(string uid)
+        {
+            if (uid == null) return;
+            long dummy;
+            _pendingSends.TryRemove(uid, out dummy);
+            _pingPerUid.TryRemove(uid, out dummy);
+        }
+
         // Ожидание КОМНАТЫ после шага маршрута: rtt гасится первым же мелким пакетом
         // (эхо/промпт), а комната — большой пакет и может ехать сильно дольше.
         private static long _roomWaitTimestamp;
