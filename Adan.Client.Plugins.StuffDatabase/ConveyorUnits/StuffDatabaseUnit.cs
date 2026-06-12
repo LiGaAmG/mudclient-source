@@ -973,12 +973,22 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             }
 
             var resultBlocks = new List<TextMessageBlock>(sourceBlocks.Count + 3);
-            AppendRangeAsStyledBlocks(resultBlocks, spans, 0, loreMatch.Start);
 
-            var styleBlock = GetBlockForCharIndex(spans, loreMatch.Start) ?? sourceBlocks[0];
+            // Если item-name был внутри скобок [ItemName], loreMatch.Start указывает внутрь.
+            // Включаем внешние скобки в замену, чтобы не получить двойные [[ и ]].
+            var replaceStart = loreMatch.Start;
+            var replaceEnd = loreMatch.End;
+            if (replaceStart > 0 && sourceText[replaceStart - 1] == '[')
+                replaceStart--;
+            if (replaceEnd < sourceText.Length && sourceText[replaceEnd] == ']')
+                replaceEnd++;
+
+            AppendRangeAsStyledBlocks(resultBlocks, spans, 0, replaceStart);
+
+            var styleBlock = GetBlockForCharIndex(spans, replaceStart) ?? sourceBlocks[0];
             resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
 
-            AppendRangeAsStyledBlocks(resultBlocks, spans, loreMatch.End, sourceText.Length);
+            AppendRangeAsStyledBlocks(resultBlocks, spans, replaceEnd, sourceText.Length);
             textMessage.UpdateMessageBlocks(resultBlocks);
             return true;
         }
@@ -1019,10 +1029,18 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         {
             var sourceBlocks = textMessage.MessageBlocks;
             var resultBlocks = new List<TextMessageBlock>(sourceBlocks.Count + 3);
-            AppendRangeAsStyledBlocks(resultBlocks, spans, 0, loreMatch.Start);
-            var styleBlock = GetBlockForCharIndex(spans, loreMatch.Start) ?? sourceBlocks[0];
+
+            var replaceStart = loreMatch.Start;
+            var replaceEnd = loreMatch.End;
+            if (replaceStart > 0 && sourceText[replaceStart - 1] == '[')
+                replaceStart--;
+            if (replaceEnd < sourceText.Length && sourceText[replaceEnd] == ']')
+                replaceEnd++;
+
+            AppendRangeAsStyledBlocks(resultBlocks, spans, 0, replaceStart);
+            var styleBlock = GetBlockForCharIndex(spans, replaceStart) ?? sourceBlocks[0];
             resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
-            AppendRangeAsStyledBlocks(resultBlocks, spans, loreMatch.End, sourceText.Length);
+            AppendRangeAsStyledBlocks(resultBlocks, spans, replaceEnd, sourceText.Length);
             textMessage.UpdateMessageBlocks(resultBlocks);
         }
 
