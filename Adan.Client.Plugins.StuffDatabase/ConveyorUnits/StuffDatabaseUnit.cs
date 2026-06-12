@@ -39,8 +39,14 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         // Кэш строк, которые были проверены и не содержат lore-предметов.
         // Ключ = нормализованная строка (цифровые последовательности → "#").
         // СТАТИЧЕСКИЙ: все табы шарят один кэш — первый промах сразу помогает всем.
-        private const int MaxNegativeLineCacheSize = 2048;
-        private static volatile HashSet<string> _negativeLineCache = new HashSet<string>(StringComparer.Ordinal);
+        // Кэш результатов обработки строк: разделён на позитивный (найден матч) и негативный (промах).
+        // ConcurrentDictionary потокобезопасен → устраняет гонку при параллельной обработке N табов.
+        private const int MaxLinePositiveCacheSize = 2048;
+        private const int MaxLineNegativeCacheSize = 4096;
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, LoreMatch> _linePositiveCache =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, LoreMatch>(StringComparer.Ordinal);
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _lineNegativeCache =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
 
         private string _lastShownObjectName = string.Empty;
 
@@ -652,6 +658,13 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 return;
             }
 
+            // Описания комнат всегда начинаются с пробела или таба (отступ сервера).
+            // Лор-предметы в них никогда не встречаются — пропускаем без pipeline.
+            if (sourceText[0] == ' ' || sourceText[0] == '\t')
+            {
+                return;
+            }
+
             // Быстрый выход для частых боевых/служебных строк, которые гарантированно не
             // содержат lore-предметов. IndexOf на короткой строке (~200 симв) — несколько мкс,
             // полный lore-pipeline — 20–47 ms на каждый уникальный ключ кэша.
@@ -689,14 +702,25 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 return;
             }
 
-            // Строчный негативный кэш: пропускаем строки, которые уже были проверены
-            // и не содержат lore-предметов. Числа нормализуются → "#", так что
-            // "Вы нанесли 47 урона" и "Вы нанесли 52 урона" — один ключ.
+            // Результирующий кэш строк: позитивный (найден LoreMatch) + негативный (промах).
+            // Числа нормализуются → "#": "Вы нанесли 47 урона" и "52 урона" — один ключ.
+            // ConcurrentDictionary устраняет гонку при параллельной обработке N табов.
             string normalizedLineKey = null;
             if (!hasMatchingQuotes && !hasArrow)
             {
                 normalizedLineKey = NormalizeDigitsForLineCache(sourceText);
-                if (_negativeLineCache.Contains(normalizedLineKey))
+
+                LoreMatch cachedMatch;
+                if (_linePositiveCache.TryGetValue(normalizedLineKey, out cachedMatch))
+                {
+                    // Матч уже известен — применяем без запуска pipeline
+                    var spansForCached = BuildBlockSpans(textMessage.MessageBlocks);
+                    if (spansForCached.Count > 0)
+                        ApplyStandaloneLoreMatch(textMessage, sourceText, cachedMatch, spansForCached);
+                    return;
+                }
+
+                if (_lineNegativeCache.ContainsKey(normalizedLineKey))
                     return;
             }
 
@@ -755,17 +779,27 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 }
             }
 
-            if (TryMarkStandaloneItemLine(textMessage, sourceText))
-            {
-                return;
-            }
-
-            // Промах: запоминаем нормализованную строку как "не содержит lore"
+            // Standalone pipeline — вызываем TryResolveStandaloneLoreMatch напрямую,
+            // чтобы закэшировать результат до применения к сообщению.
             if (normalizedLineKey != null)
             {
-                if (_negativeLineCache.Count >= MaxNegativeLineCacheSize)
-                    _negativeLineCache.Clear();
-                _negativeLineCache.Add(normalizedLineKey);
+                LoreMatch loreMatch;
+                if (TryResolveStandaloneLoreMatch(sourceText, out loreMatch))
+                {
+                    if (_linePositiveCache.Count < MaxLinePositiveCacheSize)
+                        _linePositiveCache.TryAdd(normalizedLineKey, loreMatch);
+                    ApplyStandaloneLoreMatch(textMessage, sourceText, loreMatch, spans);
+                }
+                else
+                {
+                    if (_lineNegativeCache.Count < MaxLineNegativeCacheSize)
+                        _lineNegativeCache.TryAdd(normalizedLineKey, 0);
+                }
+            }
+            else
+            {
+                // hasMatchingQuotes или hasArrow — кэш не используем, просто вызываем
+                TryMarkStandaloneItemLine(textMessage, sourceText);
             }
         }
 
@@ -823,7 +857,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 // Атомарная замена: горячий путь увидит либо старый, либо новый словарь целиком
                 _loreTooltipsByObjectName = newCache;
                 _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
-                _negativeLineCache = new HashSet<string>(StringComparer.Ordinal);
+                _linePositiveCache.Clear();
+                _lineNegativeCache.Clear();
                 _loreFolderStampUtc = folderStamp;
             }
             catch { }
@@ -972,15 +1007,23 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 return false;
             }
 
+            ApplyStandaloneLoreMatch(textMessage, sourceText, loreMatch, spans);
+            return true;
+        }
+
+        private void ApplyStandaloneLoreMatch(
+            [NotNull] TextMessage textMessage,
+            [NotNull] string sourceText,
+            [NotNull] LoreMatch loreMatch,
+            [NotNull] IList<BlockSpan> spans)
+        {
+            var sourceBlocks = textMessage.MessageBlocks;
             var resultBlocks = new List<TextMessageBlock>(sourceBlocks.Count + 3);
             AppendRangeAsStyledBlocks(resultBlocks, spans, 0, loreMatch.Start);
-
             var styleBlock = GetBlockForCharIndex(spans, loreMatch.Start) ?? sourceBlocks[0];
             resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
-
             AppendRangeAsStyledBlocks(resultBlocks, spans, loreMatch.End, sourceText.Length);
             textMessage.UpdateMessageBlocks(resultBlocks);
-            return true;
         }
 
         private bool TryResolveStandaloneLoreMatch([NotNull] string sourceText, out LoreMatch match)
@@ -1349,6 +1392,26 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
             var words = SplitWords(phrase);
             if (words.Length < (hasCountSuffix ? 1 : 2) || words.Length > 6)
+            {
+                return false;
+            }
+
+            // Пространственные предлоги и конструкции характерны для названий локаций/комнат,
+            // но никогда не встречаются в названиях lore-предметов.
+            // "Перекресток недалеко от Минас-Моргула" → false (не предмет, а комната).
+            if (phrase.IndexOf(" вдоль ", StringComparison.Ordinal) >= 0
+                || phrase.IndexOf(" рядом ", StringComparison.Ordinal) >= 0
+                || phrase.IndexOf(" вблизи ", StringComparison.Ordinal) >= 0
+                || phrase.IndexOf(" недалеко ", StringComparison.Ordinal) >= 0
+                || phrase.IndexOf(" между ", StringComparison.Ordinal) >= 0
+                || phrase.IndexOf(" напротив ", StringComparison.Ordinal) >= 0
+                || phrase.StartsWith("За ", StringComparison.Ordinal)
+                || phrase.StartsWith("Перед ", StringComparison.Ordinal)
+                || phrase.StartsWith("Между ", StringComparison.Ordinal)
+                || phrase.StartsWith("Рядом ", StringComparison.Ordinal)
+                || phrase.StartsWith("Вдоль ", StringComparison.Ordinal)
+                || phrase.StartsWith("Вблизи ", StringComparison.Ordinal)
+                || phrase.StartsWith("Недалеко ", StringComparison.Ordinal))
             {
                 return false;
             }
@@ -2053,7 +2116,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private void ResetNegativeLoreLookupCache()
         {
             _negativeLoreLookupKeys.Clear();
-            _negativeLineCache.Clear();
+            _linePositiveCache.Clear();
+            _lineNegativeCache.Clear();
         }
 
         /// <summary>

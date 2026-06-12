@@ -30,8 +30,12 @@ namespace Adan.Client.Common.Model
         }
 
         /// <summary>
-        /// Gets a value indicatins handling this action right now
+        /// Gets a value indicatins handling this action right now.
+        /// Больше не используется для детекции циклов (флаг на общем объекте ломал
+        /// глобальные алиасы при вызове из нескольких окон — детекция переехала
+        /// в AliasUnit, по-оконно). Оставлен для совместимости сериализации профилей.
         /// </summary>
+        [XmlIgnore]
         public bool IsHandling
         {
             get;

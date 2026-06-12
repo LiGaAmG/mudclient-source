@@ -49,6 +49,7 @@ namespace Adan.Client.Common.Controls
         private int _currentLineNumber;
         private int _currentNumberOfLinesInView;
         private double _lineHeight;
+        private bool _invalidatePending;
         private string _shownToolTipText = string.Empty;
         private IList<TextMessageBlock.ToolTipLine> _shownToolTipLines;
 
@@ -302,7 +303,21 @@ namespace Adan.Client.Common.Controls
 
             _currentLineNumber = _messages.Count;
 
-            InvalidateVisual();
+            ScheduleInvalidate();
+        }
+
+        private void ScheduleInvalidate()
+        {
+            if (_invalidatePending)
+                return;
+            _invalidatePending = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            {
+                _invalidatePending = false;
+                if (AutoScroll)
+                    _currentLineNumber = _messages.Count;
+                InvalidateVisual();
+            }));
         }
 
         /// <summary>

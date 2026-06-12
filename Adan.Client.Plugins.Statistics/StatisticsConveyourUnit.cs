@@ -110,15 +110,18 @@
                 {
                     if (_isFighting)
                     {
-                        _messageStack.Push(textMessage.Clone());
+                        // Юниты ниже по конвейеру (HerbUnit, LoggingUnit и др.) не модифицируют
+                        // TextMessage — клонировать не нужно, держим ссылку на оригинал.
+                        _messageStack.Push(textMessage);
                     }
-
-                    _previousTextMessageWindowQueue.Enqueue(textMessage.Clone());
-                    if (_previousTextMessageWindowQueue.Count >= 15)
+                    else
                     {
-                        _previousTextMessageWindowQueue.Dequeue();
+                        // Очередь pre-fight истории нужна только при переходе !fight→fight.
+                        // В бою её не заполняем — экономим клоны и GC-давление.
+                        _previousTextMessageWindowQueue.Enqueue(textMessage.Clone());
+                        if (_previousTextMessageWindowQueue.Count >= 15)
+                            _previousTextMessageWindowQueue.Dequeue();
                     }
-
                 }
             }
 

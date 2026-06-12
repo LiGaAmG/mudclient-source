@@ -16,7 +16,20 @@
     /// </summary>
     public class AliasUnit : ConveyorUnit
     {
-        private readonly ActionExecutionContext _context = ActionExecutionContext.Empty;
+        // ВАЖНО: контекст параметров (%0-%9) создаётся ЗАНОВО на каждое разворачивание
+        // алиаса (см. HandleAlias). Раньше был один переиспользуемый (а до того — вообще
+        // синглтон на все окна): при вложенном разворачивании (алиас рассылает другой
+        // алиас через #sendall) внутренний затирал параметры внешнего, и в остальные
+        // окна уезжали пустые строки вместо команды.
+
+        // Защита от циклических алиасов — ПО-ОКОННО. Раньше флаг IsHandling жил на самом
+        // объекте действия, а действия глобал-профиля общие для всех окон: вызов алиаса
+        // "во всех окнах" срабатывал только в первом, остальные ложно ловили "цикл".
+        // AliasUnit у каждого окна свой, поэтому счётчик глубины здесь — честная детекция
+        // рекурсии в пределах одного окна. Конечная рекурсия (алиас вызывает сам себя с
+        // уменьшающимся счётчиком) разрешена; бесконечная режется на глубине MaxAliasDepth.
+        private const int MaxAliasDepth = 20;
+        private readonly Dictionary<ActionBase, int> _executingActions = new Dictionary<ActionBase, int>();
 
         private readonly Regex _whiteSpaceRegex = new Regex(@" {2,}", RegexOptions.Compiled);
         // For optimization.
@@ -86,26 +99,29 @@
 
         private void HandleAlias(string commandText, CommandAlias alias)
         {
+            // Свежий контекст на каждое разворачивание — вложенные алиасы не портят %0-%9 родителя
+            var context = new ActionExecutionContext();
+
             int ind = commandText.IndexOf(' ');
             if (ind != -1)
-                _context.Parameters[0] = commandText.Substring(ind + 1);
+                context.Parameters[0] = commandText.Substring(ind + 1);
             else
-                _context.Parameters[0] = String.Empty;
+                context.Parameters[0] = String.Empty;
 
-            var parts = _context.Parameters[0].Split(_paramsSeparatorArray, StringSplitOptions.RemoveEmptyEntries);
+            var parts = context.Parameters[0].Split(_paramsSeparatorArray, StringSplitOptions.RemoveEmptyEntries);
             for (int i = 1; i < 10; ++i)
             {
                 if (i - 1 < parts.Length)
-                    _context.Parameters[i] = parts[i - 1];
+                    context.Parameters[i] = parts[i - 1];
                 else
-                    _context.Parameters[i] = string.Empty;
+                    context.Parameters[i] = string.Empty;
             }
 
             //If we have only 1 parameter then %1 = %0 like in jmc
             var allCommandText = String.Join(";", alias.Actions.OfType<SendTextAction>().Select(a => a.CommandText).ToArray());
             if (allCommandText.Contains("%1") && !allCommandText.Contains("%0") && !allCommandText.Contains("%2"))
             {
-                _context.Parameters[1] = _context.Parameters[0];
+                context.Parameters[1] = context.Parameters[0];
             }
 
             var aliasContainsParams = false;
@@ -123,20 +139,23 @@
 
             for (var i = 0; i < alias.Actions.Count; i++)
             {
-                if (alias.Actions[i].IsHandling)
+                var action = alias.Actions[i];
+                int currentDepth;
+                _executingActions.TryGetValue(action, out currentDepth);
+                if (currentDepth >= MaxAliasDepth)
                 {
-                    Conveyor.RootModel.PushMessageToConveyor(new ErrorMessage(string.Format("#Обнаружен циклический алиас {{{0}}}", alias.Actions[i].ToString())));
+                    Conveyor.RootModel.PushMessageToConveyor(new ErrorMessage(string.Format("#Обнаружен циклический алиас {{{0}}} (глубина > {1})", action.ToString(), MaxAliasDepth)));
                     Conveyor.RootModel.PushMessageToConveyor(new ErrorMessage("#Работа прерывается"));
                     return;
                 }
 
                 try
                 {
-                    alias.Actions[i].IsHandling = true;
+                    _executingActions[action] = currentDepth + 1;
 
                     if (i == lastSendTextAction && !aliasContainsParams)
                     {
-                        var sendTextAction = alias.Actions[i] as SendTextAction;
+                        var sendTextAction = action as SendTextAction;
                         if (sendTextAction == null)
                         {
                             continue;
@@ -144,24 +163,25 @@
 
                         if (sendTextAction.Parameters.Any())
                         {
-                            sendTextAction.Execute(Conveyor.RootModel, _context);
+                            sendTextAction.Execute(Conveyor.RootModel, context);
                         }
                         else
                         {
                             new SendTextAction
                             {
-                                CommandText = sendTextAction.CommandText + " " + _context.Parameters[0]
-                            }.Execute(Conveyor.RootModel, _context);
+                                CommandText = sendTextAction.CommandText + " " + context.Parameters[0]
+                            }.Execute(Conveyor.RootModel, context);
                         }
                     }
                     else
                     {
-                        alias.Actions[i].Execute(Conveyor.RootModel, _context);
+                        action.Execute(Conveyor.RootModel, context);
                     }
                 }
                 finally
                 {
-                    alias.Actions[i].IsHandling = false;
+                    if (--_executingActions[action] == 0)
+                        _executingActions.Remove(action);
                 }
             }
 

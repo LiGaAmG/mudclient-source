@@ -56,6 +56,16 @@ namespace Adan.Client.Plugins.SpellManager
         private int _currentZaklCircle = 0;
 
         public string Uid { get; private set; }
+
+        // Имя таба (например "Default", "Маг") — стабильное между сессиями,
+        // используется как ключ файла сохранения вместо Uid (Uid — новый GUID при каждом открытии таба).
+        private string _tabName;
+        public string TabName
+        {
+            get { return _tabName; }
+            set { _tabName = value; }
+        }
+
         public ObservableCollection<SpellEntry> Spells { get; private set; }
 
         // Отладочный флаг: отображается в UI чтобы видеть когда конвейер считает себя внутри секции зауч/закл
@@ -495,7 +505,12 @@ namespace Adan.Client.Plugins.SpellManager
         {
             var folder = Path.Combine(SettingsHolder.Instance.Folder, "SpellManager");
             Directory.CreateDirectory(folder);
-            return Path.Combine(folder, Uid + "_plan.xml");
+            // Используем имя таба как ключ — оно стабильно между сессиями.
+            // Uid — новый GUID при каждом открытии нового таба, поэтому не подходит.
+            var key = !string.IsNullOrWhiteSpace(_tabName)
+                ? string.Concat(_tabName.Split(Path.GetInvalidFileNameChars()))
+                : Uid;
+            return Path.Combine(folder, key + "_plan.xml");
         }
 
         public void Save()
@@ -512,7 +527,8 @@ namespace Adan.Client.Plugins.SpellManager
                                 new XAttribute("circle", sp.Circle),
                                 new XAttribute("desired", sp.Desired),
                                 new XAttribute("tracked", sp.IsTrackedInCounter),
-                                new XAttribute("global", sp.IsTrackedGlobally)
+                                new XAttribute("global", sp.IsTrackedGlobally),
+                                new XAttribute("memorized", sp.Memorized)
                             )
                         )
                     )
@@ -544,6 +560,7 @@ namespace Adan.Client.Plugins.SpellManager
                     int desired = (int?)el.Attribute("desired") ?? 0;
                     bool tracked = (bool?)el.Attribute("tracked") ?? false;
                     bool global = (bool?)el.Attribute("global") ?? false;
+                    int memorized = (int?)el.Attribute("memorized") ?? 0;
 
                     if (string.IsNullOrEmpty(name)) continue;
 
@@ -554,6 +571,7 @@ namespace Adan.Client.Plugins.SpellManager
                         existing.Desired = desired;
                         existing.IsTrackedInCounter = tracked;
                         existing.IsTrackedGlobally = global;
+                        existing.Memorized = memorized;
                     }
                     else
                     {
@@ -563,7 +581,8 @@ namespace Adan.Client.Plugins.SpellManager
                             Circle = circle,
                             Desired = desired,
                             IsTrackedInCounter = tracked,
-                            IsTrackedGlobally = global
+                            IsTrackedGlobally = global,
+                            Memorized = memorized
                         });
                     }
                 }

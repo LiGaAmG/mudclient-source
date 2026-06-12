@@ -31,6 +31,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Documents;
 using System.Windows.Media.Imaging;
 using Adan.Client.Resources.AvalonDock;
 using Xceed.Wpf.AvalonDock.Layout;
@@ -120,48 +121,100 @@ namespace Adan.Client
 
         private System.Threading.Timer _pingTimer;
 
+        // EMA-сглаживание RTT по каждому табу: храним последние 4 сэмпла.
+        private readonly Dictionary<string, Queue<long>> _rttEma =
+            new Dictionary<string, Queue<long>>(StringComparer.Ordinal);
+        // Гистерезис: сколько тиков подряд EMA >= порога красного.
+        private readonly Dictionary<string, int> _rttRedStreak =
+            new Dictionary<string, int>(StringComparer.Ordinal);
+        private const int RttEmaWindow = 4;
+        private const int RttRedStreakThreshold = 2;   // тиков подряд до красного
+        private const long RttOrangeMs = 400;
+        private const long RttRedMs = 1000;
+
+        private long GetEma(string uid, long sample)
+        {
+            Queue<long> q;
+            if (!_rttEma.TryGetValue(uid, out q))
+            {
+                q = new Queue<long>(RttEmaWindow);
+                _rttEma[uid] = q;
+            }
+            q.Enqueue(sample);
+            while (q.Count > RttEmaWindow) q.Dequeue();
+            long sum = 0;
+            foreach (var v in q) sum += v;
+            return sum / q.Count;
+        }
+
+        private System.Windows.Media.Brush RttBrush(string uid, long ema)
+        {
+            if (ema < 0)
+                return System.Windows.Media.Brushes.Gray;
+            if (ema < RttOrangeMs)
+            {
+                _rttRedStreak[uid] = 0;
+                return System.Windows.Media.Brushes.LimeGreen;
+            }
+            if (ema < RttRedMs)
+            {
+                _rttRedStreak[uid] = 0;
+                return System.Windows.Media.Brushes.Orange;
+            }
+            // Красный только если N тиков подряд выше порога
+            int streak;
+            _rttRedStreak.TryGetValue(uid, out streak);
+            _rttRedStreak[uid] = streak + 1;
+            return streak + 1 >= RttRedStreakThreshold
+                ? System.Windows.Media.Brushes.Red
+                : System.Windows.Media.Brushes.Orange;
+        }
+
         /// <summary>
-        /// Встроенный пинг до игрового сервера раз в 3 секунды (ICMP).
-        /// Отделяет "думает сервер" (пинг норм, игра молчит) от "лагает сеть"
-        /// (пинг прыгнул). Результат — в индикатор, #perf и perf-лог (спайки).
+        /// Пассивный RTT-монитор: SEND→первый ответ сервера, per-tab, с EMA и гистерезисом.
         /// </summary>
         private void StartServerPingMonitor()
         {
             _pingTimer = new System.Threading.Timer(_ =>
             {
-                // Пассивный RTT по игровому соединению (SEND -> первый ответ сервера).
-                // Если команда ВИСИТ без ответа — показываем её возраст живьём (">N"),
-                // не дожидаясь ответа: яма видна в момент попадания, а не задним числом.
-                long ms = Adan.Client.Common.Conveyor.PerfStats.PingLastMs;
-                long pending = Adan.Client.Common.Conveyor.PerfStats.OldestPendingMs;
-                long roomWait = Adan.Client.Common.Conveyor.PerfStats.RoomWaitMs;
-                if (roomWait > pending) pending = roomWait;
+                var perUid = Adan.Client.Common.Conveyor.PerfStats.GetEffectiveRttPerUid();
 
-                string text;
-                long effective;
-                if (pending >= 300)
+                // Добавляем RoomWait к текущему окну если он больше
+                long roomWait = Adan.Client.Common.Conveyor.PerfStats.RoomWaitMs;
+
+                // Строим данные для отображения (вычисления в фоновом потоке)
+                var segments = new List<Tuple<string, System.Windows.Media.Brush>>();
+
+                if (perUid.Count == 0)
                 {
-                    text = string.Format("rtt: >{0}", pending);
-                    effective = pending;
+                    segments.Add(Tuple.Create("rtt: ?", (System.Windows.Media.Brush)System.Windows.Media.Brushes.Gray));
                 }
                 else
                 {
-                    text = ms >= 0 ? string.Format("rtt: {0}", ms) : "rtt: ?";
-                    effective = ms;
-                }
+                    segments.Add(Tuple.Create("rtt: ", (System.Windows.Media.Brush)System.Windows.Media.Brushes.Gray));
+                    bool first = true;
+                    foreach (var kv in perUid.OrderBy(x => x.Key))
+                    {
+                        long effective = kv.Value;
+                        if (roomWait > effective) effective = roomWait;
+                        long ema = GetEma(kv.Key, effective);
+                        var brush = RttBrush(kv.Key, ema);
+                        string label = ema.ToString();
 
-                var brush =
-                    effective < 0 ? System.Windows.Media.Brushes.Gray :
-                    effective < 300 ? System.Windows.Media.Brushes.LimeGreen :
-                    effective < 800 ? System.Windows.Media.Brushes.Orange :
-                    System.Windows.Media.Brushes.Red;
+                        if (!first)
+                            segments.Add(Tuple.Create("|", (System.Windows.Media.Brush)System.Windows.Media.Brushes.Gray));
+                        segments.Add(Tuple.Create(label, brush));
+                        first = false;
+                    }
+                }
 
                 try
                 {
                     Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
                     {
-                        _pingIndicator.Text = text;
-                        _pingIndicator.Foreground = brush;
+                        _pingIndicator.Inlines.Clear();
+                        foreach (var seg in segments)
+                            _pingIndicator.Inlines.Add(new Run(seg.Item1) { Foreground = seg.Item2 });
                     }));
                 }
                 catch

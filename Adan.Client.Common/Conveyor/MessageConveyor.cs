@@ -71,9 +71,6 @@ namespace Adan.Client.Common.Conveyor
         // Метка последней неотвеченной отправки (Stopwatch ticks); 0 = ответ получен
         private long _rttSendTimestamp;
 
-        // Общий троттлинг авто-зонда (по всем соединениям)
-        private static long _lastProbeTimestamp;
-
         #endregion
 
         #region Constructors and Destructors
@@ -333,6 +330,13 @@ namespace Adan.Client.Common.Conveyor
                     command.Handled = true;
                     return;
                 }
+                if (perfText.Equals("#perf clear", StringComparison.OrdinalIgnoreCase))
+                {
+                    PerfLog.Clear();
+                    PushMessage(new InfoMessage("Лог производительности очищен."));
+                    command.Handled = true;
+                    return;
+                }
             }
 
             try
@@ -566,24 +570,10 @@ namespace Adan.Client.Common.Conveyor
                     {
                         PerfStats.ClearPendingSend(RootModel != null ? RootModel.Uid : null);
                         long rttMs = (System.Diagnostics.Stopwatch.GetTimestamp() - sendStamp) * 1000 / System.Diagnostics.Stopwatch.Frequency;
-                        PerfStats.RecordPing(rttMs);
+                        PerfStats.RecordPing(rttMs, RootModel != null ? RootModel.Uid : null);
                         if (rttMs >= 1000)
                             PerfLog.WriteTotal("GAME_RTT", rttMs, RootModel != null ? RootModel.Uid : "?");
 
-                        // Авто-зонд: команда шла дольше 700мс — проверяем остальные окна.
-                        // Их SEND/NET в логе покажут, общая это "медленная полоса" или
-                        // персональная. Не чаще раза в 30 секунд.
-                        if (rttMs >= 700 && RootModel != null)
-                        {
-                            long now = System.Diagnostics.Stopwatch.GetTimestamp();
-                            long last = System.Threading.Interlocked.Read(ref _lastProbeTimestamp);
-                            if (now - last > 30L * System.Diagnostics.Stopwatch.Frequency &&
-                                System.Threading.Interlocked.CompareExchange(ref _lastProbeTimestamp, now, last) == last)
-                            {
-                                PerfLog.WriteTotal("PROBE", rttMs, "slow rtt detected, probing other windows");
-                                RootModel.ProbeOtherWindows("время");
-                            }
-                        }
                     }
                 }
             }

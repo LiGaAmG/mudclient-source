@@ -31,6 +31,13 @@ namespace Adan.Client.Common.Conveyor
             writerThread.Start();
         }
 
+        private static volatile bool _clearRequested = false;
+
+        public static void Clear()
+        {
+            _clearRequested = true;
+        }
+
         private static void Enqueue(string line)
         {
             if (_queue.Count < MaxQueuedLines)
@@ -55,6 +62,19 @@ namespace Adan.Client.Common.Conveyor
             {
                 try
                 {
+                    if (_clearRequested)
+                    {
+                        _clearRequested = false;
+                        string drain;
+                        while (_queue.TryDequeue(out drain)) { }
+                        if (writer != null)
+                        {
+                            writer.BaseStream.SetLength(0);
+                            writer.WriteLine($"=== Adan PerfLog cleared {DateTime.Now:HH:mm:ss} ===");
+                            writer.Flush();
+                        }
+                    }
+
                     bool wroteAny = false;
                     string line;
                     while (_queue.TryDequeue(out line))

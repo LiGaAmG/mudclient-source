@@ -25,7 +25,9 @@ namespace Adan.Client.ConveyorUnits
     {
         //private readonly RootModel _rootModel;
         //private readonly ActionExecutionContext _context = new ActionExecutionContext { CurrentMessage = new OutputToMainWindowMessage(string.Empty) };
-        private readonly ActionExecutionContext _context = ActionExecutionContext.Empty;
+        // Свой контекст на окно — ActionExecutionContext.Empty это общий синглтон
+        // (см. AliasUnit: общие %1-%9 ломали рассылку алиасов по всем окнам)
+        private readonly ActionExecutionContext _context = new ActionExecutionContext();
 
         public HotkeyUnit(MessageConveyor conveyor) : base(conveyor)
         {

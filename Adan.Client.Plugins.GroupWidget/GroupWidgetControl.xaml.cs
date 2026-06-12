@@ -31,6 +31,10 @@ namespace Adan.Client.Plugins.GroupWidget
         private readonly object _stack_lock = new object();
         private readonly Stack<List<CharacterStatus>> _charactrers_stack = new Stack<List<CharacterStatus>>();
         private bool _updatePending = false;
+        private long _updateQueuedTick;
+        // Дроссель: не чаще 1 раза в 100мс. Таймер стреляет один раз, диспатчит на UI-поток.
+        private readonly System.Threading.Timer _updateThrottle;
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GroupWidgetControl"/> class.
@@ -39,6 +43,39 @@ namespace Adan.Client.Plugins.GroupWidget
         {
             InitializeComponent();
             IconRasterizer.RasterizeIcons(Resources);
+            _updateThrottle = new System.Threading.Timer(OnUpdateThrottleTimer, null,
+                System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+        }
+
+        private void OnUpdateThrottleTimer(object state)
+        {
+            List<CharacterStatus> list;
+            long queuedTick;
+            lock (_stack_lock)
+            {
+                _updatePending = false;
+                if (_charactrers_stack.Count == 0) return;
+                list = _charactrers_stack.Pop();
+                _charactrers_stack.Clear();
+                queuedTick = _updateQueuedTick;
+            }
+
+            Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+            {
+                try
+                {
+                    long executeTick = System.Diagnostics.Stopwatch.GetTimestamp();
+                    long waitedMs = (long)((executeTick - queuedTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+                    var updateSw = System.Diagnostics.Stopwatch.StartNew();
+                    var viewModel = DataContext as GroupStatusViewModel;
+                    if (viewModel != null)
+                        viewModel.UpdateModel(list);
+                    updateSw.Stop();
+                    if (waitedMs >= 20 || updateSw.ElapsedMilliseconds >= 5)
+                        Common.Conveyor.PerfLog.WriteWidget("GroupWidget", waitedMs, updateSw.ElapsedMilliseconds);
+                }
+                catch (Exception) { }
+            }));
         }
 
         /// <summary>
@@ -110,49 +147,16 @@ namespace Adan.Client.Plugins.GroupWidget
         {
             Assert.ArgumentNotNull(characters, "characters");
 
-            long queuedTick = System.Diagnostics.Stopwatch.GetTimestamp();
-
-            Action actToExecute = () =>
-            {
-                try
-                {
-                    long executeTick = System.Diagnostics.Stopwatch.GetTimestamp();
-                    long waitedMs = (long)((executeTick - queuedTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
-                    var updateSw = System.Diagnostics.Stopwatch.StartNew();
-                    GroupStatusViewModel viewModel = DataContext as GroupStatusViewModel;
-
-                    List<CharacterStatus> list = null;
-                    lock (_stack_lock)
-                    {
-                        _updatePending = false;
-                        if (_charactrers_stack.Count > 0)
-                        {
-                            list = _charactrers_stack.Pop();
-                            _charactrers_stack.Clear();
-                        }
-                    }
-
-                    if (list != null)
-                    {
-                        viewModel.UpdateModel(list);
-                    }
-                    updateSw.Stop();
-                    if (waitedMs >= 20 || updateSw.ElapsedMilliseconds >= 5)
-                        Common.Conveyor.PerfLog.WriteWidget("GroupWidget", waitedMs, updateSw.ElapsedMilliseconds);
-                }
-                catch (Exception) { }
-            };
-
-            bool needInvoke;
             lock (_stack_lock)
             {
                 _charactrers_stack.Push(characters);
-                needInvoke = !_updatePending;
-                if (needInvoke) _updatePending = true;
+                if (!_updatePending)
+                {
+                    _updatePending = true;
+                    _updateQueuedTick = System.Diagnostics.Stopwatch.GetTimestamp();
+                    _updateThrottle.Change(100, System.Threading.Timeout.Infinite);
+                }
             }
-
-            if (needInvoke)
-                Application.Current.Dispatcher.BeginInvoke(actToExecute, DispatcherPriority.Background);
         }
 
         private void CancelFocusingListBoxItem([NotNull] object sender, [NotNull] MouseButtonEventArgs e)

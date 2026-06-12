@@ -30,6 +30,7 @@ namespace Adan.Client.Plugins.SpellManager
                 {
                     _counterFontSize = value;
                     Notify("CounterFontSize");
+                    Save();
                 }
             }
         }
@@ -40,6 +41,47 @@ namespace Adan.Client.Plugins.SpellManager
         public GlobalSpellCounterModel()
         {
             Items = new ObservableCollection<GlobalSpellEntryViewModel>();
+            Load();
+        }
+
+        // ---- Сохранение настроек виджета (размер шрифта) ----
+
+        private static string GetSavePath()
+        {
+            var folder = System.IO.Path.Combine(Adan.Client.Common.Settings.SettingsHolder.Instance.Folder, "SpellManager");
+            System.IO.Directory.CreateDirectory(folder);
+            return System.IO.Path.Combine(folder, "global_counter.xml");
+        }
+
+        private void Save()
+        {
+            try
+            {
+                new System.Xml.Linq.XDocument(
+                    new System.Xml.Linq.XElement("GlobalSpellCounter",
+                        new System.Xml.Linq.XAttribute("counterFontSize", _counterFontSize)))
+                    .Save(GetSavePath());
+            }
+            catch (System.Exception)
+            {
+                // Best effort
+            }
+        }
+
+        private void Load()
+        {
+            try
+            {
+                var path = GetSavePath();
+                if (!System.IO.File.Exists(path)) return;
+                var doc = System.Xml.Linq.XDocument.Load(path);
+                if (doc.Root != null)
+                    _counterFontSize = (int?)doc.Root.Attribute("counterFontSize") ?? 11;
+            }
+            catch (System.Exception)
+            {
+                // Best effort
+            }
         }
 
         public void UpdateTabName(string uid, string tabName)

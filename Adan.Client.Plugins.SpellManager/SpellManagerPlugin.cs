@@ -131,5 +131,12 @@ namespace Adan.Client.Plugins.SpellManager
             RootModel model;
             return _rootModels.TryGetValue(uid, out model) ? model : null;
         }
+
+        public override void Dispose()
+        {
+            if (_manager != null)
+                _manager.SaveAll();
+            base.Dispose();
+        }
     }
 }

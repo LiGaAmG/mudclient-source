@@ -800,23 +800,6 @@
         }
 
         /// <summary>
-        /// Диагностический зонд: шлёт безобидную команду со всех ОСТАЛЬНЫХ окон,
-        /// чтобы по их RTT понять, общая ли "медленная полоса" или персональная.
-        /// </summary>
-        public void ProbeOtherWindows(string probeCommand)
-        {
-            foreach (var rootModel in _allModels)
-            {
-                if (ReferenceEquals(rootModel, this))
-                {
-                    continue;
-                }
-
-                rootModel.PushCommandToConveyor(new TextCommand(probeCommand));
-                rootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
-            }
-        }
-
         public void MessageToAllWindows(Message msg)
         {
             foreach (var rootModel in _allModels)

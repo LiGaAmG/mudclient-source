@@ -62,6 +62,10 @@ namespace Adan.Client.Common.Conveyor
         private static long _pingLastMs = -1;
         private static long _pingMaxMs;
 
+        // Per-uid последний завершённый RTT (мс). Заполняется RecordPing.
+        private static readonly ConcurrentDictionary<string, long> _pingPerUid =
+            new ConcurrentDictionary<string, long>(StringComparer.Ordinal);
+
         // Висящие (неотвеченные) отправки по соединениям: uid -> Stopwatch ticks.
         // Позволяет светофору показывать яму ЖИВЬЁМ, пока ответ ещё не пришёл.
         private static readonly ConcurrentDictionary<string, long> _pendingSends =
@@ -129,10 +133,36 @@ namespace Adan.Client.Common.Conveyor
         public static long PingLastMs { get { return _pingLastMs; } }
         public static long PingMaxMs { get { return _pingMaxMs; } }
 
-        public static void RecordPing(long ms)
+        public static void RecordPing(long ms, string uid = null)
         {
             _pingLastMs = ms;
             if (ms > _pingMaxMs) _pingMaxMs = ms;
+            if (uid != null) _pingPerUid[uid] = ms;
+        }
+
+        /// <summary>
+        /// Возвращает "эффективный" RTT для каждого известного таба (мс).
+        /// Если таб ждёт ответа — берём возраст висящей отправки, иначе последний завершённый RTT.
+        /// </summary>
+        public static Dictionary<string, long> GetEffectiveRttPerUid()
+        {
+            var result = new Dictionary<string, long>(StringComparer.Ordinal);
+            long now = Stopwatch.GetTimestamp();
+
+            // Сначала заполняем последними завершёнными RTT
+            foreach (var kv in _pingPerUid)
+                result[kv.Key] = kv.Value;
+
+            // Перекрываем висящими отправками где они больше
+            foreach (var kv in _pendingSends)
+            {
+                long age = (now - kv.Value) * 1000 / Stopwatch.Frequency;
+                long existing;
+                if (!result.TryGetValue(kv.Key, out existing) || age > existing)
+                    result[kv.Key] = age;
+            }
+
+            return result;
         }
 
         // Активные игровые таймеры (#timer + #wait, по всем табам)
@@ -167,6 +197,7 @@ namespace Adan.Client.Common.Conveyor
             _units.Clear();
             _uiMaxMs = 0;
             _pingMaxMs = 0;
+            _pingPerUid.Clear();
             _since = DateTime.Now;
         }
 
@@ -212,7 +243,7 @@ namespace Adan.Client.Common.Conveyor
                 }
             }
 
-            yield return "Команды: #perf — показать, #perf reset — сбросить.";
+            yield return "Команды: #perf — показать, #perf reset — сбросить, #perf clear — очистить лог.";
             yield return "Подробный лог медленных событий: %TEMP%\\adan_perf.log";
         }
     }

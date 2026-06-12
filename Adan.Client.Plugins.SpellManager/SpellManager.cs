@@ -60,6 +60,8 @@ namespace Adan.Client.Plugins.SpellManager
             if (!_models.TryGetValue(uid, out model))
             {
                 model = new SpellTabModel(uid);
+                if (!string.IsNullOrWhiteSpace(tabName))
+                    model.TabName = tabName;
                 _models[uid] = model;
                 _globalModel.AttachTab(uid, tabName ?? uid, model);
             }
@@ -70,6 +72,9 @@ namespace Adan.Client.Plugins.SpellManager
         {
             Assert.ArgumentNotNullOrWhiteSpace(uid, "uid");
             _globalModel.UpdateTabName(uid, tabName);
+            SpellTabModel model;
+            if (_models.TryGetValue(uid, out model) && !string.IsNullOrWhiteSpace(tabName))
+                model.TabName = tabName;
         }
 
         /// <summary>
@@ -126,6 +131,15 @@ namespace Adan.Client.Plugins.SpellManager
         {
             SpellTabModel model;
             return _models.TryGetValue(uid, out model) ? model : null;
+        }
+
+        /// <summary>
+        /// Save all open tabs — called on application exit so Memorized counts survive.
+        /// </summary>
+        public void SaveAll()
+        {
+            foreach (var model in _models.Values)
+                model.Save();
         }
     }
 }
