@@ -482,6 +482,9 @@ namespace Adan.Client.Common.Conveyor
         /// </summary>
         public void Dispose()
         {
+            System.Threading.Interlocked.Exchange(ref _rttSendTimestamp, 0);
+            PerfStats.RemoveUid(RootModel != null ? RootModel.Uid : null);
+
             if (_mccpClient != null)
             {
                 _mccpClient.Dispose();
