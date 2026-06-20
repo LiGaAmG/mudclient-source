@@ -219,6 +219,54 @@ namespace Adan.Client.Common.Settings
             }
         }
 
+        /// <summary>
+        /// Serializes to a temp file first and only replaces the real
+        /// target file once serialization succeeds. The previous approach
+        /// opened the target file with FileMode.Create (truncating it to
+        /// zero bytes) BEFORE attempting to serialize, so any serialization
+        /// failure (e.g. an XML-illegal control character that snuck into
+        /// a script's text) left the file empty/corrupt and the existing
+        /// data was lost for good -- this is what destroyed users' saved
+        /// Lua scripts.
+        /// </summary>
+        private void SerializeToFileSafely(string fileFullPath, string errorContext, Action<XmlWriter> serializeAction)
+        {
+            var tempFilePath = fileFullPath + ".tmp";
+
+            try
+            {
+                using (var stream = File.Open(tempFilePath, FileMode.Create, FileAccess.Write))
+                using (var streamWriter = new XmlTextWriter(stream, Encoding.UTF8))
+                {
+                    streamWriter.Formatting = Formatting.Indented;
+                    serializeAction(streamWriter);
+                }
+
+                File.Copy(tempFilePath, fileFullPath, true);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.Instance.Write(string.Format("Error save {0}: {1}\r\n{2}", errorContext, ex.Message, ex.StackTrace));
+
+                if (ErrorOccurred != null)
+                    ErrorOccurred(this, new SettingsErrorEventArgs("#Ошибка при сохранении " + fileFullPath + ": " + ex.Message + "."));
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(tempFilePath))
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Best-effort cleanup -- a leftover .tmp file is harmless.
+                }
+            }
+        }
+
         private void SaveCommonSettings()
         {
             if (!Directory.Exists(GetProfileSettingsFolder()))
@@ -226,21 +274,12 @@ namespace Adan.Client.Common.Settings
                 Directory.CreateDirectory(GetProfileSettingsFolder());
             }
 
-            using (var stream = File.Open(Path.Combine(GetProfileSettingsFolder(), "Common.xml"), FileMode.Create, FileAccess.Write))
-            using (var streamWriter = new XmlTextWriter(stream, Encoding.UTF8))
+            var fileFullPath = Path.Combine(GetProfileSettingsFolder(), "Common.xml");
+            SerializeToFileSafely(fileFullPath, "common settings", writer =>
             {
-                streamWriter.Formatting = Formatting.Indented;
-
-                try
-                {
-                    var serializer = new XmlSerializer(typeof(CommonProfileSettings));
-                    serializer.Serialize(streamWriter, CommonSettings);
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.Instance.Write(string.Format("Error save common settings: {0}\r\n{1}", ex.Message, ex.StackTrace));
-                }
-            }
+                var serializer = new XmlSerializer(typeof(CommonProfileSettings));
+                serializer.Serialize(writer, CommonSettings);
+            });
         }
 
         private void ReadGroups()
@@ -292,25 +331,11 @@ namespace Adan.Client.Common.Settings
             }
 
             var settingsFileFullPath = Path.Combine(GetProfileSettingsFolder(), "Settings.xml");
-            using (var stream = File.Open(settingsFileFullPath, FileMode.Create, FileAccess.Write))
-            using (var streamWriter = new XmlTextWriter(stream, Encoding.UTF8))
+            SerializeToFileSafely(settingsFileFullPath, "groups", writer =>
             {
-                streamWriter.Formatting = Formatting.Indented;
-
-                try
-                {
-                    var serializer = new XmlSerializer(typeof(List<Group>), SettingsHolder.Instance.AllSerializationTypes.ToArray());
-                    serializer.Serialize(streamWriter, Groups);
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.Instance.Write(string.Format("Error save groups: {0}\r\n{1}", ex.Message, ex.StackTrace));
-
-                    if (ErrorOccurred != null)
-                        ErrorOccurred(this, new SettingsErrorEventArgs("#Ошибка при сохранении " + settingsFileFullPath + ": " + ex.Message + "."));
-
-                }
-            }
+                var serializer = new XmlSerializer(typeof(List<Group>), SettingsHolder.Instance.AllSerializationTypes.ToArray());
+                serializer.Serialize(writer, Groups);
+            });
         }
 
         private void ReadVariables()
@@ -351,24 +376,11 @@ namespace Adan.Client.Common.Settings
             }
 
             var fileFullPath = Path.Combine(GetProfileSettingsFolder(), "Variables.xml");
-            using (var stream = File.Open(fileFullPath, FileMode.Create, FileAccess.Write))
-            using (var streamWriter = new XmlTextWriter(stream, Encoding.UTF8))
+            SerializeToFileSafely(fileFullPath, "variables", writer =>
             {
-                streamWriter.Formatting = Formatting.Indented;
-
-                try
-                {
-                    var serializer = new XmlSerializer(typeof(List<Variable>));
-                    serializer.Serialize(streamWriter, Variables);
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.Instance.Write(string.Format("Error save variables: {0}\r\n{1}", ex.Message, ex.StackTrace));
-
-                    if (ErrorOccurred != null)
-                        ErrorOccurred(this, new SettingsErrorEventArgs("#Ошибка при сохранении " + fileFullPath + ": " + ex.Message + "."));
-                }
-            }
+                var serializer = new XmlSerializer(typeof(List<Variable>));
+                serializer.Serialize(writer, Variables);
+            });
         }
 
         private void ReadScripts()
@@ -408,24 +420,11 @@ namespace Adan.Client.Common.Settings
             }
 
             var fileFullPath = Path.Combine(GetProfileSettingsFolder(), "Scripts.xml");
-            using (var stream = File.Open(fileFullPath, FileMode.Create, FileAccess.Write))
-            using (var streamWriter = new XmlTextWriter(stream, Encoding.UTF8))
+            SerializeToFileSafely(fileFullPath, "scripts", writer =>
             {
-                streamWriter.Formatting = Formatting.Indented;
-
-                try
-                {
-                    var serializer = new XmlSerializer(typeof(List<ScriptDefinition>));
-                    serializer.Serialize(streamWriter, Scripts);
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.Instance.Write(string.Format("Error save scripts: {0}\r\n{1}", ex.Message, ex.StackTrace));
-
-                    if (ErrorOccurred != null)
-                        ErrorOccurred(this, new SettingsErrorEventArgs("#Ошибка при сохранении " + fileFullPath + ": " + ex.Message + "."));
-                }
-            }
+                var serializer = new XmlSerializer(typeof(List<ScriptDefinition>));
+                serializer.Serialize(writer, Scripts);
+            });
         }
 
         private void ReadCommandsHistory()
@@ -461,21 +460,12 @@ namespace Adan.Client.Common.Settings
                 Directory.CreateDirectory(GetProfileSettingsFolder());
             }
 
-            using (var stream = File.Open(Path.Combine(GetProfileSettingsFolder(), "History.xml"), FileMode.Create, FileAccess.Write))
-            using (var streamWriter = new XmlTextWriter(stream, Encoding.UTF8))
+            var fileFullPath = Path.Combine(GetProfileSettingsFolder(), "History.xml");
+            SerializeToFileSafely(fileFullPath, "command history", writer =>
             {
-                streamWriter.Formatting = Formatting.Indented;
-
-                try
-                {
-                    var serializer = new XmlSerializer(typeof(List<string>));
-                    serializer.Serialize(streamWriter, CommandsHistory);
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.Instance.Write(string.Format("Error save command history: {0}\r\n{1}", ex.Message, ex.StackTrace));
-                }
-            }
+                var serializer = new XmlSerializer(typeof(List<string>));
+                serializer.Serialize(writer, CommandsHistory);
+            });
         }
 
         [NotNull]
