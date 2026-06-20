@@ -90,6 +90,23 @@
                     conveyor.PushCommand(new Commands.TextCommand("#status " + text));
                     conveyor.PushCommand(Commands.FlushOutputQueueCommand.Instance);
                 },
+                SendToWindow = (name, text) =>
+                {
+                    var targetModel = _allModels.FirstOrDefault(w => w._name == name);
+                    if (targetModel != null)
+                    {
+                        targetModel.PushCommandToConveyor(new Commands.TextCommand(text));
+                        targetModel.PushCommandToConveyor(Commands.FlushOutputQueueCommand.Instance);
+                    }
+                },
+                SendToAllWindows = text =>
+                {
+                    foreach (var targetModel in _allModels)
+                    {
+                        targetModel.PushCommandToConveyor(new Commands.TextCommand(text));
+                        targetModel.PushCommandToConveyor(Commands.FlushOutputQueueCommand.Instance);
+                    }
+                },
             });
             ReloadScripts();
 
