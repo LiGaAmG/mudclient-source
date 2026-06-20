@@ -66,7 +66,18 @@
             _allModels = allModels;
             MessageConveyor = conveyor;
             _scriptHost = new Scripting.LuaScriptHost(
-                command => conveyor.PushCommand(new Commands.TextCommand(command)));
+                command =>
+                {
+                    // TextCommandSerializer only buffers TextCommand bytes --
+                    // it doesn't actually write them to the socket until a
+                    // FlushOutputQueueCommand arrives (normally pushed by the
+                    // input box's own Enter-key handler) or the buffer passes
+                    // 200 bytes. Without this, a Lua-triggered SendCommand
+                    // just sits buffered until the user happens to type
+                    // something else, instead of going out immediately.
+                    conveyor.PushCommand(new Commands.TextCommand(command));
+                    conveyor.PushCommand(Commands.FlushOutputQueueCommand.Instance);
+                });
             ReloadScripts();
 
             GroupStatus = new List<CharacterStatus>();
