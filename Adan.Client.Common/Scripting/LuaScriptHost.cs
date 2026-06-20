@@ -48,6 +48,15 @@ namespace Adan.Client.Common.Scripting
         private string _roomStateHandlerName;
         private string _roomChangeHandlerName;
 
+        private readonly Dictionary<string, RunningScript> _runningScripts = new Dictionary<string, RunningScript>();
+
+        private sealed class RunningScript
+        {
+            public KeraLua.Lua Thread;
+            public ScriptRunStatus Status;
+            public DateTime TimerDueAtUtc;
+        }
+
         public LuaScriptHost()
             : this(null)
         {
@@ -79,6 +88,19 @@ namespace Adan.Client.Common.Scripting
             // the pointer.
             _hookFunction = OnInstructionHook;
             _lua.State.SetHook(_hookFunction, LuaHookMask.Count, InstructionBudget);
+
+            // Shared by every coroutine script (they all see the same globals,
+            // since Lua coroutines created via lua_newthread share the creating
+            // state's _G by default). Wait(ms) yields with a "timer" tag + the
+            // requested delay; Tick() reads that delay off the yielding thread's
+            // own stack (no cross-thread value passing needed) and decides when
+            // to resume. WaitGroupState/WaitRoomState/WaitRoomChange are added in
+            // a later task.
+            _lua.DoString(@"
+                function Wait(ms)
+                    coroutine.yield('timer', ms)
+                end
+            ", "scripting-runtime-prelude");
         }
 
         /// <summary>
@@ -156,6 +178,113 @@ namespace Adan.Client.Common.Scripting
         public void LoadScript(string luaSource)
         {
             RunProtected(() => _lua.DoString(luaSource));
+        }
+
+        /// <summary>
+        /// Starts (or restarts, if already running/finished/faulted under this
+        /// name) a named coroutine script. The chunk runs immediately up to its
+        /// first yield (Wait, or a future WaitXxxState) or to completion -- this
+        /// call is synchronous for that first leg, same watchdog budget as Eval.
+        /// </summary>
+        public void StartScript(string name, string code)
+        {
+            StopScript(name);
+
+            var thread = _lua.State.NewThread();
+            thread.SetHook(_hookFunction, LuaHookMask.Count, InstructionBudget);
+
+            var loadStatus = thread.LoadString(code, name);
+            if (loadStatus != LuaStatus.OK)
+            {
+                _runningScripts[name] = new RunningScript { Thread = thread, Status = ScriptRunStatus.Faulted };
+                return;
+            }
+
+            var script = new RunningScript { Thread = thread, Status = ScriptRunStatus.Running };
+            _runningScripts[name] = script;
+            ResumeScript(name, script);
+        }
+
+        /// <summary>
+        /// Stops a running script -- it will not be resumed again. The
+        /// coroutine itself is simply dropped (no cooperative cleanup/finally
+        /// support in this version); its Lua thread becomes garbage.
+        /// </summary>
+        public void StopScript(string name)
+        {
+            _runningScripts.Remove(name);
+        }
+
+        /// <summary>
+        /// Current lifecycle state of a named script, or NotRunning if it was
+        /// never started, was stopped, or the name is unknown.
+        /// </summary>
+        public ScriptRunStatus GetScriptStatus(string name)
+        {
+            RunningScript script;
+            return _runningScripts.TryGetValue(name, out script) ? script.Status : ScriptRunStatus.NotRunning;
+        }
+
+        /// <summary>
+        /// Resumes every script whose Wait(ms) deadline has passed. Call this
+        /// periodically (e.g. every 100-200ms from a UI timer).
+        /// </summary>
+        public void Tick()
+        {
+            var now = DateTime.UtcNow;
+            foreach (var pair in new List<KeyValuePair<string, RunningScript>>(_runningScripts))
+            {
+                if (pair.Value.Status == ScriptRunStatus.WaitingOnTimer && pair.Value.TimerDueAtUtc <= now)
+                {
+                    ResumeScript(pair.Key, pair.Value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resumes the given script's coroutine with zero arguments. Inspects
+        /// the result: OK means the chunk finished; Yield means it's suspended
+        /// again (tag read off the thread's own stack decides which Waiting*
+        /// state it's now in); any error status means Faulted.
+        /// </summary>
+        private void ResumeScript(string name, RunningScript script)
+        {
+            _budgetExceeded = false;
+            _timeoutRequested = false;
+
+            int resultCount;
+            var status = script.Thread.Resume(_lua.State, 0, out resultCount);
+
+            if (status == LuaStatus.OK)
+            {
+                script.Status = ScriptRunStatus.Finished;
+                return;
+            }
+
+            if (status != LuaStatus.Yield)
+            {
+                script.Status = ScriptRunStatus.Faulted;
+                return;
+            }
+
+            var tag = script.Thread.ToString(1);
+            if (tag == "timer")
+            {
+                var delayMs = script.Thread.ToNumber(2);
+                script.Status = ScriptRunStatus.WaitingOnTimer;
+                script.TimerDueAtUtc = DateTime.UtcNow.AddMilliseconds(delayMs);
+            }
+            else
+            {
+                // Unknown yield tag (event-based tags like "group"/"room"/
+                // "roomchange" are added in a later task) -- treat as an inert
+                // suspended state so GetScriptStatus doesn't crash, but nothing
+                // will auto-resume it yet.
+                script.Status = ScriptRunStatus.WaitingOnTimer;
+                script.TimerDueAtUtc = DateTime.MaxValue;
+            }
+
+            script.Thread.Pop(script.Thread.GetTop());
         }
 
         /// <summary>

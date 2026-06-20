@@ -416,5 +416,80 @@ namespace Adan.Client.Common.Tests.Scripting
                 Assert.That(host.Eval("return coroutine.close == nil"), Is.EqualTo(true));
             }
         }
+
+        [Test]
+        public void StartScript_OneShotScript_RunsAndFinishes()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("test", "did_run = true");
+                Assert.That(host.Eval("return did_run"), Is.EqualTo(true));
+                Assert.That(host.GetScriptStatus("test"), Is.EqualTo(ScriptRunStatus.Finished));
+            }
+        }
+
+        [Test]
+        public void StartScript_WithWait_SuspendsUntilTickPastDeadline()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("test", "counter = 0 while true do counter = counter + 1 Wait(50) end");
+
+                Assert.That(host.Eval("return counter"), Is.EqualTo(1));
+                Assert.That(host.GetScriptStatus("test"), Is.EqualTo(ScriptRunStatus.WaitingOnTimer));
+
+                host.Tick();
+                Assert.That(host.Eval("return counter"), Is.EqualTo(1));
+
+                System.Threading.Thread.Sleep(80);
+                host.Tick();
+                Assert.That(host.Eval("return counter"), Is.EqualTo(2));
+                Assert.That(host.GetScriptStatus("test"), Is.EqualTo(ScriptRunStatus.WaitingOnTimer));
+            }
+        }
+
+        [Test]
+        public void StopScript_PreventsFurtherResumes()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("test", "counter = 0 while true do counter = counter + 1 Wait(10) end");
+                host.StopScript("test");
+                Assert.That(host.GetScriptStatus("test"), Is.EqualTo(ScriptRunStatus.NotRunning));
+
+                System.Threading.Thread.Sleep(50);
+                host.Tick();
+                Assert.That(host.Eval("return counter"), Is.EqualTo(1));
+            }
+        }
+
+        [Test]
+        public void GetScriptStatus_UnknownScript_ReturnsNotRunning()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.That(host.GetScriptStatus("never-started"), Is.EqualTo(ScriptRunStatus.NotRunning));
+            }
+        }
+
+        [Test]
+        public void StartScript_SyntaxError_IsFaultedNotThrown()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.DoesNotThrow(() => host.StartScript("broken", "this is not valid lua ((("));
+                Assert.That(host.GetScriptStatus("broken"), Is.EqualTo(ScriptRunStatus.Faulted));
+            }
+        }
+
+        [Test]
+        public void StartScript_RunawayLoopWithoutWait_BecomesFaultedNotHung()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("runaway", "while true do end");
+                Assert.That(host.GetScriptStatus("runaway"), Is.EqualTo(ScriptRunStatus.Faulted));
+            }
+        }
     }
 }
