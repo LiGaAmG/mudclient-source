@@ -127,9 +127,11 @@ namespace Adan.Client.ViewModel
         /// </summary>
         public int SubstitutionsCount { get { return _groupsViewModel.Groups.Sum(g => g.Substitutions.Count); } }
         /// <summary>
-        /// Amount of global scripts in the profile
+        /// Amount of global scripts in the profile. Null for the synthetic
+        /// "Global" profile (see the string/groups constructor above) --
+        /// scripts are per-character, not part of the Group system.
         /// </summary>
-        public int ScriptsCount { get { return Profile.Scripts.Count; } }
+        public int ScriptsCount { get { return Profile == null ? 0 : Profile.Scripts.Count; } }
 
         /// <summary>
         /// Can profile be imported or not
@@ -201,6 +203,16 @@ namespace Adan.Client.ViewModel
                     hotKeysEditDialog.Show();
                     break;
                 case "Scripts":
+                    if (Profile == null)
+                    {
+                        MessageBox.Show(
+                            "Scripts are per-character and not available for the synthetic Global profile.",
+                            "Scripts",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                        break;
+                    }
+
                     var scriptsEditDialog = new ScriptsEditDialog
                     {
                         DataContext = new ScriptsViewModel(Profile.Scripts),
