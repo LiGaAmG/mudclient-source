@@ -80,6 +80,11 @@ namespace Adan.Client.Dialogs
                 Multiselect = false
             };
 
+            if (!string.IsNullOrEmpty(scriptsViewModel.InitialDirectory) && Directory.Exists(scriptsViewModel.InitialDirectory))
+            {
+                fileDialog.InitialDirectory = scriptsViewModel.InitialDirectory;
+            }
+
             var result = fileDialog.ShowDialog(this);
             if (result.HasValue && result.Value)
             {

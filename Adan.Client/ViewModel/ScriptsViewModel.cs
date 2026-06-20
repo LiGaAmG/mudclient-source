@@ -27,18 +27,34 @@ namespace Adan.Client.ViewModel
         /// </summary>
         /// <param name="backingList">The backing list.</param>
         /// <param name="scriptHost">The script host used for live Start/Stop/Status.</param>
-        public ScriptsViewModel([NotNull] List<ScriptDefinition> backingList, [NotNull] LuaScriptHost scriptHost)
+        /// <param name="initialDirectory">
+        /// Folder the Load button's file picker should open in by default
+        /// (e.g. the owning profile's Settings folder) -- null/empty falls
+        /// back to whatever the OS's open-file dialog defaults to on its own.
+        /// </param>
+        public ScriptsViewModel([NotNull] List<ScriptDefinition> backingList, [NotNull] LuaScriptHost scriptHost, string initialDirectory = null)
         {
             Assert.ArgumentNotNull(backingList, "backingList");
             Assert.ArgumentNotNull(scriptHost, "scriptHost");
 
             _backingList = backingList;
             _scriptHost = scriptHost;
+            InitialDirectory = initialDirectory;
             Scripts = new ObservableCollection<ScriptViewModel>(
                 backingList.Select(s => new ScriptViewModel(s, scriptHost)));
 
             AddScriptCommand = new DelegateCommand(AddScriptCommandExecute, true);
             DeleteScriptCommand = new DelegateCommand(DeleteScriptCommandExecute, false);
+        }
+
+        /// <summary>
+        /// Folder the Load button's file picker should open in by default.
+        /// </summary>
+        [CanBeNull]
+        public string InitialDirectory
+        {
+            get;
+            private set;
         }
 
         /// <summary>

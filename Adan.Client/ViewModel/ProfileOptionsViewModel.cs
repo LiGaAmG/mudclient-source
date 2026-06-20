@@ -238,7 +238,7 @@ namespace Adan.Client.ViewModel
 
                     var scriptsEditDialog = new ScriptsEditDialog
                     {
-                        DataContext = new ScriptsViewModel(Profile.Scripts, scriptHostForDialog),
+                        DataContext = new ScriptsViewModel(Profile.Scripts, scriptHostForDialog, Profile.SettingsFolderPath),
                         Owner = owner
                     };
                     // SaveRequested (Save button, dialog stays open) and

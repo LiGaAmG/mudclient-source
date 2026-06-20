@@ -48,6 +48,24 @@ namespace Adan.Client.Common.Controls
         {
             AcceptsTab = true;
             TextChanged += HandleTextChanged;
+
+            // Every keystroke rebuilds the WHOLE FlowDocument (re-highlight,
+            // see ApplyHighlighting), and switching which script is shown
+            // (the Code property changing because a different list item got
+            // selected) does the same via SetPlainText -- both go through
+            // WPF's normal Document mutation path, which records onto this
+            // control's undo stack same as a real edit would. That made
+            // Ctrl+Z unwind PAST a script switch and corrupt/replace the
+            // current script's text with a stale, unrelated previous
+            // script's content -- not just "undo my last keystroke". WPF's
+            // undo here only ever operates at "replace the whole document"
+            // granularity anyway (never per-character), so it was never a
+            // safe/meaningful undo to begin with; disabling it trades away
+            // in-editor undo for not silently destroying script content.
+            // The actual persisted state lives in ScriptDefinition.Code,
+            // saved via the dialog's Save/Close, not in this transient
+            // editor history.
+            IsUndoEnabled = false;
         }
 
         public string Code

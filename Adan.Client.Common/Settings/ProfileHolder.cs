@@ -484,6 +484,22 @@ namespace Adan.Client.Common.Settings
             return Path.Combine(GetSettingsFolder(), name == null ? Name : name);
         }
 
+        /// <summary>
+        /// The folder this profile's Settings/Variables/Scripts.xml etc.
+        /// actually live in (e.g. "...\Documents\Adan client\Settings\Default").
+        /// Exposed publicly so UI that lets the user pick a .lua file (the
+        /// Scripts dialog's Load button) can default there -- scripts
+        /// themselves aren't stored as individual files (they're XML
+        /// elements inside this folder's Scripts.xml), but it's the most
+        /// sensible "this profile's stuff lives here" folder to start
+        /// browsing from if the user keeps source .lua files alongside it.
+        /// </summary>
+        [NotNull]
+        public string SettingsFolderPath
+        {
+            get { return GetProfileSettingsFolder(); }
+        }
+
         [NotNull]
         private string GetSettingsFolder()
         {

@@ -1043,7 +1043,7 @@ namespace Adan.Client
             var profile = rootModel.Profile;
             var scriptsEditDialog = new ScriptsEditDialog
             {
-                DataContext = new ScriptsViewModel(profile.Scripts, rootModel.ScriptHost),
+                DataContext = new ScriptsViewModel(profile.Scripts, rootModel.ScriptHost, profile.SettingsFolderPath),
                 Owner = this
             };
 
