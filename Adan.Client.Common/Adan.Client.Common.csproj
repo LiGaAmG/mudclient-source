@@ -60,6 +60,12 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="NLua">
+      <HintPath>..\packages\NLua.1.7.3\lib\net46\NLua.dll</HintPath>
+    </Reference>
+    <Reference Include="KeraLua">
+      <HintPath>..\packages\KeraLua.1.4.4\lib\net46\KeraLua.dll</HintPath>
+    </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="WindowsFormsIntegration" />
   </ItemGroup>
@@ -104,6 +110,8 @@
     <Compile Include="Settings\SettingsChangedEventArgs.cs" />
     <Compile Include="Settings\SettingsErrorEventArgs.cs" />
     <Compile Include="Settings\SettingsFolder.cs" />
+    <Compile Include="Scripting\LuaScriptHost.cs" />
+    <Compile Include="Scripting\LuaScriptHost.SandboxSetup.cs" />
     <Compile Include="ConveyorUnits\ConveyorUnit.cs" />
     <Compile Include="Conveyor\MessageConveyor.cs" />
     <Compile Include="Conveyor\MessageReceivedEventArgs.cs" />
