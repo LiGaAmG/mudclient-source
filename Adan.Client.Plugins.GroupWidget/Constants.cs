@@ -78,6 +78,11 @@ namespace Adan.Client.Plugins.GroupWidget
                                   new AffectDescription("Meditation",      "Медитация",           "медитация",             "Meditation"),
                                   new AffectDescription("WaterBreath",     "Дыхание под водой",   "дыхание под водой",     "WaterBreath"),
                                   new AffectDescription("Pain",            "Боль",                "боль",                  "Pain") { IsRoundBased = true },
+                                  new AffectDescription("Portal",          "Портал",              "портал",                "Portal") { IsRoundBased = true },
+                                  new AffectDescription("SenseLife",       "Чувствовать жизнь",  new List<string> { "чувствовать жизнь", "чувст.жизнь" }, new List<string> { "SenseLife", "SenseLife" }),
+                                  new AffectDescription("Infravision",     "Инфракрасное зрение", new List<string> { "инфракрасное зрение", "инфразрение" }, new List<string> { "Infravision", "Infravision" }),
+                                  new AffectDescription("SeeInvisible",    "Видеть невидимое",   new List<string> { "видеть невидимое", "вид.невидимость" }, new List<string> { "SeeInvisible", "SeeInvisible" }),
+                                  new AffectDescription("SeeMagic",        "Видеть магию",       new List<string> { "видеть магию", "вид.магия" }, new List<string> { "SeeMagic", "SeeMagic" }),
                               };
 
         /// <summary>

@@ -6650,6 +6650,148 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
+    <!-- Portal — кольцо-портал с внутренним свечением (портал) -->
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Portal" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <!-- Внешнее кольцо -->
+                <Path Stretch="Fill" Width="22" Height="22" Canvas.Left="2" Canvas.Top="2" StrokeThickness="0">
+                    <Path.Data>
+                        <CombinedGeometry GeometryCombineMode="Exclude">
+                            <CombinedGeometry.Geometry1>
+                                <EllipseGeometry Center="11,11" RadiusX="11" RadiusY="11"/>
+                            </CombinedGeometry.Geometry1>
+                            <CombinedGeometry.Geometry2>
+                                <EllipseGeometry Center="11,11" RadiusX="7" RadiusY="7"/>
+                            </CombinedGeometry.Geometry2>
+                        </CombinedGeometry>
+                    </Path.Data>
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FF00FFEE" Offset="0"/>
+                            <GradientStop Color="#FF0055CC" Offset="0.5"/>
+                            <GradientStop Color="#FF8800FF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <!-- Внутренее свечение -->
+                <Ellipse Width="12" Height="12" Canvas.Left="7" Canvas.Top="7">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#AAFFFFFF" Offset="0"/>
+                            <GradientStop Color="#660099FF" Offset="0.6"/>
+                            <GradientStop Color="#00000000" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- SenseLife — глаз с пульсом (чувствовать жизнь) -->
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_SenseLife" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <!-- Глаз -->
+                <Path Data="M13,7 C6,7 1,13 1,13 C1,13 6,19 13,19 C20,19 25,13 25,13 C25,13 20,7 13,7 Z"
+                      Width="24" Height="12" Canvas.Left="1" Canvas.Top="7" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FF88FF99" Offset="0"/>
+                            <GradientStop Color="#FF006622" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <!-- Зрачок -->
+                <Ellipse Width="6" Height="6" Canvas.Left="10" Canvas.Top="10">
+                    <Ellipse.Fill><SolidColorBrush Color="#FF003311"/></Ellipse.Fill>
+                </Ellipse>
+                <!-- Пульс/ЭКГ поверх -->
+                <Path Data="M1,13 L5,13 L7,10 L9,16 L11,11 L13,13 L25,13"
+                      StrokeThickness="1.5" Stroke="#CCFFFFFF" Fill="Transparent"/>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- Infravision — глаз с ИК-волнами (инфракрасное зрение) -->
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Infravision" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <!-- Глаз -->
+                <Path Data="M13,7 C6,7 1,13 1,13 C1,13 6,19 13,19 C20,19 25,13 25,13 C25,13 20,7 13,7 Z"
+                      Width="24" Height="12" Canvas.Left="1" Canvas.Top="7" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FFFF6622" Offset="0"/>
+                            <GradientStop Color="#FF881100" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <!-- Зрачок -->
+                <Ellipse Width="6" Height="6" Canvas.Left="10" Canvas.Top="10">
+                    <Ellipse.Fill><SolidColorBrush Color="#FFFF2200"/></Ellipse.Fill>
+                </Ellipse>
+                <!-- ИК-волны снизу -->
+                <Path Data="M8,21 C9,23 11,24 13,24 C15,24 17,23 18,21"
+                      StrokeThickness="1.5" Stroke="#FFFF6600" Fill="Transparent"/>
+                <Path Data="M6,22 C7.5,25 10,26.5 13,26.5 C16,26.5 18.5,25 20,22"
+                      StrokeThickness="1" Stroke="#88FF4400" Fill="Transparent"/>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- SeeInvisible — глаз с пунктирным силуэтом (видеть невидимое) -->
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_SeeInvisible" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <!-- Глаз -->
+                <Path Data="M13,7 C6,7 1,13 1,13 C1,13 6,19 13,19 C20,19 25,13 25,13 C25,13 20,7 13,7 Z"
+                      Width="24" Height="12" Canvas.Left="1" Canvas.Top="7" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FFCC88FF" Offset="0"/>
+                            <GradientStop Color="#FF550099" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <!-- Зрачок -->
+                <Ellipse Width="6" Height="6" Canvas.Left="10" Canvas.Top="10">
+                    <Ellipse.Fill><SolidColorBrush Color="#FF220044"/></Ellipse.Fill>
+                </Ellipse>
+                <!-- Пунктирный контур невидимого существа -->
+                <Ellipse Width="14" Height="10" Canvas.Left="6" Canvas.Top="2"
+                         StrokeThickness="1.5" StrokeDashArray="2,2" Stroke="#AABB44FF" Fill="Transparent"/>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <!-- SeeMagic — глаз со звёздочкой (видеть магию) -->
+    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_SeeMagic" Stretch="Uniform">
+        <VisualBrush.Visual>
+            <Canvas Height="26" Width="26">
+                <!-- Глаз -->
+                <Path Data="M13,7 C6,7 1,13 1,13 C1,13 6,19 13,19 C20,19 25,13 25,13 C25,13 20,7 13,7 Z"
+                      Width="24" Height="12" Canvas.Left="1" Canvas.Top="7" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FF88CCFF" Offset="0"/>
+                            <GradientStop Color="#FF0044AA" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <!-- Зрачок -->
+                <Ellipse Width="6" Height="6" Canvas.Left="10" Canvas.Top="10">
+                    <Ellipse.Fill><SolidColorBrush Color="#FF001133"/></Ellipse.Fill>
+                </Ellipse>
+                <!-- Маленькая звезда над глазом -->
+                <Path Data="M13,1 L14,4 L17,4 L14.5,6 L15.5,9 L13,7.2 L10.5,9 L11.5,6 L9,4 L12,4 Z"
+                      Width="8" Height="8" Canvas.Left="9" Canvas.Top="0" Stretch="Fill" StrokeThickness="0">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#FFFFEE88" Offset="0"/>
+                            <GradientStop Color="#FFFFAA00" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
     <!-- ══════════════════════════════════════════ -->
     <GeometryDrawing x:Key="Drawing_Standing"
                      Brush="{StaticResource Brush_Standing}">
@@ -6958,6 +7100,11 @@
     <GeometryDrawing x:Key="Drawing_Meditation"   Brush="{StaticResource Brush_Meditation}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_WaterBreath"  Brush="{StaticResource Brush_WaterBreath}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_Pain"         Brush="{StaticResource Brush_Pain}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Portal"       Brush="{StaticResource Brush_Portal}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_SenseLife"    Brush="{StaticResource Brush_SenseLife}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_Infravision"  Brush="{StaticResource Brush_Infravision}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_SeeInvisible" Brush="{StaticResource Brush_SeeInvisible}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_SeeMagic"     Brush="{StaticResource Brush_SeeMagic}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <DrawingImage x:Key="ImageSource_Standing"
                   Drawing="{StaticResource Drawing_Standing}" />
     <DrawingImage x:Key="ImageSource_Sitting"
@@ -7070,6 +7217,11 @@
     <DrawingImage x:Key="ImageSource_Meditation"       Drawing="{StaticResource Drawing_Meditation}" />
     <DrawingImage x:Key="ImageSource_WaterBreath"      Drawing="{StaticResource Drawing_WaterBreath}" />
     <DrawingImage x:Key="ImageSource_Pain"             Drawing="{StaticResource Drawing_Pain}" />
+    <DrawingImage x:Key="ImageSource_Portal"          Drawing="{StaticResource Drawing_Portal}" />
+    <DrawingImage x:Key="ImageSource_SenseLife"       Drawing="{StaticResource Drawing_SenseLife}" />
+    <DrawingImage x:Key="ImageSource_Infravision"     Drawing="{StaticResource Drawing_Infravision}" />
+    <DrawingImage x:Key="ImageSource_SeeInvisible"    Drawing="{StaticResource Drawing_SeeInvisible}" />
+    <DrawingImage x:Key="ImageSource_SeeMagic"        Drawing="{StaticResource Drawing_SeeMagic}" />
 
     <DrawingBrush Stretch="None"
                   TileMode="Tile"
@@ -7242,6 +7394,11 @@
         <Utils:SwitchCase  When="Meditation"      Then="{StaticResource ImageSource_Meditation}" />
         <Utils:SwitchCase  When="WaterBreath"     Then="{StaticResource ImageSource_WaterBreath}" />
         <Utils:SwitchCase  When="Pain"            Then="{StaticResource ImageSource_Pain}" />
+        <Utils:SwitchCase  When="Portal"         Then="{StaticResource ImageSource_Portal}" />
+        <Utils:SwitchCase  When="SenseLife"      Then="{StaticResource ImageSource_SenseLife}" />
+        <Utils:SwitchCase  When="Infravision"    Then="{StaticResource ImageSource_Infravision}" />
+        <Utils:SwitchCase  When="SeeInvisible"   Then="{StaticResource ImageSource_SeeInvisible}" />
+        <Utils:SwitchCase  When="SeeMagic"       Then="{StaticResource ImageSource_SeeMagic}" />
     </Utils:SwitchConverter>
 
     <Style x:Key="SmallIcon"
