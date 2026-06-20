@@ -158,15 +158,24 @@
                 {
                     _scriptHost.LoadScript(script.Code);
 
-                    if (script.HandlerKind == ScriptHandlerKind.GroupState)
+                    // The three Handle* flags are independent -- a single
+                    // script can register for any combination of packet
+                    // types at once (e.g. define both on_group_state and
+                    // on_room_state in the same script and check both
+                    // boxes), unlike the old single-choice HandlerKind
+                    // dropdown this replaces. HandlerKind is still read as
+                    // a fallback for scripts saved before this existed.
+                    if (script.HandleGroupState || script.HandlerKind == ScriptHandlerKind.GroupState)
                     {
                         _scriptHost.RegisterGroupStateHandler("on_group_state");
                     }
-                    else if (script.HandlerKind == ScriptHandlerKind.RoomState)
+
+                    if (script.HandleRoomState || script.HandlerKind == ScriptHandlerKind.RoomState)
                     {
                         _scriptHost.RegisterRoomStateHandler("on_room_state");
                     }
-                    else if (script.HandlerKind == ScriptHandlerKind.RoomChange)
+
+                    if (script.HandleRoomChange || script.HandlerKind == ScriptHandlerKind.RoomChange)
                     {
                         _scriptHost.RegisterRoomChangeHandler("on_room_change");
                     }

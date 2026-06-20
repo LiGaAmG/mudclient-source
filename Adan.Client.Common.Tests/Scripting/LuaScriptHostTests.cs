@@ -289,6 +289,38 @@ namespace Adan.Client.Common.Tests.Scripting
         }
 
         [Test]
+        public void OneScript_CanRegisterAllThreeHandlersAtOnce()
+        {
+            // Demonstrates the actual answer to "can one script react to
+            // several packet types": yes -- LuaScriptHost places no
+            // restriction on registering all three handler kinds
+            // simultaneously, as long as the single shared Lua state
+            // defines all three functions. RootModel.ReloadScripts() is
+            // what decides, per script, which of the three Register*Handler
+            // calls to make (now driven by three independent checkboxes,
+            // not a single Handler choice).
+            using (var host = new LuaScriptHost())
+            {
+                host.LoadScript(@"
+                    function on_group_state(group) last_group_count = #group end
+                    function on_room_state(monsters) last_monster_count = #monsters end
+                    function on_room_change(roomId, zoneId, room) last_room_id = roomId end
+                ");
+                host.RegisterGroupStateHandler("on_group_state");
+                host.RegisterRoomStateHandler("on_room_state");
+                host.RegisterRoomChangeHandler("on_room_change");
+
+                host.RaiseGroupStateChanged(new List<CharacterStatus> { new CharacterStatus() });
+                host.RaiseRoomStateChanged(new List<MonsterStatus> { new MonsterStatus(), new MonsterStatus() });
+                host.RaiseRoomChanged(777, 1, null);
+
+                Assert.That(host.Eval("return last_group_count"), Is.EqualTo(1));
+                Assert.That(host.Eval("return last_monster_count"), Is.EqualTo(2));
+                Assert.That(host.Eval("return last_room_id"), Is.EqualTo(777));
+            }
+        }
+
+        [Test]
         public void RaiseGroupStateChanged_NoHandlerRegistered_DoesNothing()
         {
             using (var host = new LuaScriptHost())

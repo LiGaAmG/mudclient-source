@@ -37,16 +37,16 @@
             </StackPanel>
             <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,5">
                 <CheckBox Content="Enabled" IsChecked="{Binding Path=IsEnabled, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,15,0" />
-                <Label>Handler:</Label>
-                <ComboBox Width="150" SelectedValue="{Binding Path=HandlerKind, Mode=TwoWay}" SelectedValuePath="Content">
-                    <ComboBoxItem Content="None" />
-                    <ComboBoxItem Content="GroupState" />
-                    <ComboBoxItem Content="RoomState" />
-                    <ComboBoxItem Content="RoomChange" />
-                </ComboBox>
+                <Label>Handles:</Label>
+                <CheckBox Content="GroupState" IsChecked="{Binding Path=HandleGroupState, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"
+                          ToolTip="Script must define on_group_state(group)" />
+                <CheckBox Content="RoomState" IsChecked="{Binding Path=HandleRoomState, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"
+                          ToolTip="Script must define on_room_state(monsters)" />
+                <CheckBox Content="RoomChange" IsChecked="{Binding Path=HandleRoomChange, Mode=TwoWay}" VerticalAlignment="Center"
+                          ToolTip="Script must define on_room_change(roomId, zoneId, room)" />
             </StackPanel>
             <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,5" Foreground="#FF999999"
-                       Text="GroupState scripts must define on_group_state(group). RoomState scripts must define on_room_state(monsters). RoomChange scripts must define on_room_change(roomId, zoneId, room). See Help for the full API." />
+                       Text="Check any combination -- one script can handle several packet types at once. GroupState needs on_group_state(group), RoomState needs on_room_state(monsters), RoomChange needs on_room_change(roomId, zoneId, room). See Help for the full API." />
             <Border Grid.Row="3" BorderBrush="#FF555555" BorderThickness="1" CornerRadius="3" Background="#FF1E1E1E">
                 <Controls:LuaCodeEditor Code="{Binding Path=Code, UpdateSourceTrigger=PropertyChanged}"
                          FontFamily="Consolas" FontSize="13"

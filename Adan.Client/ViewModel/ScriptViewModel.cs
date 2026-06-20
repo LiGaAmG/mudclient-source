@@ -74,15 +74,44 @@ namespace Adan.Client.ViewModel
         }
 
         /// <summary>
-        /// Gets or sets the handler kind.
+        /// Gets or sets whether this script registers an on_group_state
+        /// handler. Independent of the other two -- check any combination.
         /// </summary>
-        public ScriptHandlerKind HandlerKind
+        public bool HandleGroupState
         {
-            get { return _script.HandlerKind; }
+            get { return _script.HandleGroupState; }
             set
             {
-                _script.HandlerKind = value;
-                OnPropertyChanged("HandlerKind");
+                _script.HandleGroupState = value;
+                OnPropertyChanged("HandleGroupState");
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether this script registers an on_room_state
+        /// handler. Independent of the other two -- check any combination.
+        /// </summary>
+        public bool HandleRoomState
+        {
+            get { return _script.HandleRoomState; }
+            set
+            {
+                _script.HandleRoomState = value;
+                OnPropertyChanged("HandleRoomState");
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether this script registers an on_room_change
+        /// handler. Independent of the other two -- check any combination.
+        /// </summary>
+        public bool HandleRoomChange
+        {
+            get { return _script.HandleRoomChange; }
+            set
+            {
+                _script.HandleRoomChange = value;
+                OnPropertyChanged("HandleRoomChange");
             }
         }
     }
