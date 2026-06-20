@@ -48,24 +48,6 @@ namespace Adan.Client.Common.Controls
         {
             AcceptsTab = true;
             TextChanged += HandleTextChanged;
-
-            // Every keystroke rebuilds the WHOLE FlowDocument (re-highlight,
-            // see ApplyHighlighting), and switching which script is shown
-            // (the Code property changing because a different list item got
-            // selected) does the same via SetPlainText -- both go through
-            // WPF's normal Document mutation path, which records onto this
-            // control's undo stack same as a real edit would. That made
-            // Ctrl+Z unwind PAST a script switch and corrupt/replace the
-            // current script's text with a stale, unrelated previous
-            // script's content -- not just "undo my last keystroke". WPF's
-            // undo here only ever operates at "replace the whole document"
-            // granularity anyway (never per-character), so it was never a
-            // safe/meaningful undo to begin with; disabling it trades away
-            // in-editor undo for not silently destroying script content.
-            // The actual persisted state lives in ScriptDefinition.Code,
-            // saved via the dialog's Save/Close, not in this transient
-            // editor history.
-            IsUndoEnabled = false;
         }
 
         public string Code
@@ -96,6 +78,22 @@ namespace Adan.Client.Common.Controls
             {
                 editor._isUpdatingFromCode = false;
             }
+
+            // This branch only runs when Code changed from OUTSIDE this
+            // control (e.g. the Scripts dialog's list selection switched to
+            // a different script, or a fresh script's code was just loaded)
+            // -- never on a per-keystroke edit, since those go through
+            // HandleTextChanged with _isUpdatingFromDocument set, which the
+            // early-return above already filters out. So clearing the undo
+            // stack here only erases history at exactly the moment the
+            // displayed content actually changed to a DIFFERENT script's
+            // text, which is the only point where continuing to let Ctrl+Z
+            // reach further back would mean undoing into unrelated, stale
+            // content. Toggling IsUndoEnabled off-then-on is the documented
+            // way to clear WPF's undo stack; normal typing keeps
+            // accumulating undo history as expected in between these resets.
+            editor.IsUndoEnabled = false;
+            editor.IsUndoEnabled = true;
         }
 
         private void HandleTextChanged(object sender, TextChangedEventArgs e)
