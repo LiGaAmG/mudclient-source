@@ -203,6 +203,11 @@ namespace Adan.Client.Common.Scripting
         /// </summary>
         public void RaiseGroupStateChanged(List<CharacterStatus> group)
         {
+            if (group == null)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(_groupStateHandlerName))
             {
                 return;
@@ -237,6 +242,11 @@ namespace Adan.Client.Common.Scripting
         /// </summary>
         public void RaiseRoomStateChanged(List<MonsterStatus> monsters)
         {
+            if (monsters == null)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(_roomStateHandlerName))
             {
                 return;

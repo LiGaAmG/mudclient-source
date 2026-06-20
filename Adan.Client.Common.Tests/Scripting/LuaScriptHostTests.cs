@@ -206,5 +206,23 @@ namespace Adan.Client.Common.Tests.Scripting
                 Assert.DoesNotThrow(() => host.Eval("SendCommand('whatever')"));
             }
         }
+
+        [Test]
+        public void RaiseGroupStateChanged_NullGroup_DoesNotThrow()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.DoesNotThrow(() => host.RaiseGroupStateChanged(null));
+            }
+        }
+
+        [Test]
+        public void RaiseRoomStateChanged_NullMonsters_DoesNotThrow()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.DoesNotThrow(() => host.RaiseRoomStateChanged(null));
+            }
+        }
     }
 }
