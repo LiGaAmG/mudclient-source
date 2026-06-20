@@ -40,6 +40,7 @@ using Adan.Client.Common.Messages;
 
 namespace Adan.Client
 {
+    using System.Windows.Threading;
     using System.Xml.Serialization;
     using Settings;
 
@@ -50,6 +51,7 @@ namespace Adan.Client
         private readonly IList<Window> _allWidgets = new List<Window>();
         private readonly IList<OutputWindow> _outputWindows = new List<OutputWindow>();
         private readonly IList<RootModel> _allRootModels = new List<RootModel>();
+        private readonly DispatcherTimer _scriptsTickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
 
         private WindowState _nonFullScreenWindowState;
         private IntPtr _smallIconHandle = IntPtr.Zero;
@@ -223,6 +225,22 @@ namespace Adan.Client
             }, null, 5000, 500);
         }
 
+        /// <summary>
+        /// Resumes any coroutine script (across every open tab) whose Wait(ms)
+        /// timer has elapsed. 150ms keeps Wait reasonably responsive (worst-
+        /// case extra delay ~150ms on top of the requested duration) without
+        /// adding a meaningful per-frame cost -- Tick() is a near-no-op scan
+        /// over a typically-tiny dictionary for tabs with nothing currently
+        /// waiting on a timer.
+        /// </summary>
+        private void HandleScriptsTickTimer(object sender, EventArgs e)
+        {
+            foreach (var rootModel in _allRootModels)
+            {
+                rootModel.ScriptHost.Tick();
+            }
+        }
+
         private long _dispatcherOpStartTimestamp;
 
         /// <summary>
@@ -369,6 +387,9 @@ namespace Adan.Client
             StartUiLatencyMonitor();
             StartDispatcherOpTracing();
             StartServerPingMonitor();
+
+            _scriptsTickTimer.Tick += HandleScriptsTickTimer;
+            _scriptsTickTimer.Start();
 
             //Load all types for deserialization
             var types = new List<Type>
