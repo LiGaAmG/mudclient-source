@@ -234,39 +234,13 @@ namespace Adan.Client.ViewModel
                         DataContext = new ScriptsViewModel(Profile.Scripts),
                         Owner = owner
                     };
-                    scriptsEditDialog.Closed += (s, e) =>
-                    {
-                        OnPropertyChanged("ScriptsCount");
-
-                        // This view model's Profile is a CLONE (see
-                        // ProfilesEditViewModel.EditProfile, which clones
-                        // before opening this dialog -- the same reason the
-                        // "Groups" case above writes AllGroup back onto the
-                        // live, SettingsHolder-tracked instance instead of
-                        // relying on SetProfile to pick up the clone's
-                        // edits). Without this assignment, SetProfile below
-                        // would save the LIVE instance's (unedited, possibly
-                        // not-yet-loaded) Scripts list straight back over
-                        // itself, silently discarding everything just typed
-                        // into the dialog.
-                        SettingsHolder.Instance.GetProfile(Profile.Name).Scripts = Profile.Scripts;
-                        SettingsHolder.Instance.SetProfile(Profile.Name);
-
-                        // Apply the edit to every already-open tab using this
-                        // profile right now -- without this, a script change
-                        // would only take effect the next time a tab using
-                        // this profile is (re)connected.
-                        if (_allRootModels != null)
-                        {
-                            foreach (var rootModel in _allRootModels)
-                            {
-                                if (rootModel.Profile != null && rootModel.Profile.Name == Profile.Name)
-                                {
-                                    rootModel.ReloadScripts();
-                                }
-                            }
-                        }
-                    };
+                    // SaveRequested (Save button, dialog stays open) and
+                    // Closed (window actually closing) both apply the same
+                    // way -- a user clicking Save repeatedly, then Close,
+                    // should not behave any differently than just clicking
+                    // Close once.
+                    scriptsEditDialog.SaveRequested += (s, e) => ApplyScriptsChanges();
+                    scriptsEditDialog.Closed += (s, e) => ApplyScriptsChanges();
                     scriptsEditDialog.Show();
                     break;
                 case "Substitutions":
@@ -295,6 +269,34 @@ namespace Adan.Client.ViewModel
                     };
                     triggerEditDialog.Show();
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Pushes the Scripts dialog's edits (made against the CLONE that
+        /// is this view model's <see cref="Profile"/>, see EditProfile's
+        /// "Scripts" case) onto the live, SettingsHolder-tracked profile
+        /// instance, persists it, and reloads it into every already-open
+        /// tab using this profile. Called from both ScriptsEditDialog's
+        /// Save button (dialog stays open) and its Closed event (window
+        /// actually closing), so either path behaves identically.
+        /// </summary>
+        private void ApplyScriptsChanges()
+        {
+            OnPropertyChanged("ScriptsCount");
+
+            SettingsHolder.Instance.GetProfile(Profile.Name).Scripts = Profile.Scripts;
+            SettingsHolder.Instance.SetProfile(Profile.Name);
+
+            if (_allRootModels != null)
+            {
+                foreach (var rootModel in _allRootModels)
+                {
+                    if (rootModel.Profile != null && rootModel.Profile.Name == Profile.Name)
+                    {
+                        rootModel.ReloadScripts();
+                    }
+                }
             }
         }
 

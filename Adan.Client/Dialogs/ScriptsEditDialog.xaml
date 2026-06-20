@@ -58,10 +58,12 @@
 
         <StackPanel Grid.Column="0" Grid.Row="1" Orientation="Horizontal" Margin="0,5,0,0">
             <Button Command="{Binding Path=AddScriptCommand}" MinWidth="60" Margin="0,0,5,0">Add</Button>
-            <Button Command="{Binding Path=DeleteScriptCommand}" MinWidth="60">Delete</Button>
+            <Button Command="{Binding Path=DeleteScriptCommand}" MinWidth="60" Margin="0,0,5,0">Delete</Button>
+            <Button Click="HandleLoadFromFileClick" MinWidth="60" ToolTip="Load the selected script's code from a .lua file on disk (e.g. one you edited in an external editor)">Load...</Button>
         </StackPanel>
         <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
             <Button Click="HandleHelpClick" MinWidth="60" Margin="0,0,5,0">Help</Button>
+            <Button Click="HandleSaveClick" MinWidth="60" Margin="0,0,5,0" ToolTip="Save and apply to already-open tabs, without closing this window">Save</Button>
             <Button Click="HandleCloseClick" IsCancel="True" MinWidth="60">Close</Button>
         </StackPanel>
     </Grid>
