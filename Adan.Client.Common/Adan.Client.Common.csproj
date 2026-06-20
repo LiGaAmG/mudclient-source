@@ -64,7 +64,7 @@
       <HintPath>..\packages\NLua.1.7.3\lib\net46\NLua.dll</HintPath>
     </Reference>
     <Reference Include="KeraLua">
-      <HintPath>..\packages\KeraLua.1.4.4\lib\net46\KeraLua.dll</HintPath>
+      <HintPath>..\packages\KeraLua.1.4.1\lib\net46\KeraLua.dll</HintPath>
     </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="WindowsFormsIntegration" />
