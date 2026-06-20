@@ -189,6 +189,7 @@
     <Compile Include="Dialogs\HighlightEditDialog.xaml.cs">
       <DependentUpon>HighlightEditDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\HelpBlockTemplateSelector.cs" />
     <Compile Include="Dialogs\HelpWindow.xaml.cs">
       <DependentUpon>HelpWindow.xaml</DependentUpon>
     </Compile>
@@ -330,6 +331,7 @@
     <Compile Include="ViewModel\ProfileOptionsViewModel.cs" />
     <Compile Include="ViewModel\ProfilesEditViewModel.cs" />
     <Compile Include="ViewModel\ProfileViewModel.cs" />
+    <Compile Include="ViewModel\HelpContentBlock.cs" />
     <Compile Include="ViewModel\HelpTopic.cs" />
     <Compile Include="ViewModel\HelpTopics.cs" />
     <Compile Include="ViewModel\ScriptViewModel.cs" />

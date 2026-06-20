@@ -4,6 +4,7 @@ namespace Adan.Client.Dialogs
     using System.ComponentModel;
     using System.Linq;
     using System.Windows;
+    using System.Windows.Data;
 
     using ViewModel;
 
@@ -11,11 +12,13 @@ namespace Adan.Client.Dialogs
     {
         private string _searchText = string.Empty;
         private HelpTopic _selectedTopic;
+        private ListCollectionView _groupedTopics;
 
         public HelpWindow()
         {
             InitializeComponent();
             DataContext = this;
+            RebuildGroupedTopics();
             SelectedTopic = HelpTopics.All.FirstOrDefault();
         }
 
@@ -28,23 +31,14 @@ namespace Adan.Client.Dialogs
             {
                 _searchText = value;
                 OnPropertyChanged("SearchText");
-                OnPropertyChanged("FilteredTopics");
+                RebuildGroupedTopics();
+                OnPropertyChanged("GroupedTopics");
             }
         }
 
-        public IEnumerable<HelpTopic> FilteredTopics
+        public ICollectionView GroupedTopics
         {
-            get
-            {
-                if (string.IsNullOrWhiteSpace(SearchText))
-                {
-                    return HelpTopics.All;
-                }
-
-                return HelpTopics.All.Where(t =>
-                    t.Title.IndexOf(SearchText, System.StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    t.Content.IndexOf(SearchText, System.StringComparison.OrdinalIgnoreCase) >= 0);
-            }
+            get { return _groupedTopics; }
         }
 
         public HelpTopic SelectedTopic
@@ -55,6 +49,19 @@ namespace Adan.Client.Dialogs
                 _selectedTopic = value;
                 OnPropertyChanged("SelectedTopic");
             }
+        }
+
+        private void RebuildGroupedTopics()
+        {
+            IEnumerable<HelpTopic> source = HelpTopics.All;
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                source = HelpTopics.All.Where(t =>
+                    t.SearchableText.IndexOf(SearchText, System.StringComparison.OrdinalIgnoreCase) >= 0);
+            }
+
+            _groupedTopics = new ListCollectionView(source.ToList());
+            _groupedTopics.GroupDescriptions.Add(new PropertyGroupDescription("Category"));
         }
 
         private void OnPropertyChanged(string propertyName)
