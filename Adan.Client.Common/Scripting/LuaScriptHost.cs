@@ -207,11 +207,11 @@ namespace Adan.Client.Common.Scripting
         /// <summary>
         /// Invokes the registered group-state handler (see
         /// <see cref="RegisterGroupStateHandler"/>), if any, passing the
-        /// supplied group members as a 1-based Lua array of tables exposing
-        /// <c>Name</c> and <c>HitsPercent</c> fields. A no-op if no handler
-        /// has been registered. Routed through the same watchdog protection
-        /// as <see cref="Eval"/> so a runaway handler is just as bounded as
-        /// a runaway top-level script.
+        /// supplied group members as a 1-based Lua array of tables built by
+        /// <see cref="BuildCharacterTable"/> (every CharacterStatus field).
+        /// A no-op if no handler has been registered. Routed through the
+        /// same watchdog protection as <see cref="Eval"/> so a runaway
+        /// handler is just as bounded as a runaway top-level script.
         /// </summary>
         public void RaiseGroupStateChanged(List<CharacterStatus> group)
         {
@@ -231,13 +231,10 @@ namespace Adan.Client.Common.Scripting
                 return;
             }
 
-            var groupTable = (LuaTable)_lua.DoString("return {}")[0];
+            var groupTable = NewLuaTable();
             for (var i = 0; i < group.Count; i++)
             {
-                var memberTable = (LuaTable)_lua.DoString("return {}")[0];
-                memberTable["Name"] = group[i].Name;
-                memberTable["HitsPercent"] = group[i].HitsPercent;
-                groupTable[i + 1] = memberTable;
+                groupTable[i + 1] = BuildCharacterTable(group[i]);
             }
 
             RunProtected(() => function.Call(groupTable));
@@ -246,11 +243,12 @@ namespace Adan.Client.Common.Scripting
         /// <summary>
         /// Invokes the registered room-state handler (see
         /// <see cref="RegisterRoomStateHandler"/>), if any, passing the
-        /// supplied monsters as a 1-based Lua array of tables exposing
-        /// <c>Name</c> and <c>HitsPercent</c> fields. A no-op if no handler
-        /// has been registered. Routed through the same watchdog protection
-        /// as <see cref="Eval"/> so a runaway handler is just as bounded as
-        /// a runaway top-level script.
+        /// supplied monsters as a 1-based Lua array of tables built by
+        /// <see cref="BuildCharacterTable"/> (every CharacterStatus field,
+        /// plus MonsterStatus's own IsPlayerCharacter/IsBoss). A no-op if no
+        /// handler has been registered. Routed through the same watchdog
+        /// protection as <see cref="Eval"/> so a runaway handler is just as
+        /// bounded as a runaway top-level script.
         /// </summary>
         public void RaiseRoomStateChanged(List<MonsterStatus> monsters)
         {
@@ -270,16 +268,64 @@ namespace Adan.Client.Common.Scripting
                 return;
             }
 
-            var monstersTable = (LuaTable)_lua.DoString("return {}")[0];
+            var monstersTable = NewLuaTable();
             for (var i = 0; i < monsters.Count; i++)
             {
-                var monsterTable = (LuaTable)_lua.DoString("return {}")[0];
-                monsterTable["Name"] = monsters[i].Name;
-                monsterTable["HitsPercent"] = monsters[i].HitsPercent;
+                var monsterTable = BuildCharacterTable(monsters[i]);
+                monsterTable["IsPlayerCharacter"] = monsters[i].IsPlayerCharacter;
+                monsterTable["IsBoss"] = monsters[i].IsBoss;
                 monstersTable[i + 1] = monsterTable;
             }
 
             RunProtected(() => function.Call(monstersTable));
+        }
+
+        /// <summary>
+        /// Creates a fresh, empty Lua table. NLua has no direct "new table"
+        /// API on <see cref="NLua.Lua"/> other than running a chunk that
+        /// returns one.
+        /// </summary>
+        private LuaTable NewLuaTable()
+        {
+            return (LuaTable)_lua.DoString("return {}")[0];
+        }
+
+        /// <summary>
+        /// Builds a Lua table exposing every <see cref="CharacterStatus"/>
+        /// field -- shared by <see cref="RaiseGroupStateChanged"/> (group
+        /// members, plain CharacterStatus) and
+        /// <see cref="RaiseRoomStateChanged"/> (monsters, which add their
+        /// own IsPlayerCharacter/IsBoss on top of this). <c>Position</c> is
+        /// exposed as its string name (e.g. "Standing"), not a raw enum
+        /// int, since Lua has no enum type. <c>Affects</c> is a nested
+        /// 1-based array of tables with Name/Duration/Rounds.
+        /// </summary>
+        private LuaTable BuildCharacterTable(CharacterStatus character)
+        {
+            var table = NewLuaTable();
+            table["Name"] = character.Name;
+            table["TargetName"] = character.TargetName;
+            table["Position"] = character.Position.ToString();
+            table["InSameRoom"] = character.InSameRoom;
+            table["IsAttacked"] = character.IsAttacked;
+            table["HitsPercent"] = character.HitsPercent;
+            table["MovesPercent"] = character.MovesPercent;
+            table["MemTime"] = character.MemTime;
+            table["WaitState"] = character.WaitState;
+
+            var affectsTable = NewLuaTable();
+            for (var i = 0; i < character.Affects.Count; i++)
+            {
+                var affectTable = NewLuaTable();
+                affectTable["Name"] = character.Affects[i].Name;
+                affectTable["Duration"] = character.Affects[i].Duration;
+                affectTable["Rounds"] = character.Affects[i].Rounds;
+                affectsTable[i + 1] = affectTable;
+            }
+
+            table["Affects"] = affectsTable;
+
+            return table;
         }
 
         /// <summary>

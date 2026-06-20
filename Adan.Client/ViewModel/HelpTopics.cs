@@ -18,18 +18,35 @@ namespace Adan.Client.ViewModel
                 "данные поступают напрямую из структурированного пакета сервера."),
 
             new HelpTopic(
+                "Поля group[i] / monsters[i]",
+                "Каждая запись в group/monsters — это таблица со ВСЕМИ полями CharacterStatus:\n\n" +
+                "  Name (строка) — имя\n" +
+                "  TargetName (строка) — имя для команды атаки/обращения\n" +
+                "  Position (строка) — поза: Dying, Sleeping, Resting, Sitting, Fighting, Standing, Riding\n" +
+                "  InSameRoom (true/false) — в той же комнате, что и вы\n" +
+                "  IsAttacked (true/false) — атакован кем-то прямо сейчас\n" +
+                "  HitsPercent (число, 0-100) — процент HP\n" +
+                "  MovesPercent (число, 0-100) — процент выносливости\n" +
+                "  MemTime (число) — оставшееся время memtime, -1 если нет\n" +
+                "  WaitState (число) — оставшийся wait, -1 если нет\n" +
+                "  Affects (таблица, индекс с 1) — список баффов/дебаффов, каждый: " +
+                "{ Name (строка), Duration (число, -1 = бессрочно), Rounds (число) }\n\n" +
+                "monsters[i] дополнительно содержит:\n" +
+                "  IsPlayerCharacter (true/false) — игрок, а не моб\n" +
+                "  IsBoss (true/false) — босс"),
+
+            new HelpTopic(
                 "События: on_group_state(group)",
                 "Установите Handler = GroupState в диалоге Scripts и определите точно:\n\n" +
                 "function on_group_state(group)\n" +
                 "  for i = 1, #group do\n" +
                 "    local member = group[i]\n" +
-                "    -- member.Name, member.HitsPercent\n" +
+                "    -- member.Name, member.HitsPercent, member.Position,\n" +
+                "    -- member.Affects[1].Name, и т.д. — см. тему \"Поля group[i] / monsters[i]\"\n" +
                 "  end\n" +
                 "end\n\n" +
                 "Вызывается каждый раз, когда сервер отправляет пакет состояния группы (тип 12). " +
-                "group — это индексируемая с 1 таблица Lua; каждая запись в настоящее время предоставляет только " +
-                "Name (строка) и HitsPercent (число, 0-100). Дополнительные поля CharacterStatus " +
-                "(Position, IsAttacked, Affects и т.д.) пока не доступны."),
+                "group — это индексируемая с 1 таблица Lua."),
 
             new HelpTopic(
                 "События: on_room_state(monsters)",
@@ -37,12 +54,11 @@ namespace Adan.Client.ViewModel
                 "function on_room_state(monsters)\n" +
                 "  for i = 1, #monsters do\n" +
                 "    local m = monsters[i]\n" +
-                "    -- m.Name, m.HitsPercent\n" +
+                "    -- m.Name, m.HitsPercent, m.IsBoss, m.IsPlayerCharacter, и т.д.\n" +
                 "  end\n" +
                 "end\n\n" +
                 "Вызывается каждый раз, когда сервер отправляет пакет с монстрами комнаты (тип 13), " +
-                "примерно раз за боевой раунд. Те же ограничения по полям, что и для группы: только " +
-                "Name и HitsPercent пока."),
+                "примерно раз за боевой раунд."),
 
             new HelpTopic(
                 "События: on_room_change(roomId, zoneId)",
