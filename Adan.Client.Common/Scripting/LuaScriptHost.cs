@@ -330,14 +330,22 @@ namespace Adan.Client.Common.Scripting
 
         /// <summary>
         /// Invokes the registered room-change handler (see
-        /// <see cref="RegisterRoomChangeHandler"/>), if any, passing the
-        /// new room/zone id as two plain Lua numbers (no table needed --
-        /// unlike group/room-monster data, this packet carries only two
-        /// scalar ids, see CurrentRoomMessage). A no-op if no handler has
-        /// been registered. Routed through the same watchdog protection as
-        /// <see cref="Eval"/>.
+        /// <see cref="RegisterRoomChangeHandler"/>), if any, passing
+        /// roomId/zoneId (the only fields the server's CurrentRoomMessage
+        /// packet itself carries) as two plain Lua numbers, plus a third
+        /// table argument built from <paramref name="roomInfo"/> -- data
+        /// the CLIENT already has locally from its own loaded zone files
+        /// (name, description, coordinates, exits, user annotations), not
+        /// from the server packet. <paramref name="roomInfo"/> may be null
+        /// (room not present in the local map) -- the third argument is
+        /// then Lua nil, not an empty table, so scripts can tell "unmapped"
+        /// apart from "mapped but everything blank". Existing scripts
+        /// written as <c>function on_room_change(roomId, zoneId)</c> are
+        /// unaffected -- Lua ignores extra arguments a function doesn't
+        /// declare. A no-op if no handler has been registered. Routed
+        /// through the same watchdog protection as <see cref="Eval"/>.
         /// </summary>
-        public void RaiseRoomChanged(int roomId, int zoneId)
+        public void RaiseRoomChanged(int roomId, int zoneId, RoomInfo roomInfo)
         {
             if (string.IsNullOrEmpty(_roomChangeHandlerName))
             {
@@ -350,7 +358,36 @@ namespace Adan.Client.Common.Scripting
                 return;
             }
 
-            RunProtected(() => function.Call((double)roomId, (double)zoneId));
+            object roomTable = null;
+            if (roomInfo != null)
+            {
+                var table = NewLuaTable();
+                table["ZoneName"] = roomInfo.ZoneName;
+                table["Name"] = roomInfo.Name;
+                table["Description"] = roomInfo.Description;
+                table["X"] = roomInfo.X;
+                table["Y"] = roomInfo.Y;
+                table["Z"] = roomInfo.Z;
+                table["Alias"] = roomInfo.Alias;
+                table["Comments"] = roomInfo.Comments;
+                table["HasBeenVisited"] = roomInfo.HasBeenVisited;
+                table["HasHerb"] = roomInfo.HasHerb;
+                table["HerbDangerLevel"] = roomInfo.HerbDangerLevel;
+
+                var exitsTable = NewLuaTable();
+                for (var i = 0; i < roomInfo.Exits.Count; i++)
+                {
+                    var exitTable = NewLuaTable();
+                    exitTable["Direction"] = roomInfo.Exits[i].Direction;
+                    exitTable["RoomId"] = roomInfo.Exits[i].RoomId;
+                    exitsTable[i + 1] = exitTable;
+                }
+
+                table["Exits"] = exitsTable;
+                roomTable = table;
+            }
+
+            RunProtected(() => function.Call((double)roomId, (double)zoneId, roomTable));
         }
 
         /// <summary>

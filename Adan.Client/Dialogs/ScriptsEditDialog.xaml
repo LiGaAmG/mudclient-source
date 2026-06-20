@@ -46,7 +46,7 @@
                 </ComboBox>
             </StackPanel>
             <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,5" Foreground="#FF999999"
-                       Text="GroupState scripts must define on_group_state(group). RoomState scripts must define on_room_state(monsters). RoomChange scripts must define on_room_change(roomId, zoneId). See Help for the full API." />
+                       Text="GroupState scripts must define on_group_state(group). RoomState scripts must define on_room_state(monsters). RoomChange scripts must define on_room_change(roomId, zoneId, room). See Help for the full API." />
             <Border Grid.Row="3" BorderBrush="#FF555555" BorderThickness="1" CornerRadius="3" Background="#FF1E1E1E">
                 <Controls:LuaCodeEditor Code="{Binding Path=Code, UpdateSourceTrigger=PropertyChanged}"
                          FontFamily="Consolas" FontSize="13"

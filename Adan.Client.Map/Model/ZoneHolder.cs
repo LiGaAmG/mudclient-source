@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Linq;
 using Adan.Client.Common.Model;
+using Adan.Client.Common.Scripting;
 using Adan.Client.Map.Messages;
+using Adan.Client.Map.ViewModel;
 using CSLib.Net.Annotations;
 
 namespace Adan.Client.Map.Model
@@ -82,12 +85,14 @@ namespace Adan.Client.Map.Model
 
                     RoomId = mapMessage.RoomId;
                     ZoneId = mapMessage.ZoneId;
-                    RootModel.ScriptHost.RaiseRoomChanged(RoomId, ZoneId);
 
                     // Update RootModel so other plugins (e.g. lore) can read current zone
-                    var zoneName = _zoneManager.GetZoneName(mapMessage.ZoneId);
+                    var zoneViewModel = _zoneManager.GetZone(ZoneId);
+                    var zoneName = zoneViewModel?.Name ?? string.Empty;
                     if (!string.IsNullOrEmpty(zoneName))
                         RootModel.CurrentZoneName = zoneName;
+
+                    RootModel.ScriptHost.RaiseRoomChanged(RoomId, ZoneId, BuildRoomInfo(zoneViewModel, zoneName));
 
                     _zoneManager.ExecuteRoomAction(this);
                     _zoneManager.UpdateControl(this);
@@ -99,6 +104,45 @@ namespace Adan.Client.Map.Model
                             Uid != null && Uid.Length > 8 ? Uid.Substring(0, 8) : Uid));
                 }
             }
+        }
+
+        /// <summary>
+        /// Builds the local-map snapshot passed to Lua's on_room_change
+        /// (see <see cref="Scripting.LuaScriptHost.RaiseRoomChanged"/>).
+        /// Returns null if the room isn't in the locally loaded zone data
+        /// (e.g. an unmapped/uncharted room) -- that's a normal, expected
+        /// case, not an error.
+        /// </summary>
+        private RoomInfo BuildRoomInfo(ZoneViewModel zoneViewModel, string zoneName)
+        {
+            var roomViewModel = zoneViewModel?.AllRooms.FirstOrDefault(r => r.RoomId == RoomId);
+            if (roomViewModel == null)
+            {
+                return null;
+            }
+
+            var room = roomViewModel.Room;
+            var info = new RoomInfo
+            {
+                ZoneName = zoneName,
+                Name = room.Name,
+                Description = room.Description,
+                X = room.XLocation,
+                Y = room.YLocation,
+                Z = room.ZLocation,
+                Alias = roomViewModel.AdditionalRoomParameters.RoomAlias,
+                Comments = roomViewModel.AdditionalRoomParameters.Comments,
+                HasBeenVisited = roomViewModel.AdditionalRoomParameters.HasBeenVisited,
+                HasHerb = roomViewModel.AdditionalRoomParameters.HasHerb,
+                HerbDangerLevel = roomViewModel.AdditionalRoomParameters.HerbDangerLevel.ToString(),
+            };
+
+            foreach (var exit in room.Exits)
+            {
+                info.Exits.Add(new RoomExitInfo { Direction = exit.Direction.ToString(), RoomId = exit.RoomId });
+            }
+
+            return info;
         }
     }
 }

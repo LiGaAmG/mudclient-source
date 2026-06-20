@@ -212,6 +212,83 @@ namespace Adan.Client.Common.Tests.Scripting
         }
 
         [Test]
+        public void RaiseRoomChanged_WithRoomInfo_ExposesLocalMapData()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.LoadScript(@"
+                    function on_room_change(roomId, zoneId, room)
+                        last_room_id = roomId
+                        last_zone_name = room.ZoneName
+                        last_room_name = room.Name
+                        last_alias = room.Alias
+                        last_has_herb = room.HasHerb
+                        last_exit_dir = room.Exits[1].Direction
+                        last_exit_room = room.Exits[1].RoomId
+                    end
+                ");
+                host.RegisterRoomChangeHandler("on_room_change");
+
+                var roomInfo = new RoomInfo
+                {
+                    ZoneName = "Минас-Тирит",
+                    Name = "Дерево",
+                    Alias = "домашняя клетка",
+                    HasHerb = true,
+                };
+                roomInfo.Exits.Add(new RoomExitInfo { Direction = "North", RoomId = 42 });
+
+                host.RaiseRoomChanged(1842, 12, roomInfo);
+
+                Assert.That(host.Eval("return last_room_id"), Is.EqualTo(1842));
+                Assert.That(host.Eval("return last_zone_name"), Is.EqualTo("Минас-Тирит"));
+                Assert.That(host.Eval("return last_room_name"), Is.EqualTo("Дерево"));
+                Assert.That(host.Eval("return last_alias"), Is.EqualTo("домашняя клетка"));
+                Assert.That(host.Eval("return last_has_herb"), Is.EqualTo(true));
+                Assert.That(host.Eval("return last_exit_dir"), Is.EqualTo("North"));
+                Assert.That(host.Eval("return last_exit_room"), Is.EqualTo(42));
+            }
+        }
+
+        [Test]
+        public void RaiseRoomChanged_NullRoomInfo_PassesNilForRoomTable()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.LoadScript(@"
+                    function on_room_change(roomId, zoneId, room)
+                        last_room_is_nil = (room == nil)
+                    end
+                ");
+                host.RegisterRoomChangeHandler("on_room_change");
+
+                Assert.DoesNotThrow(() => host.RaiseRoomChanged(1842, 12, null));
+                Assert.That(host.Eval("return last_room_is_nil"), Is.EqualTo(true));
+            }
+        }
+
+        [Test]
+        public void RaiseRoomChanged_OldTwoArgFunction_StillWorks()
+        {
+            // Scripts written before this change as
+            // function on_room_change(roomId, zoneId) must keep working --
+            // Lua silently ignores the extra third argument.
+            using (var host = new LuaScriptHost())
+            {
+                host.LoadScript(@"
+                    function on_room_change(roomId, zoneId)
+                        last_sum = roomId + zoneId
+                    end
+                ");
+                host.RegisterRoomChangeHandler("on_room_change");
+
+                host.RaiseRoomChanged(100, 23, new RoomInfo());
+
+                Assert.That(host.Eval("return last_sum"), Is.EqualTo(123));
+            }
+        }
+
+        [Test]
         public void RaiseGroupStateChanged_NoHandlerRegistered_DoesNothing()
         {
             using (var host = new LuaScriptHost())
