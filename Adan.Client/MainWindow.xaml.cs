@@ -426,6 +426,7 @@ namespace Adan.Client
             actionDescriptions.Add(new SendToWindowActionDescription(actionDescriptions));
             actionDescriptions.Add(new ToggleFullScreenModeActionDescription(actionDescriptions));
             actionDescriptions.Add(new StatusActionDescription(parameterDescriptions, actionDescriptions));
+            actionDescriptions.Add(new LuaScriptActionDescription(actionDescriptions));
 
             parameterDescriptions.Add(new TriggerOrCommandParameterDescription(parameterDescriptions));
             parameterDescriptions.Add(new VariableReferenceParameterDescription(parameterDescriptions));

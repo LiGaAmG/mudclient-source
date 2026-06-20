@@ -241,6 +241,7 @@
     <Compile Include="Messages\StopLoggingMessage.cs" />
     <Compile Include="Messages\ToggleFullScreenModeMessage.cs" />
     <Compile Include="Model\ActionDescriptions\ClearVariableValueActionDescription.cs" />
+    <Compile Include="Model\ActionDescriptions\LuaScriptActionDescription.cs" />
     <Compile Include="Model\ActionDescriptions\ConditionalActionDescription.cs" />
     <Compile Include="Model\ActionDescriptions\DisableGroupActionDescription.cs" />
     <Compile Include="Model\ActionDescriptions\EnableGroupActionDescription.cs" />
@@ -261,6 +262,7 @@
     <Compile Include="Model\ActionParameters\TriggerOrCommandParameter.cs" />
     <Compile Include="Model\ActionParameters\VariableReferenceParameter.cs" />
     <Compile Include="Model\Actions\ClearVariableValueAction.cs" />
+    <Compile Include="Model\Actions\LuaScriptAction.cs" />
     <Compile Include="Model\Actions\ConditionalAction.cs" />
     <Compile Include="Model\Actions\DisableGroupAction.cs" />
     <Compile Include="Model\Actions\EnableGroupAction.cs" />
@@ -301,6 +303,7 @@
     <Compile Include="ViewModel\Actions\ShowOutputWindowActionViewModel.cs" />
     <Compile Include="ViewModel\Actions\StartLogActionViewModel.cs" />
     <Compile Include="ViewModel\Actions\ClearVariableValueActionViewModel.cs" />
+    <Compile Include="ViewModel\Actions\LuaScriptActionViewModel.cs" />
     <Compile Include="ViewModel\Actions\StatusActionViewModel.cs" />
     <Compile Include="ViewModel\Actions\StopLogActionViewModel.cs" />
     <Compile Include="ViewModel\AliasesViewModel.cs" />
