@@ -68,6 +68,38 @@
             _scriptHost = new Scripting.LuaScriptHost(
                 command => conveyor.PushCommand(new Commands.TextCommand(command)));
 
+            foreach (var script in profile.Scripts)
+            {
+                if (!script.IsEnabled)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    _scriptHost.LoadScript(script.Code);
+
+                    if (script.HandlerKind == ScriptHandlerKind.GroupState)
+                    {
+                        _scriptHost.RegisterGroupStateHandler("on_group_state");
+                    }
+                    else if (script.HandlerKind == ScriptHandlerKind.RoomState)
+                    {
+                        _scriptHost.RegisterRoomStateHandler("on_room_state");
+                    }
+                }
+                catch (Exception)
+                {
+                    // A broken script must not prevent the tab from opening --
+                    // LoadScript already routes through the watchdog-protected
+                    // RunProtected, so this only catches genuine syntax/runtime
+                    // errors (LuaScriptTimeoutException or NLua.Exceptions.LuaScriptException),
+                    // not a hang. The user finds out their script is broken when they
+                    // notice its handler never fires, not via a crashed tab. (A
+                    // follow-up plan covers surfacing this error in the UI.)
+                }
+            }
+
             GroupStatus = new List<CharacterStatus>();
             RoomMonstersStatus = new List<MonsterStatus>();
 
