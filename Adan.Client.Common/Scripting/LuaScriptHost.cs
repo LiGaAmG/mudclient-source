@@ -26,6 +26,10 @@ namespace Adan.Client.Common.Scripting
         /// production script entry points are the RegisterXxxHandler methods
         /// added in later tasks.
         /// </summary>
+        /// <exception cref="NLua.Exceptions.LuaScriptException">
+        /// Thrown when <paramref name="luaExpression"/> has invalid syntax or
+        /// raises a runtime error during execution.
+        /// </exception>
         public object Eval(string luaExpression)
         {
             var results = _lua.DoString(luaExpression);

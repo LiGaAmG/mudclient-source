@@ -35,5 +35,44 @@ namespace Adan.Client.Common.Tests.Scripting
                 Assert.That(result, Is.EqualTo("OK3"));
             }
         }
+
+        [Test]
+        public void SandboxedState_HasNoLoad()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                var result = host.Eval("return load == nil");
+                Assert.That(result, Is.EqualTo(true));
+            }
+        }
+
+        [Test]
+        public void SandboxedState_HasNoSetMetatable()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                var result = host.Eval("return setmetatable == nil");
+                Assert.That(result, Is.EqualTo(true));
+            }
+        }
+
+        [Test]
+        public void SandboxedState_HasNoGetMetatable()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                var result = host.Eval("return getmetatable == nil");
+                Assert.That(result, Is.EqualTo(true));
+            }
+        }
+
+        [Test]
+        public void Eval_InvalidSyntax_ThrowsLuaException()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.Throws<NLua.Exceptions.LuaScriptException>(() => host.Eval("this is not valid lua ((("));
+            }
+        }
     }
 }
