@@ -21,6 +21,7 @@ namespace Adan.Client.Common.Settings
 
         private List<Group> _groups;
         private List<Variable> _variables;
+        private List<ScriptDefinition> _scripts;
         private string _name;
         private List<string> _commandsHistory;
 
@@ -108,6 +109,21 @@ namespace Adan.Client.Common.Settings
         }
 
         /// <summary>
+        /// Gets or sets the global Lua scripts (not tied to any trigger/alias).
+        /// </summary>
+        [NotNull]
+        public List<ScriptDefinition> Scripts
+        {
+            get
+            {
+                if (_scripts == null)
+                    ReadScripts();
+                return _scripts;
+            }
+            set { _scripts = value; }
+        }
+
+        /// <summary>
         /// Profile name.
         /// </summary>
         [NotNull]
@@ -143,6 +159,7 @@ namespace Adan.Client.Common.Settings
         {
             SaveGroups();
             SaveVariables();
+            SaveScripts();
             SaveCommonSettings();
             SaveCommandHistory();
         }
@@ -346,6 +363,63 @@ namespace Adan.Client.Common.Settings
                 catch (Exception ex)
                 {
                     ErrorLogger.Instance.Write(string.Format("Error save variables: {0}\r\n{1}", ex.Message, ex.StackTrace));
+
+                    if (ErrorOccurred != null)
+                        ErrorOccurred(this, new SettingsErrorEventArgs("#Ошибка при сохранении " + fileFullPath + ": " + ex.Message + "."));
+                }
+            }
+        }
+
+        private void ReadScripts()
+        {
+            var scriptsFileFullPath = Path.Combine(GetProfileSettingsFolder(), "Scripts.xml");
+            if (!File.Exists(scriptsFileFullPath))
+            {
+                Scripts = new List<ScriptDefinition>();
+                return;
+            }
+
+            using (var stream = File.OpenRead(scriptsFileFullPath))
+            {
+                try
+                {
+                    var serializer = new XmlSerializer(typeof(List<ScriptDefinition>));
+                    Scripts = (List<ScriptDefinition>)serializer.Deserialize(stream);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.Instance.Write(string.Format("Error read scripts: {0}\r\n{1}", ex.Message, ex.StackTrace));
+                    MessageBox.Show(
+                        "Произошла ошибка при загрузке " + scriptsFileFullPath + ": " + ex.Message + ". Скрипты обнулены.",
+                        "Ошибка",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    Scripts = new List<ScriptDefinition>();
+                }
+            }
+        }
+
+        private void SaveScripts()
+        {
+            if (!Directory.Exists(GetProfileSettingsFolder()))
+            {
+                Directory.CreateDirectory(GetProfileSettingsFolder());
+            }
+
+            var fileFullPath = Path.Combine(GetProfileSettingsFolder(), "Scripts.xml");
+            using (var stream = File.Open(fileFullPath, FileMode.Create, FileAccess.Write))
+            using (var streamWriter = new XmlTextWriter(stream, Encoding.UTF8))
+            {
+                streamWriter.Formatting = Formatting.Indented;
+
+                try
+                {
+                    var serializer = new XmlSerializer(typeof(List<ScriptDefinition>));
+                    serializer.Serialize(streamWriter, Scripts);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.Instance.Write(string.Format("Error save scripts: {0}\r\n{1}", ex.Message, ex.StackTrace));
 
                     if (ErrorOccurred != null)
                         ErrorOccurred(this, new SettingsErrorEventArgs("#Ошибка при сохранении " + fileFullPath + ": " + ex.Message + "."));
