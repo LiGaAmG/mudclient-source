@@ -4,7 +4,6 @@ namespace Adan.Client.Dialogs
     using System.ComponentModel;
     using System.Linq;
     using System.Windows;
-    using System.Windows.Data;
 
     using ViewModel;
 
@@ -12,14 +11,15 @@ namespace Adan.Client.Dialogs
     {
         private string _searchText = string.Empty;
         private HelpTopic _selectedTopic;
-        private ListCollectionView _groupedTopics;
+        private HelpListEntry _selectedEntry;
+        private List<HelpListEntry> _entries;
 
         public HelpWindow()
         {
             InitializeComponent();
             DataContext = this;
-            RebuildGroupedTopics();
-            SelectedTopic = HelpTopics.All.FirstOrDefault();
+            RebuildEntries();
+            SelectedEntry = _entries.FirstOrDefault(e => !e.IsHeader);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -31,27 +31,41 @@ namespace Adan.Client.Dialogs
             {
                 _searchText = value;
                 OnPropertyChanged("SearchText");
-                RebuildGroupedTopics();
-                OnPropertyChanged("GroupedTopics");
+                RebuildEntries();
+                OnPropertyChanged("Entries");
             }
         }
 
-        public ICollectionView GroupedTopics
+        public List<HelpListEntry> Entries
         {
-            get { return _groupedTopics; }
+            get { return _entries; }
+        }
+
+        public HelpListEntry SelectedEntry
+        {
+            get { return _selectedEntry; }
+            set
+            {
+                _selectedEntry = value;
+                OnPropertyChanged("SelectedEntry");
+                if (value != null && !value.IsHeader)
+                {
+                    SelectedTopic = value.Topic;
+                }
+            }
         }
 
         public HelpTopic SelectedTopic
         {
             get { return _selectedTopic; }
-            set
+            private set
             {
                 _selectedTopic = value;
                 OnPropertyChanged("SelectedTopic");
             }
         }
 
-        private void RebuildGroupedTopics()
+        private void RebuildEntries()
         {
             IEnumerable<HelpTopic> source = HelpTopics.All;
             if (!string.IsNullOrWhiteSpace(SearchText))
@@ -60,8 +74,20 @@ namespace Adan.Client.Dialogs
                     t.SearchableText.IndexOf(SearchText, System.StringComparison.OrdinalIgnoreCase) >= 0);
             }
 
-            _groupedTopics = new ListCollectionView(source.ToList());
-            _groupedTopics.GroupDescriptions.Add(new PropertyGroupDescription("Category"));
+            var entries = new List<HelpListEntry>();
+            string lastCategory = null;
+            foreach (var topic in source)
+            {
+                if (topic.Category != lastCategory)
+                {
+                    entries.Add(HelpListEntry.ForHeader(topic.Category));
+                    lastCategory = topic.Category;
+                }
+
+                entries.Add(HelpListEntry.ForTopic(topic));
+            }
+
+            _entries = entries;
         }
 
         private void OnPropertyChanged(string propertyName)
