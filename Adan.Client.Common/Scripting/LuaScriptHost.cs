@@ -1,6 +1,8 @@
 namespace Adan.Client.Common.Scripting
 {
     using System;
+    using System.Collections.Generic;
+    using Adan.Client.Common.Model;
     using KeraLua;
     using NLua;
 
@@ -41,8 +43,19 @@ namespace Adan.Client.Common.Scripting
         // rather than just the innermost protected frame.
         private bool _timeoutRequested;
 
+        private readonly Action<string> _sendCommand;
+        private string _groupStateHandlerName;
+        private string _roomStateHandlerName;
+
         public LuaScriptHost()
+            : this(null)
         {
+        }
+
+        public LuaScriptHost(Action<string> sendCommand)
+        {
+            _sendCommand = sendCommand ?? (_ => { });
+
             _lua = CreateSandboxedState();
 
             // Exposed to the sandbox's pcall/xpcall guard shim (see
@@ -50,6 +63,13 @@ namespace Adan.Client.Common.Scripting
             // detect a watchdog trip and re-raise instead of swallowing it.
             _lua.RegisterFunction("__watchdog_timeout", this, GetType().GetMethod(nameof(IsTimeoutRequested)));
             InstallPcallGuard();
+
+            // Registered AFTER CreateSandboxedState's allowlist sweep has
+            // already run (the sweep only happens once, inside
+            // CreateSandboxedState, before this point), so "SendCommand"
+            // is added back in as a global that survives -- the sweep
+            // never runs again to strip it.
+            _lua.RegisterFunction("SendCommand", this, GetType().GetMethod(nameof(SendCommandFromLua)));
 
             // Keep a reference to the delegate for the lifetime of the host:
             // KeraLua's SetHook stores a native callback pointer derived from
@@ -123,6 +143,121 @@ namespace Adan.Client.Common.Scripting
         public object Eval(string luaExpression)
         {
             return RunProtected(() => _lua.DoString(luaExpression));
+        }
+
+        /// <summary>
+        /// Compiles and runs top-level Lua source (e.g. function definitions)
+        /// into this host's persistent state, so the defined functions are
+        /// available for later calls such as the RegisterXxxHandler /
+        /// RaiseXxxChanged methods below. Routed through the same watchdog
+        /// protection as <see cref="Eval"/>.
+        /// </summary>
+        public void LoadScript(string luaSource)
+        {
+            RunProtected(() => _lua.DoString(luaSource));
+        }
+
+        /// <summary>
+        /// Exposed to Lua as the global function <c>SendCommand</c>.
+        /// Invokes the delegate supplied to the
+        /// <see cref="LuaScriptHost(Action{string})"/> constructor, or a
+        /// no-op if the host was constructed with the parameterless
+        /// constructor (e.g. design-time/empty RootModel instances with no
+        /// live network connection).
+        /// </summary>
+        public void SendCommandFromLua(string command)
+        {
+            _sendCommand(command);
+        }
+
+        /// <summary>
+        /// Registers the name of a Lua function (already defined in this
+        /// host's state, e.g. via <see cref="LoadScript"/>) to be invoked by
+        /// <see cref="RaiseGroupStateChanged"/> whenever the player's group
+        /// state changes.
+        /// </summary>
+        public void RegisterGroupStateHandler(string luaFunctionName)
+        {
+            _groupStateHandlerName = luaFunctionName;
+        }
+
+        /// <summary>
+        /// Registers the name of a Lua function (already defined in this
+        /// host's state, e.g. via <see cref="LoadScript"/>) to be invoked by
+        /// <see cref="RaiseRoomStateChanged"/> whenever the contents of the
+        /// player's current room change.
+        /// </summary>
+        public void RegisterRoomStateHandler(string luaFunctionName)
+        {
+            _roomStateHandlerName = luaFunctionName;
+        }
+
+        /// <summary>
+        /// Invokes the registered group-state handler (see
+        /// <see cref="RegisterGroupStateHandler"/>), if any, passing the
+        /// supplied group members as a 1-based Lua array of tables exposing
+        /// <c>Name</c> and <c>HitsPercent</c> fields. A no-op if no handler
+        /// has been registered. Routed through the same watchdog protection
+        /// as <see cref="Eval"/> so a runaway handler is just as bounded as
+        /// a runaway top-level script.
+        /// </summary>
+        public void RaiseGroupStateChanged(List<CharacterStatus> group)
+        {
+            if (string.IsNullOrEmpty(_groupStateHandlerName))
+            {
+                return;
+            }
+
+            var function = _lua.GetFunction(_groupStateHandlerName);
+            if (function == null)
+            {
+                return;
+            }
+
+            var groupTable = (LuaTable)_lua.DoString("return {}")[0];
+            for (var i = 0; i < group.Count; i++)
+            {
+                var memberTable = (LuaTable)_lua.DoString("return {}")[0];
+                memberTable["Name"] = group[i].Name;
+                memberTable["HitsPercent"] = group[i].HitsPercent;
+                groupTable[i + 1] = memberTable;
+            }
+
+            RunProtected(() => function.Call(groupTable));
+        }
+
+        /// <summary>
+        /// Invokes the registered room-state handler (see
+        /// <see cref="RegisterRoomStateHandler"/>), if any, passing the
+        /// supplied monsters as a 1-based Lua array of tables exposing
+        /// <c>Name</c> and <c>HitsPercent</c> fields. A no-op if no handler
+        /// has been registered. Routed through the same watchdog protection
+        /// as <see cref="Eval"/> so a runaway handler is just as bounded as
+        /// a runaway top-level script.
+        /// </summary>
+        public void RaiseRoomStateChanged(List<MonsterStatus> monsters)
+        {
+            if (string.IsNullOrEmpty(_roomStateHandlerName))
+            {
+                return;
+            }
+
+            var function = _lua.GetFunction(_roomStateHandlerName);
+            if (function == null)
+            {
+                return;
+            }
+
+            var monstersTable = (LuaTable)_lua.DoString("return {}")[0];
+            for (var i = 0; i < monsters.Count; i++)
+            {
+                var monsterTable = (LuaTable)_lua.DoString("return {}")[0];
+                monsterTable["Name"] = monsters[i].Name;
+                monsterTable["HitsPercent"] = monsters[i].HitsPercent;
+                monstersTable[i + 1] = monsterTable;
+            }
+
+            RunProtected(() => function.Call(monstersTable));
         }
 
         /// <summary>
