@@ -35,6 +35,7 @@
                 <Separator Visibility="Collapsed" Name="_optionsSeparator"/>
                 <MenuItem Header="Global profile" Click="HandleGlobalProfile"/>
                 <MenuItem Header="Profiles" Click="HandleEditProfiles"/>
+                <MenuItem Header="Scripts (active tab)" Click="HandleActiveTabScripts"/>
                 <Separator />
                 <MenuItem Header="Options" Click="HandleEditOptions"/>
                 <Separator Visibility="Collapsed" />

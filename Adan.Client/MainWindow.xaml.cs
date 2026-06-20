@@ -1014,6 +1014,59 @@ namespace Adan.Client
             var aboutDialog = new AboutDialog() { Owner = this, }.ShowDialog();
         }
 
+        /// <summary>
+        /// Opens the Scripts dialog directly for the currently active
+        /// tab's profile, skipping the Options -> Profiles -> Edit ->
+        /// Scripts navigation. Unlike that path (which edits a CLONE of
+        /// the profile, see ProfileOptionsViewModel.EditProfile), this
+        /// uses the active tab's RootModel.Profile directly -- it's
+        /// already the live, SettingsHolder-tracked instance, so no
+        /// clone/write-back juggling is needed here.
+        /// </summary>
+        private void HandleActiveTabScripts([NotNull] object sender, [NotNull] RoutedEventArgs e)
+        {
+            Assert.ArgumentNotNull(sender, "sender");
+            Assert.ArgumentNotNull(e, "e");
+
+            var activeContent = _dockManager.ActiveContent as MainOutputWindow;
+            var rootModel = activeContent != null ? activeContent.RootModel : null;
+            if (rootModel == null || rootModel.Profile == null)
+            {
+                MessageBox.Show(
+                    "Select (or connect) a tab first -- Scripts are per-character.",
+                    "Scripts",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var profile = rootModel.Profile;
+            var scriptsEditDialog = new ScriptsEditDialog
+            {
+                DataContext = new ScriptsViewModel(profile.Scripts, rootModel.ScriptHost),
+                Owner = this
+            };
+
+            Action applyChanges = () =>
+            {
+                SettingsHolder.Instance.SetProfile(profile.Name);
+
+                // Other tabs (if any) on this same profile pick up the
+                // edit too, not just the one this dialog was opened from.
+                foreach (var openRootModel in _allRootModels)
+                {
+                    if (openRootModel.Profile != null && openRootModel.Profile.Name == profile.Name)
+                    {
+                        openRootModel.ReloadScripts();
+                    }
+                }
+            };
+
+            scriptsEditDialog.SaveRequested += (s, args) => applyChanges();
+            scriptsEditDialog.Closed += (s, args) => applyChanges();
+            scriptsEditDialog.Show();
+        }
+
         private void HandleConnect([NotNull] object sender, [NotNull] RoutedEventArgs e)
         {
             Assert.ArgumentNotNull(sender, "sender");
