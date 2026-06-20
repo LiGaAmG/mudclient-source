@@ -124,14 +124,23 @@ namespace Adan.Client.Map.Model
             var room = roomViewModel.Room;
             var info = new RoomInfo
             {
-                ZoneName = zoneName,
-                Name = room.Name,
-                Description = room.Description,
+                // AdditionalRoomParameters only defaults RoomAlias to ""
+                // in its constructor -- Comments has no such default and
+                // is plain null for any room that never had a comment set
+                // (confirmed in AdditionalRoomParameters.cs). A null here
+                // would reach Lua as nil instead of an empty string, and
+                // ".." (Lua string concat) throws on nil -- coerce every
+                // string field to "" so the Help-documented
+                // `if __last_room.Comments ~= "" then` pattern is actually
+                // safe to use, never crashes on an unset field.
+                ZoneName = zoneName ?? string.Empty,
+                Name = room.Name ?? string.Empty,
+                Description = room.Description ?? string.Empty,
                 X = room.XLocation,
                 Y = room.YLocation,
                 Z = room.ZLocation,
-                Alias = roomViewModel.AdditionalRoomParameters.RoomAlias,
-                Comments = roomViewModel.AdditionalRoomParameters.Comments,
+                Alias = roomViewModel.AdditionalRoomParameters.RoomAlias ?? string.Empty,
+                Comments = roomViewModel.AdditionalRoomParameters.Comments ?? string.Empty,
                 HasBeenVisited = roomViewModel.AdditionalRoomParameters.HasBeenVisited,
                 HasHerb = roomViewModel.AdditionalRoomParameters.HasHerb,
                 HerbDangerLevel = roomViewModel.AdditionalRoomParameters.HerbDangerLevel.ToString(),
