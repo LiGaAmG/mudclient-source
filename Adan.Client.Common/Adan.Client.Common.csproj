@@ -157,6 +157,8 @@
     <Compile Include="Model\PetStatus.cs" />
     <Compile Include="Model\Position.cs" />
     <Compile Include="Model\RootModel.cs" />
+    <Compile Include="Model\ScriptDefinition.cs" />
+    <Compile Include="Model\ScriptHandlerKind.cs" />
     <Compile Include="Model\Substitution.cs" />
     <Compile Include="Model\TextTrigger.cs" />
     <Compile Include="Model\Ticker.cs" />
