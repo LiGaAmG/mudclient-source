@@ -126,6 +126,10 @@ namespace Adan.Client.ViewModel
         /// Amount of triggers in the profile
         /// </summary>
         public int SubstitutionsCount { get { return _groupsViewModel.Groups.Sum(g => g.Substitutions.Count); } }
+        /// <summary>
+        /// Amount of global scripts in the profile
+        /// </summary>
+        public int ScriptsCount { get { return Profile.Scripts.Count; } }
 
         /// <summary>
         /// Can profile be imported or not
@@ -195,6 +199,19 @@ namespace Adan.Client.ViewModel
                         SettingsHolder.Instance.SetProfile(_groupsViewModel.Name);
                     };
                     hotKeysEditDialog.Show();
+                    break;
+                case "Scripts":
+                    var scriptsEditDialog = new ScriptsEditDialog
+                    {
+                        DataContext = new ScriptsViewModel(Profile.Scripts),
+                        Owner = owner
+                    };
+                    scriptsEditDialog.Closed += (s, e) =>
+                    {
+                        OnPropertyChanged("ScriptsCount");
+                        SettingsHolder.Instance.SetProfile(Profile.Name);
+                    };
+                    scriptsEditDialog.Show();
                     break;
                 case "Substitutions":
                     var substitutionsEditDialog = new SubstitutionsEditDialog

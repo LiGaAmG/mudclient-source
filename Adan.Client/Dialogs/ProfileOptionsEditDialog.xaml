@@ -51,6 +51,12 @@
                     <TextBlock Text="{Binding Path=HotkeysCount, StringFormat=' ({0})'}" />
                 </StackPanel>
             </ListBoxItem>
+            <ListBoxItem Tag="Scripts">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock>Scripts</TextBlock>
+                    <TextBlock Text="{Binding Path=ScriptsCount, StringFormat=' ({0})'}" />
+                </StackPanel>
+            </ListBoxItem>
             <ListBoxItem Tag="Substitutions">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock>Substitutions</TextBlock>
