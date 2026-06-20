@@ -87,12 +87,17 @@ namespace Adan.Client.Common.Controls
                 return;
             }
 
-            // Total character offset of the caret from the start of the
-            // document -- saved before the rebuild below replaces every
+            // Caret position saved before the rebuild below replaces every
             // Run/LineBreak (which would otherwise reset the caret to the
             // start), then used to put the caret back where the user was
-            // typing.
-            var caretOffset = new TextRange(Document.ContentStart, CaretPosition).Text.Length;
+            // typing. MUST use GetOffsetToPosition/GetPositionAtOffset on
+            // BOTH ends -- WPF's TextPointer "offset" is a "symbol count",
+            // not a plain character count, and once highlighting splits a
+            // line into many small Run elements (one per token) a plain
+            // character count (e.g. via TextRange.Text.Length) drifts from
+            // the symbol count, which is exactly what made the caret jump
+            // around while typing in longer/more-tokenized lines.
+            var caretOffset = Document.ContentStart.GetOffsetToPosition(CaretPosition);
 
             _isUpdatingFromDocument = true;
             try
