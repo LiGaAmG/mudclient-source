@@ -48,6 +48,15 @@ namespace Adan.Client.Common.Controls
         {
             AcceptsTab = true;
             TextChanged += HandleTextChanged;
+
+            // RichTextBox/FlowDocument wraps lines to the visible width by
+            // default, which breaks the column alignment of any
+            // fixed-width-formatted text (e.g. the tables in the help
+            // content). A fixed, generously wide PageWidth disables that
+            // reflow -- long lines instead overflow and scroll horizontally
+            // (callers should enable HorizontalScrollBarVisibility), which
+            // is also the behavior every plain-text code editor has.
+            Document.PageWidth = 4000;
         }
 
         public string Code
@@ -128,6 +137,16 @@ namespace Adan.Client.Common.Controls
             ApplyHighlighting();
 
             var restoredPosition = Document.ContentStart.GetPositionAtOffset(caretOffset);
+
+            // Briefly move the caret away before snapping it back to where
+            // the user was typing. WPF only merges this edit's undo unit
+            // with the previous one when the caret stays contiguous with
+            // the prior edit's end position; this discontinuity is what
+            // makes WPF start a fresh undo unit per keystroke instead of
+            // accumulating the whole editing session into a single unit
+            // (see ApplyHighlighting's comment for the other half of this
+            // fix -- both were needed to stop Ctrl+Z from wiping the script).
+            CaretPosition = Document.ContentStart;
             CaretPosition = restoredPosition ?? Document.ContentEnd;
         }
 
@@ -151,7 +170,28 @@ namespace Adan.Client.Common.Controls
             {
                 var text = GetPlainText();
 
-                var paragraph = new Paragraph { Margin = new Thickness(0) };
+                // Reuse the existing Paragraph object (just clear and refill
+                // its Inlines) instead of replacing Document.Blocks wholesale
+                // on every keystroke. Swapping the Block object itself made
+                // WPF's undo manager treat every highlighting pass as a
+                // brand-new "replace the whole document" edit with nothing
+                // distinguishing it from the previous pass, so consecutive
+                // keystrokes kept merging into one giant undo unit -- a
+                // single Ctrl+Z could wipe an entire script. Mutating the
+                // same Paragraph's Inlines keeps the edit scoped to content
+                // changes only, which WPF can merge/segment more sensibly.
+                var paragraph = Document.Blocks.FirstBlock as Paragraph;
+                if (paragraph == null)
+                {
+                    paragraph = new Paragraph { Margin = new Thickness(0) };
+                    Document.Blocks.Clear();
+                    Document.Blocks.Add(paragraph);
+                }
+                else
+                {
+                    paragraph.Inlines.Clear();
+                }
+
                 var lastIndex = 0;
 
                 foreach (Match match in TokenRegex.Matches(text))
@@ -187,9 +227,6 @@ namespace Adan.Client.Common.Controls
                 {
                     AddTextWithLineBreaks(paragraph.Inlines, text.Substring(lastIndex), DefaultBrush);
                 }
-
-                Document.Blocks.Clear();
-                Document.Blocks.Add(paragraph);
             }
             finally
             {

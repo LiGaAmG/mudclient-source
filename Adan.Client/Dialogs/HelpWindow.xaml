@@ -22,6 +22,8 @@
                 <commonControls:LuaCodeEditor Code="{Binding Path=Code, Mode=OneWay}"
                                                IsReadOnly="True" IsUndoEnabled="False"
                                                Focusable="True" IsTabStop="False"
+                                               HorizontalScrollBarVisibility="Auto"
+                                               VerticalScrollBarVisibility="Disabled"
                                                Background="#FF1E1E1E" BorderThickness="0"
                                                FontFamily="Consolas" FontSize="13" Padding="6" />
             </Border>
