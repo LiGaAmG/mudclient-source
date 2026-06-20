@@ -149,14 +149,22 @@
         <DataTemplate x:Key="ToggleFullScreenModeActionViewModelTemplate" DataType="ToggleFullScreenModeActionViewModel">
         </DataTemplate>
         <DataTemplate x:Key="LuaScriptActionViewModelTemplate" DataType="LuaScriptActionViewModel">
-            <StackPanel Margin="0,5,0,0">
-                <Label>Lua script:</Label>
-                <TextBox Text="{Binding Path=ScriptText, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True" AcceptsTab="True" TextWrapping="NoWrap"
-                         FontFamily="../Resources/consola.ttf#Consolas"
-                         MinHeight="100" MaxHeight="300"
-                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
-            </StackPanel>
+            <Border Margin="0,5,0,0" BorderBrush="#FF555555" BorderThickness="1" CornerRadius="3" Background="#FF1E1E1E">
+                <Grid Margin="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition />
+                    </Grid.RowDefinitions>
+                    <Label Grid.Row="0" Foreground="#FFAAAAAA" Padding="4,2,4,0">Lua script:</Label>
+                    <Controls:LuaCodeEditor Grid.Row="1"
+                             Code="{Binding Path=ScriptText, UpdateSourceTrigger=PropertyChanged}"
+                             FontFamily="Consolas" FontSize="13"
+                             Background="#FF1E1E1E" BorderThickness="0"
+                             CaretBrush="White" Padding="4"
+                             MinHeight="160" MaxHeight="400"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                </Grid>
+            </Border>
         </DataTemplate>
     </UserControl.Resources>
     <Grid>

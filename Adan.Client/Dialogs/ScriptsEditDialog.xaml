@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:Controls="clr-namespace:Adan.Client.Common.Controls;assembly=Adan.Client.Common"
         mc:Ignorable="d"
         Title="Scripts"
         Width="700" Height="500"
@@ -47,10 +48,9 @@
             <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,5" Foreground="#FF999999"
                        Text="GroupState scripts must define on_group_state(group). RoomState scripts must define on_room_state(monsters). RoomChange scripts must define on_room_change(roomId, zoneId). See Help for the full API." />
             <Border Grid.Row="3" BorderBrush="#FF555555" BorderThickness="1" CornerRadius="3" Background="#FF1E1E1E">
-                <TextBox Text="{Binding Path=Code, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True" AcceptsTab="True" TextWrapping="NoWrap"
+                <Controls:LuaCodeEditor Code="{Binding Path=Code, UpdateSourceTrigger=PropertyChanged}"
                          FontFamily="Consolas" FontSize="13"
-                         Background="#FF1E1E1E" Foreground="#FFD4D4D4" BorderThickness="0"
+                         Background="#FF1E1E1E" BorderThickness="0"
                          CaretBrush="White" Padding="4"
                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
             </Border>
