@@ -50,7 +50,8 @@
                   ItemsSource="{Binding Path=GroupedTopics}"
                   SelectedItem="{Binding Path=SelectedTopic}"
                   DisplayMemberPath="Title"
-                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  VirtualizingPanel.IsVirtualizing="False">
             <ListBox.GroupStyle>
                 <GroupStyle>
                     <GroupStyle.HeaderTemplate>
