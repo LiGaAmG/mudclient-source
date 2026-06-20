@@ -393,5 +393,28 @@ namespace Adan.Client.Common.Tests.Scripting
                 Assert.DoesNotThrow(() => host.RaiseRoomStateChanged(null));
             }
         }
+
+        [Test]
+        public void SandboxedState_HasRestrictedCoroutineTable()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.That(host.Eval("return type(coroutine) == 'table'"), Is.EqualTo(true));
+                Assert.That(host.Eval("return type(coroutine.create) == 'function'"), Is.EqualTo(true));
+                Assert.That(host.Eval("return type(coroutine.resume) == 'function'"), Is.EqualTo(true));
+                Assert.That(host.Eval("return type(coroutine.yield) == 'function'"), Is.EqualTo(true));
+                Assert.That(host.Eval("return type(coroutine.status) == 'function'"), Is.EqualTo(true));
+            }
+        }
+
+        [Test]
+        public void SandboxedState_CoroutineTableHasNoWrapOrClose()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.That(host.Eval("return coroutine.wrap == nil"), Is.EqualTo(true));
+                Assert.That(host.Eval("return coroutine.close == nil"), Is.EqualTo(true));
+            }
+        }
     }
 }

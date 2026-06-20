@@ -20,6 +20,14 @@ namespace Adan.Client.Common.Scripting
             var lua = new Lua();
             lua.State.Encoding = System.Text.Encoding.UTF8;
 
+            // The sweep below deletes every global not in the allowlist,
+            // including "coroutine" (which is intentionally NOT in
+            // AllowedGlobals since the full table exposes wrap/close/
+            // isyieldable/running that scripts have no business touching).
+            // Grab a reference to the original table first so a
+            // restricted copy can be re-exposed after the sweep runs.
+            var originalCoroutine = (LuaTable)lua["coroutine"];
+
             // NLua exposes the full standard library by default; remove
             // anything not in the allowlist instead of trying to enumerate
             // every dangerous function individually. The allowlist is
@@ -44,6 +52,16 @@ namespace Adan.Client.Common.Scripting
                 end
                 __sandbox_allowed = nil
             ", "sandbox-init");
+
+            // Re-expose a restricted "coroutine" table with only the four
+            // functions needed for the script scheduler (create/resume/
+            // yield/status) -- no wrap/close/isyieldable/running.
+            var restrictedCoroutine = (LuaTable)lua.DoString("return {}")[0];
+            restrictedCoroutine["create"] = originalCoroutine["create"];
+            restrictedCoroutine["resume"] = originalCoroutine["resume"];
+            restrictedCoroutine["yield"] = originalCoroutine["yield"];
+            restrictedCoroutine["status"] = originalCoroutine["status"];
+            lua["coroutine"] = restrictedCoroutine;
 
             return lua;
         }
