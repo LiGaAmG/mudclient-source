@@ -65,8 +65,9 @@
             _profile = profile;
             _allModels = allModels;
             MessageConveyor = conveyor;
-            _scriptHost = new Scripting.LuaScriptHost(
-                command =>
+            _scriptHost = new Scripting.LuaScriptHost(new Scripting.LuaScriptHostBindings
+            {
+                SendCommand = command =>
                 {
                     // TextCommandSerializer only buffers TextCommand bytes --
                     // it doesn't actually write them to the socket until a
@@ -77,7 +78,19 @@
                     // something else, instead of going out immediately.
                     conveyor.PushCommand(new Commands.TextCommand(command));
                     conveyor.PushCommand(Commands.FlushOutputQueueCommand.Instance);
-                });
+                },
+                SetVariable = (name, value) => SetVariableValue(name, value, true),
+                ClearVariable = name => ClearVariableValue(name, true),
+                GetVariable = name => GetVariableValue(name),
+                Echo = text => PushMessageToConveyor(new OutputToMainWindowMessage(text, Themes.TextColor.None, Themes.TextColor.None) { SkipTriggers = true }),
+                EnableGroup = name => EnableGroup(name),
+                DisableGroup = name => DisableGroup(name),
+                SetStatus = text =>
+                {
+                    conveyor.PushCommand(new Commands.TextCommand("#status " + text));
+                    conveyor.PushCommand(Commands.FlushOutputQueueCommand.Instance);
+                },
+            });
             ReloadScripts();
 
             GroupStatus = new List<CharacterStatus>();
