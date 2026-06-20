@@ -22,6 +22,12 @@ namespace Adan.Client.Common.Model
         /// Script must define a function named exactly "on_room_state",
         /// registered via LuaScriptHost.RegisterRoomStateHandler.
         /// </summary>
-        RoomState
+        RoomState,
+
+        /// <summary>
+        /// Script must define a function named exactly "on_room_change",
+        /// registered via LuaScriptHost.RegisterRoomChangeHandler.
+        /// </summary>
+        RoomChange
     }
 }

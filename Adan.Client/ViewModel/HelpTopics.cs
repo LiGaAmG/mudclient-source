@@ -7,75 +7,84 @@ namespace Adan.Client.ViewModel
         public static List<HelpTopic> All = new List<HelpTopic>
         {
             new HelpTopic(
-                "Overview",
-                "Every tab has one persistent, sandboxed Lua state (LuaScriptHost). " +
-                "Scripts attached to a trigger/alias action (\"Run Lua script\") run in " +
-                "this same state, sharing variables with scripts in the Scripts dialog " +
-                "for the same tab. A script attached to a trigger runs every time that " +
-                "trigger fires. A script in the Scripts dialog with a Handler set to " +
-                "GroupState or RoomState runs its on_group_state/on_room_state function " +
-                "every time the server sends that kind of packet -- no text parsing " +
-                "involved, the data comes straight from the server's structured packet."),
+                "Обзор",
+                "Каждая вкладка имеет одно постоянное изолированное состояние Lua (LuaScriptHost). " +
+                "Скрипты, прикреплённые к действию триггера/алиаса (\"Выполнить Lua-скрипт\"), выполняются в " +
+                "этом же состоянии, разделяя переменные со скриптами из диалога Scripts " +
+                "для той же вкладки. Скрипт, прикреплённый к триггеру, выполняется каждый раз, когда этот " +
+                "триггер срабатывает. Скрипт в диалоге Scripts с установленным обработчиком " +
+                "GroupState, RoomState или RoomChange запускает свою функцию on_group_state/on_room_state/on_room_change " +
+                "каждый раз, когда сервер отправляет такой тип пакета — без анализа текста, " +
+                "данные поступают напрямую из структурированного пакета сервера."),
 
             new HelpTopic(
-                "Events: on_group_state(group)",
-                "Set Handler = GroupState in the Scripts dialog and define exactly:\n\n" +
+                "События: on_group_state(group)",
+                "Установите Handler = GroupState в диалоге Scripts и определите точно:\n\n" +
                 "function on_group_state(group)\n" +
                 "  for i = 1, #group do\n" +
                 "    local member = group[i]\n" +
                 "    -- member.Name, member.HitsPercent\n" +
                 "  end\n" +
                 "end\n\n" +
-                "Called every time the server sends a group-status packet (type 12). " +
-                "group is a 1-indexed Lua table; each entry currently exposes only " +
-                "Name (string) and HitsPercent (number, 0-100). More CharacterStatus " +
-                "fields (Position, IsAttacked, Affects, etc.) are not exposed yet."),
+                "Вызывается каждый раз, когда сервер отправляет пакет состояния группы (тип 12). " +
+                "group — это индексируемая с 1 таблица Lua; каждая запись в настоящее время предоставляет только " +
+                "Name (строка) и HitsPercent (число, 0-100). Дополнительные поля CharacterStatus " +
+                "(Position, IsAttacked, Affects и т.д.) пока не доступны."),
 
             new HelpTopic(
-                "Events: on_room_state(monsters)",
-                "Set Handler = RoomState in the Scripts dialog and define exactly:\n\n" +
+                "События: on_room_state(monsters)",
+                "Установите Handler = RoomState в диалоге Scripts и определите точно:\n\n" +
                 "function on_room_state(monsters)\n" +
                 "  for i = 1, #monsters do\n" +
                 "    local m = monsters[i]\n" +
                 "    -- m.Name, m.HitsPercent\n" +
                 "  end\n" +
                 "end\n\n" +
-                "Called every time the server sends a room-monsters packet (type 13), " +
-                "roughly once per combat round. Same field limitations as group: only " +
-                "Name and HitsPercent today."),
+                "Вызывается каждый раз, когда сервер отправляет пакет с монстрами комнаты (тип 13), " +
+                "примерно раз за боевой раунд. Те же ограничения по полям, что и для группы: только " +
+                "Name и HitsPercent пока."),
 
             new HelpTopic(
-                "Functions: SendCommand(text)",
+                "События: on_room_change(roomId, zoneId)",
+                "Установите Handler = RoomChange в диалоге Scripts и определите точно:\n\n" +
+                "function on_room_change(roomId, zoneId)\n" +
+                "  -- roomId, zoneId — числа\n" +
+                "end\n\n" +
+                "Вызывается, когда сервер подтверждает смену комнаты (пакет типа 14), т.е. " +
+                "сразу после успешного перемещения персонажа. roomId и zoneId — это просто " +
+                "числовые идентификаторы (без названия комнаты/зоны и без списка выходов — " +
+                "сервер пока не присылает это структурированно)."),
+
+            new HelpTopic(
+                "Функции: SendCommand(text)",
                 "SendCommand(\"атаковать крысу\")\n\n" +
-                "Sends a text command to the server, exactly as if you typed it. " +
-                "Works the same from a trigger-attached script or a Scripts-dialog " +
-                "script."),
+                "Отправляет текстовую команду серверу, точно так же, как если бы вы её ввели. " +
+                "Работает одинаково из скрипта, прикреплённого к триггеру, или из скрипта в диалоге Scripts."),
 
             new HelpTopic(
-                "Sandbox restrictions",
-                "Only these globals are available: string, table, math, tostring, " +
+                "Ограничения изолированной среды",
+                "Доступны только следующие глобальные переменные: string, table, math, tostring, " +
                 "tonumber, type, pairs, ipairs, select, error, pcall, xpcall, assert, " +
-                "print, plus the functions documented here (SendCommand). io, os, " +
-                "package, require, debug, dofile, loadfile, load, getmetatable, and " +
-                "setmetatable are all removed and cannot be reintroduced from a " +
-                "script. There is no filesystem, network, or process access from Lua " +
-                "at all -- by design."),
+                "print, а также функции, описанные здесь (SendCommand). io, os, " +
+                "package, require, debug, dofile, loadfile, load, getmetatable и " +
+                "setmetatable удалены и не могут быть повторно введены из скрипта. " +
+                "Из Lua нет доступа к файловой системе, сети или процессам — это сделано намеренно."),
 
             new HelpTopic(
-                "Runaway scripts",
-                "Every script call is limited to roughly 1,000,000 Lua VM " +
-                "instructions. A script that loops forever (while true do end) is " +
-                "killed automatically -- you'll see an error message instead of a " +
-                "frozen tab. This applies even if the loop is wrapped in pcall."),
+                "Неуправляемые скрипты",
+                "Каждый вызов скрипта ограничен примерно 1 000 000 инструкций " +
+                "виртуальной машины Lua. Скрипт, зацикливающийся бесконечно (while true do end), " +
+                "автоматически завершается — вы увидите сообщение об ошибке вместо " +
+                "зависшей вкладки. Это действует даже если цикл обёрнут в pcall."),
 
             new HelpTopic(
-                "Known limitation: one script per handler kind",
-                "If you enable two different scripts that both have Handler = " +
-                "GroupState, only the last one (in list order) actually keeps its " +
-                "on_group_state definition -- the second LoadScript call silently " +
-                "redefines the function from the first. Keep at most one enabled " +
-                "GroupState script and one enabled RoomState script per profile " +
-                "until this is fixed in a future version."),
+                "Известное ограничение: один скрипт на тип обработчика",
+                "Если вы включите два разных скрипта, у которых обоих установлен Handler = " +
+                "GroupState, только последний (в порядке списка) фактически сохранит своё " +
+                "определение on_group_state — второй вызов LoadScript молча " +
+                "переопределяет функцию из первого. То же касается RoomState и RoomChange. " +
+                "Оставляйте не более одного включённого скрипта на каждый тип обработчика " +
+                "на профиль, пока это не будет исправлено в будущей версии."),
         };
     }
 }

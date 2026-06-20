@@ -82,6 +82,7 @@ namespace Adan.Client.Map.Model
 
                     RoomId = mapMessage.RoomId;
                     ZoneId = mapMessage.ZoneId;
+                    RootModel.ScriptHost.RaiseRoomChanged(RoomId, ZoneId);
 
                     // Update RootModel so other plugins (e.g. lore) can read current zone
                     var zoneName = _zoneManager.GetZoneName(mapMessage.ZoneId);

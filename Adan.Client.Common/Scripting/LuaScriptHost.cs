@@ -46,6 +46,7 @@ namespace Adan.Client.Common.Scripting
         private readonly Action<string> _sendCommand;
         private string _groupStateHandlerName;
         private string _roomStateHandlerName;
+        private string _roomChangeHandlerName;
 
         public LuaScriptHost()
             : this(null)
@@ -193,6 +194,17 @@ namespace Adan.Client.Common.Scripting
         }
 
         /// <summary>
+        /// Registers the name of a Lua function (already defined in this
+        /// host's state, e.g. via <see cref="LoadScript"/>) to be invoked by
+        /// <see cref="RaiseRoomChanged"/> whenever the server confirms the
+        /// player has moved to a new room (the type-14 packet).
+        /// </summary>
+        public void RegisterRoomChangeHandler(string luaFunctionName)
+        {
+            _roomChangeHandlerName = luaFunctionName;
+        }
+
+        /// <summary>
         /// Invokes the registered group-state handler (see
         /// <see cref="RegisterGroupStateHandler"/>), if any, passing the
         /// supplied group members as a 1-based Lua array of tables exposing
@@ -268,6 +280,31 @@ namespace Adan.Client.Common.Scripting
             }
 
             RunProtected(() => function.Call(monstersTable));
+        }
+
+        /// <summary>
+        /// Invokes the registered room-change handler (see
+        /// <see cref="RegisterRoomChangeHandler"/>), if any, passing the
+        /// new room/zone id as two plain Lua numbers (no table needed --
+        /// unlike group/room-monster data, this packet carries only two
+        /// scalar ids, see CurrentRoomMessage). A no-op if no handler has
+        /// been registered. Routed through the same watchdog protection as
+        /// <see cref="Eval"/>.
+        /// </summary>
+        public void RaiseRoomChanged(int roomId, int zoneId)
+        {
+            if (string.IsNullOrEmpty(_roomChangeHandlerName))
+            {
+                return;
+            }
+
+            var function = _lua.GetFunction(_roomChangeHandlerName);
+            if (function == null)
+            {
+                return;
+            }
+
+            RunProtected(() => function.Call((double)roomId, (double)zoneId));
         }
 
         /// <summary>

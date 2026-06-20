@@ -87,6 +87,10 @@
                     {
                         _scriptHost.RegisterRoomStateHandler("on_room_state");
                     }
+                    else if (script.HandlerKind == ScriptHandlerKind.RoomChange)
+                    {
+                        _scriptHost.RegisterRoomChangeHandler("on_room_change");
+                    }
                 }
                 catch (Exception)
                 {
