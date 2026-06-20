@@ -44,9 +44,6 @@ namespace Adan.Client.Common.Scripting
         private bool _timeoutRequested;
 
         private readonly Action<string> _sendCommand;
-        private string _groupStateHandlerName;
-        private string _roomStateHandlerName;
-        private string _roomChangeHandlerName;
 
         private readonly Dictionary<string, RunningScript> _runningScripts = new Dictionary<string, RunningScript>();
 
@@ -94,11 +91,26 @@ namespace Adan.Client.Common.Scripting
             // state's _G by default). Wait(ms) yields with a "timer" tag + the
             // requested delay; Tick() reads that delay off the yielding thread's
             // own stack (no cross-thread value passing needed) and decides when
-            // to resume. WaitGroupState/WaitRoomState/WaitRoomChange are added in
-            // a later task.
+            // to resume. WaitGroupState/WaitRoomState/WaitRoomChange yield with
+            // their own tags and are resumed by ResumeAllWaitingOn whenever the
+            // corresponding RaiseXxxChanged method updates the matching
+            // __last_* global -- the script reads that global itself right
+            // after the yield returns, so it always sees fresh data.
             _lua.DoString(@"
                 function Wait(ms)
                     coroutine.yield('timer', ms)
+                end
+
+                function WaitGroupState()
+                    coroutine.yield('group')
+                end
+
+                function WaitRoomState()
+                    coroutine.yield('room')
+                end
+
+                function WaitRoomChange()
+                    coroutine.yield('roomchange')
                 end
             ", "scripting-runtime-prelude");
         }
@@ -274,17 +286,46 @@ namespace Adan.Client.Common.Scripting
                 script.Status = ScriptRunStatus.WaitingOnTimer;
                 script.TimerDueAtUtc = DateTime.UtcNow.AddMilliseconds(delayMs);
             }
+            else if (tag == "group")
+            {
+                script.Status = ScriptRunStatus.WaitingOnGroupState;
+            }
+            else if (tag == "room")
+            {
+                script.Status = ScriptRunStatus.WaitingOnRoomState;
+            }
+            else if (tag == "roomchange")
+            {
+                script.Status = ScriptRunStatus.WaitingOnRoomChange;
+            }
             else
             {
-                // Unknown yield tag (event-based tags like "group"/"room"/
-                // "roomchange" are added in a later task) -- treat as an inert
-                // suspended state so GetScriptStatus doesn't crash, but nothing
-                // will auto-resume it yet.
+                // Unknown yield tag -- treat as an inert suspended state so
+                // GetScriptStatus doesn't crash, but nothing will auto-resume
+                // it.
                 script.Status = ScriptRunStatus.WaitingOnTimer;
                 script.TimerDueAtUtc = DateTime.MaxValue;
             }
 
             script.Thread.Pop(script.Thread.GetTop());
+        }
+
+        /// <summary>
+        /// Resumes every currently-suspended script whose Waiting* status
+        /// matches the given one. Called by RaiseGroupStateChanged/
+        /// RaiseRoomStateChanged/RaiseRoomChanged after they update the
+        /// corresponding __last_* global, so resumed scripts see fresh data
+        /// the moment they read it.
+        /// </summary>
+        private void ResumeAllWaitingOn(ScriptRunStatus waitingStatus)
+        {
+            foreach (var pair in new List<KeyValuePair<string, RunningScript>>(_runningScripts))
+            {
+                if (pair.Value.Status == waitingStatus)
+                {
+                    ResumeScript(pair.Key, pair.Value);
+                }
+            }
         }
 
         /// <summary>
@@ -301,61 +342,16 @@ namespace Adan.Client.Common.Scripting
         }
 
         /// <summary>
-        /// Registers the name of a Lua function (already defined in this
-        /// host's state, e.g. via <see cref="LoadScript"/>) to be invoked by
-        /// <see cref="RaiseGroupStateChanged"/> whenever the player's group
-        /// state changes.
-        /// </summary>
-        public void RegisterGroupStateHandler(string luaFunctionName)
-        {
-            _groupStateHandlerName = luaFunctionName;
-        }
-
-        /// <summary>
-        /// Registers the name of a Lua function (already defined in this
-        /// host's state, e.g. via <see cref="LoadScript"/>) to be invoked by
-        /// <see cref="RaiseRoomStateChanged"/> whenever the contents of the
-        /// player's current room change.
-        /// </summary>
-        public void RegisterRoomStateHandler(string luaFunctionName)
-        {
-            _roomStateHandlerName = luaFunctionName;
-        }
-
-        /// <summary>
-        /// Registers the name of a Lua function (already defined in this
-        /// host's state, e.g. via <see cref="LoadScript"/>) to be invoked by
-        /// <see cref="RaiseRoomChanged"/> whenever the server confirms the
-        /// player has moved to a new room (the type-14 packet).
-        /// </summary>
-        public void RegisterRoomChangeHandler(string luaFunctionName)
-        {
-            _roomChangeHandlerName = luaFunctionName;
-        }
-
-        /// <summary>
-        /// Invokes the registered group-state handler (see
-        /// <see cref="RegisterGroupStateHandler"/>), if any, passing the
-        /// supplied group members as a 1-based Lua array of tables built by
-        /// <see cref="BuildCharacterTable"/> (every CharacterStatus field).
-        /// A no-op if no handler has been registered. Routed through the
-        /// same watchdog protection as <see cref="Eval"/> so a runaway
-        /// handler is just as bounded as a runaway top-level script.
+        /// Updates the <c>__last_group</c> Lua global with a freshly built
+        /// 1-based array of tables (one per group member, via
+        /// <see cref="BuildCharacterTable"/>), then resumes every script
+        /// currently suspended in <see cref="ScriptRunStatus.WaitingOnGroupState"/>
+        /// (i.e. blocked inside <c>WaitGroupState()</c>). A no-op when
+        /// <paramref name="group"/> is null.
         /// </summary>
         public void RaiseGroupStateChanged(List<CharacterStatus> group)
         {
             if (group == null)
-            {
-                return;
-            }
-
-            if (string.IsNullOrEmpty(_groupStateHandlerName))
-            {
-                return;
-            }
-
-            var function = _lua.GetFunction(_groupStateHandlerName);
-            if (function == null)
             {
                 return;
             }
@@ -366,33 +362,22 @@ namespace Adan.Client.Common.Scripting
                 groupTable[i + 1] = BuildCharacterTable(group[i]);
             }
 
-            RunProtected(() => function.Call(groupTable));
+            _lua["__last_group"] = groupTable;
+            ResumeAllWaitingOn(ScriptRunStatus.WaitingOnGroupState);
         }
 
         /// <summary>
-        /// Invokes the registered room-state handler (see
-        /// <see cref="RegisterRoomStateHandler"/>), if any, passing the
-        /// supplied monsters as a 1-based Lua array of tables built by
-        /// <see cref="BuildCharacterTable"/> (every CharacterStatus field,
-        /// plus MonsterStatus's own IsPlayerCharacter/IsBoss). A no-op if no
-        /// handler has been registered. Routed through the same watchdog
-        /// protection as <see cref="Eval"/> so a runaway handler is just as
-        /// bounded as a runaway top-level script.
+        /// Updates the <c>__last_room_monsters</c> Lua global with a freshly
+        /// built 1-based array of tables (one per monster, via
+        /// <see cref="BuildCharacterTable"/> plus MonsterStatus's own
+        /// IsPlayerCharacter/IsBoss), then resumes every script currently
+        /// suspended in <see cref="ScriptRunStatus.WaitingOnRoomState"/>
+        /// (i.e. blocked inside <c>WaitRoomState()</c>). A no-op when
+        /// <paramref name="monsters"/> is null.
         /// </summary>
         public void RaiseRoomStateChanged(List<MonsterStatus> monsters)
         {
             if (monsters == null)
-            {
-                return;
-            }
-
-            if (string.IsNullOrEmpty(_roomStateHandlerName))
-            {
-                return;
-            }
-
-            var function = _lua.GetFunction(_roomStateHandlerName);
-            if (function == null)
             {
                 return;
             }
@@ -406,7 +391,8 @@ namespace Adan.Client.Common.Scripting
                 monstersTable[i + 1] = monsterTable;
             }
 
-            RunProtected(() => function.Call(monstersTable));
+            _lua["__last_room_monsters"] = monstersTable;
+            ResumeAllWaitingOn(ScriptRunStatus.WaitingOnRoomState);
         }
 
         /// <summary>
@@ -458,35 +444,22 @@ namespace Adan.Client.Common.Scripting
         }
 
         /// <summary>
-        /// Invokes the registered room-change handler (see
-        /// <see cref="RegisterRoomChangeHandler"/>), if any, passing
-        /// roomId/zoneId (the only fields the server's CurrentRoomMessage
-        /// packet itself carries) as two plain Lua numbers, plus a third
-        /// table argument built from <paramref name="roomInfo"/> -- data
-        /// the CLIENT already has locally from its own loaded zone files
-        /// (name, description, coordinates, exits, user annotations), not
-        /// from the server packet. <paramref name="roomInfo"/> may be null
-        /// (room not present in the local map) -- the third argument is
-        /// then Lua nil, not an empty table, so scripts can tell "unmapped"
-        /// apart from "mapped but everything blank". Existing scripts
-        /// written as <c>function on_room_change(roomId, zoneId)</c> are
-        /// unaffected -- Lua ignores extra arguments a function doesn't
-        /// declare. A no-op if no handler has been registered. Routed
-        /// through the same watchdog protection as <see cref="Eval"/>.
+        /// Updates the <c>__last_room_id</c>/<c>__last_zone_id</c>/
+        /// <c>__last_room</c> Lua globals -- roomId/zoneId are the only
+        /// fields the server's CurrentRoomMessage packet itself carries;
+        /// <paramref name="roomInfo"/> is data the CLIENT already has
+        /// locally from its own loaded zone files (name, description,
+        /// coordinates, exits, user annotations), not from the server
+        /// packet. <paramref name="roomInfo"/> may be null (room not
+        /// present in the local map) -- <c>__last_room</c> is then Lua nil,
+        /// not an empty table, so scripts can tell "unmapped" apart from
+        /// "mapped but everything blank". Then resumes every script
+        /// currently suspended in
+        /// <see cref="ScriptRunStatus.WaitingOnRoomChange"/> (i.e. blocked
+        /// inside <c>WaitRoomChange()</c>).
         /// </summary>
         public void RaiseRoomChanged(int roomId, int zoneId, RoomInfo roomInfo)
         {
-            if (string.IsNullOrEmpty(_roomChangeHandlerName))
-            {
-                return;
-            }
-
-            var function = _lua.GetFunction(_roomChangeHandlerName);
-            if (function == null)
-            {
-                return;
-            }
-
             object roomTable = null;
             if (roomInfo != null)
             {
@@ -516,7 +489,10 @@ namespace Adan.Client.Common.Scripting
                 roomTable = table;
             }
 
-            RunProtected(() => function.Call((double)roomId, (double)zoneId, roomTable));
+            _lua["__last_room_id"] = (double)roomId;
+            _lua["__last_zone_id"] = (double)zoneId;
+            _lua["__last_room"] = roomTable;
+            ResumeAllWaitingOn(ScriptRunStatus.WaitingOnRoomChange);
         }
 
         /// <summary>

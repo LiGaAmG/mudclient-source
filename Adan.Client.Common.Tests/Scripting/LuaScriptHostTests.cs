@@ -124,237 +124,6 @@ namespace Adan.Client.Common.Tests.Scripting
         }
 
         [Test]
-        public void RegisterGroupStateHandler_FiresWithMemberData()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                host.LoadScript(@"
-                    function on_group_state(group)
-                        last_name = group[1].Name
-                        last_hits = group[1].HitsPercent
-                    end
-                ");
-                host.RegisterGroupStateHandler("on_group_state");
-
-                var members = new List<CharacterStatus>
-                {
-                    new CharacterStatus { Name = "Нимриэль", HitsPercent = 73.5f }
-                };
-
-                host.RaiseGroupStateChanged(members);
-
-                var capturedName = (string)host.Eval("return last_name");
-                var capturedHits = (double)host.Eval("return last_hits");
-
-                Assert.That(capturedName, Is.EqualTo("Нимриэль"));
-                Assert.That(capturedHits, Is.EqualTo(73.5).Within(0.001));
-            }
-        }
-
-        [Test]
-        public void RaiseGroupStateChanged_ExposesAllCharacterStatusFields()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                host.LoadScript(@"
-                    function on_group_state(group)
-                        local m = group[1]
-                        last_position = m.Position
-                        last_in_same_room = m.InSameRoom
-                        last_is_attacked = m.IsAttacked
-                        last_moves = m.MovesPercent
-                        last_affect_name = m.Affects[1].Name
-                        last_affect_rounds = m.Affects[1].Rounds
-                    end
-                ");
-                host.RegisterGroupStateHandler("on_group_state");
-
-                var member = new CharacterStatus
-                {
-                    Name = "Тазерал",
-                    Position = Position.Fighting,
-                    InSameRoom = true,
-                    IsAttacked = true,
-                    MovesPercent = 42.0f
-                };
-                member.Affects.Add(new Affect { Name = "Berserk", Rounds = 3 });
-
-                host.RaiseGroupStateChanged(new List<CharacterStatus> { member });
-
-                Assert.That(host.Eval("return last_position"), Is.EqualTo("Fighting"));
-                Assert.That(host.Eval("return last_in_same_room"), Is.EqualTo(true));
-                Assert.That(host.Eval("return last_is_attacked"), Is.EqualTo(true));
-                Assert.That(host.Eval("return last_moves"), Is.EqualTo(42.0).Within(0.001));
-                Assert.That(host.Eval("return last_affect_name"), Is.EqualTo("Berserk"));
-                Assert.That(host.Eval("return last_affect_rounds"), Is.EqualTo(3));
-            }
-        }
-
-        [Test]
-        public void RaiseRoomStateChanged_ExposesMonsterOnlyFields()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                host.LoadScript(@"
-                    function on_room_state(monsters)
-                        last_is_boss = monsters[1].IsBoss
-                        last_is_player = monsters[1].IsPlayerCharacter
-                    end
-                ");
-                host.RegisterRoomStateHandler("on_room_state");
-
-                var monster = new MonsterStatus { Name = "Хозяин", IsBoss = true, IsPlayerCharacter = false };
-                host.RaiseRoomStateChanged(new List<MonsterStatus> { monster });
-
-                Assert.That(host.Eval("return last_is_boss"), Is.EqualTo(true));
-                Assert.That(host.Eval("return last_is_player"), Is.EqualTo(false));
-            }
-        }
-
-        [Test]
-        public void RaiseRoomChanged_WithRoomInfo_ExposesLocalMapData()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                host.LoadScript(@"
-                    function on_room_change(roomId, zoneId, room)
-                        last_room_id = roomId
-                        last_zone_name = room.ZoneName
-                        last_room_name = room.Name
-                        last_alias = room.Alias
-                        last_has_herb = room.HasHerb
-                        last_exit_dir = room.Exits[1].Direction
-                        last_exit_room = room.Exits[1].RoomId
-                    end
-                ");
-                host.RegisterRoomChangeHandler("on_room_change");
-
-                var roomInfo = new RoomInfo
-                {
-                    ZoneName = "Минас-Тирит",
-                    Name = "Дерево",
-                    Alias = "домашняя клетка",
-                    HasHerb = true,
-                };
-                roomInfo.Exits.Add(new RoomExitInfo { Direction = "North", RoomId = 42 });
-
-                host.RaiseRoomChanged(1842, 12, roomInfo);
-
-                Assert.That(host.Eval("return last_room_id"), Is.EqualTo(1842));
-                Assert.That(host.Eval("return last_zone_name"), Is.EqualTo("Минас-Тирит"));
-                Assert.That(host.Eval("return last_room_name"), Is.EqualTo("Дерево"));
-                Assert.That(host.Eval("return last_alias"), Is.EqualTo("домашняя клетка"));
-                Assert.That(host.Eval("return last_has_herb"), Is.EqualTo(true));
-                Assert.That(host.Eval("return last_exit_dir"), Is.EqualTo("North"));
-                Assert.That(host.Eval("return last_exit_room"), Is.EqualTo(42));
-            }
-        }
-
-        [Test]
-        public void RaiseRoomChanged_NullRoomInfo_PassesNilForRoomTable()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                host.LoadScript(@"
-                    function on_room_change(roomId, zoneId, room)
-                        last_room_is_nil = (room == nil)
-                    end
-                ");
-                host.RegisterRoomChangeHandler("on_room_change");
-
-                Assert.DoesNotThrow(() => host.RaiseRoomChanged(1842, 12, null));
-                Assert.That(host.Eval("return last_room_is_nil"), Is.EqualTo(true));
-            }
-        }
-
-        [Test]
-        public void RaiseRoomChanged_OldTwoArgFunction_StillWorks()
-        {
-            // Scripts written before this change as
-            // function on_room_change(roomId, zoneId) must keep working --
-            // Lua silently ignores the extra third argument.
-            using (var host = new LuaScriptHost())
-            {
-                host.LoadScript(@"
-                    function on_room_change(roomId, zoneId)
-                        last_sum = roomId + zoneId
-                    end
-                ");
-                host.RegisterRoomChangeHandler("on_room_change");
-
-                host.RaiseRoomChanged(100, 23, new RoomInfo());
-
-                Assert.That(host.Eval("return last_sum"), Is.EqualTo(123));
-            }
-        }
-
-        [Test]
-        public void OneScript_CanRegisterAllThreeHandlersAtOnce()
-        {
-            // Demonstrates the actual answer to "can one script react to
-            // several packet types": yes -- LuaScriptHost places no
-            // restriction on registering all three handler kinds
-            // simultaneously, as long as the single shared Lua state
-            // defines all three functions. RootModel.ReloadScripts() is
-            // what decides, per script, which of the three Register*Handler
-            // calls to make (now driven by three independent checkboxes,
-            // not a single Handler choice).
-            using (var host = new LuaScriptHost())
-            {
-                host.LoadScript(@"
-                    function on_group_state(group) last_group_count = #group end
-                    function on_room_state(monsters) last_monster_count = #monsters end
-                    function on_room_change(roomId, zoneId, room) last_room_id = roomId end
-                ");
-                host.RegisterGroupStateHandler("on_group_state");
-                host.RegisterRoomStateHandler("on_room_state");
-                host.RegisterRoomChangeHandler("on_room_change");
-
-                host.RaiseGroupStateChanged(new List<CharacterStatus> { new CharacterStatus() });
-                host.RaiseRoomStateChanged(new List<MonsterStatus> { new MonsterStatus(), new MonsterStatus() });
-                host.RaiseRoomChanged(777, 1, null);
-
-                Assert.That(host.Eval("return last_group_count"), Is.EqualTo(1));
-                Assert.That(host.Eval("return last_monster_count"), Is.EqualTo(2));
-                Assert.That(host.Eval("return last_room_id"), Is.EqualTo(777));
-            }
-        }
-
-        [Test]
-        public void RaiseGroupStateChanged_NoHandlerRegistered_DoesNothing()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                Assert.DoesNotThrow(() => host.RaiseGroupStateChanged(new List<CharacterStatus>()));
-            }
-        }
-
-        [Test]
-        public void RaiseRoomStateChanged_FiresRegisteredHandlerWithMonsterData()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                host.LoadScript(@"
-                    function on_room_state(monsters)
-                        last_monster_count = #monsters
-                    end
-                ");
-                host.RegisterRoomStateHandler("on_room_state");
-
-                var monsters = new List<MonsterStatus>
-                {
-                    new MonsterStatus { Name = "крыса" },
-                    new MonsterStatus { Name = "паук" }
-                };
-
-                host.RaiseRoomStateChanged(monsters);
-
-                var count = host.Eval("return last_monster_count");
-                Assert.That(count, Is.EqualTo(2));
-            }
-        }
-
-        [Test]
         public void SendCommand_InvokesInjectedDelegate()
         {
             string sentCommand = null;
@@ -373,24 +142,6 @@ namespace Adan.Client.Common.Tests.Scripting
             using (var host = new LuaScriptHost())
             {
                 Assert.DoesNotThrow(() => host.Eval("SendCommand('whatever')"));
-            }
-        }
-
-        [Test]
-        public void RaiseGroupStateChanged_NullGroup_DoesNotThrow()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                Assert.DoesNotThrow(() => host.RaiseGroupStateChanged(null));
-            }
-        }
-
-        [Test]
-        public void RaiseRoomStateChanged_NullMonsters_DoesNotThrow()
-        {
-            using (var host = new LuaScriptHost())
-            {
-                Assert.DoesNotThrow(() => host.RaiseRoomStateChanged(null));
             }
         }
 
@@ -489,6 +240,105 @@ namespace Adan.Client.Common.Tests.Scripting
             {
                 host.StartScript("runaway", "while true do end");
                 Assert.That(host.GetScriptStatus("runaway"), Is.EqualTo(ScriptRunStatus.Faulted));
+            }
+        }
+
+        [Test]
+        public void WaitGroupState_ResumesWithLatestGroupSnapshot()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("test", @"
+                    captured_count = 0
+                    while true do
+                        WaitGroupState()
+                        captured_count = captured_count + 1
+                        captured_name = __last_group[1].Name
+                    end
+                ");
+
+                Assert.That(host.GetScriptStatus("test"), Is.EqualTo(ScriptRunStatus.WaitingOnGroupState));
+
+                host.RaiseGroupStateChanged(new List<CharacterStatus> { new CharacterStatus { Name = "Тазерал" } });
+
+                Assert.That(host.Eval("return captured_count"), Is.EqualTo(1));
+                Assert.That(host.Eval("return captured_name"), Is.EqualTo("Тазерал"));
+                Assert.That(host.GetScriptStatus("test"), Is.EqualTo(ScriptRunStatus.WaitingOnGroupState));
+            }
+        }
+
+        [Test]
+        public void WaitRoomState_ResumesWithLatestMonsterSnapshot()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("test", @"
+                    while true do
+                        WaitRoomState()
+                        captured_count = #__last_room_monsters
+                    end
+                ");
+
+                host.RaiseRoomStateChanged(new List<MonsterStatus> { new MonsterStatus(), new MonsterStatus() });
+
+                Assert.That(host.Eval("return captured_count"), Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void WaitRoomChange_ResumesWithRoomIdZoneIdAndRoomInfo()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("test", @"
+                    while true do
+                        WaitRoomChange()
+                        captured_room_id = __last_room_id
+                        captured_zone_name = __last_room and __last_room.ZoneName or nil
+                    end
+                ");
+
+                var info = new RoomInfo { ZoneName = "Минас-Тирит" };
+                host.RaiseRoomChanged(1842, 12, info);
+
+                Assert.That(host.Eval("return captured_room_id"), Is.EqualTo(1842));
+                Assert.That(host.Eval("return captured_zone_name"), Is.EqualTo("Минас-Тирит"));
+            }
+        }
+
+        [Test]
+        public void TwoScripts_CanBothWaitOnGroupStateIndependently()
+        {
+            // The whole point of the coroutine model: no shared-function-name
+            // collision, unlike the old on_group_state convention it replaces.
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("a", "a_count = 0 while true do WaitGroupState() a_count = a_count + 1 end");
+                host.StartScript("b", "b_count = 0 while true do WaitGroupState() b_count = b_count + 1 end");
+
+                host.RaiseGroupStateChanged(new List<CharacterStatus> { new CharacterStatus() });
+                host.RaiseGroupStateChanged(new List<CharacterStatus> { new CharacterStatus() });
+
+                Assert.That(host.Eval("return a_count"), Is.EqualTo(2));
+                Assert.That(host.Eval("return b_count"), Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void RaiseGroupStateChanged_NullGroup_DoesNotThrow()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.DoesNotThrow(() => host.RaiseGroupStateChanged(null));
+            }
+        }
+
+        [Test]
+        public void RaiseRoomStateChanged_NullMonsters_DoesNotThrow()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.DoesNotThrow(() => host.RaiseRoomStateChanged(null));
             }
         }
     }
