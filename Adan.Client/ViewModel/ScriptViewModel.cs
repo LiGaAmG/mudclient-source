@@ -95,6 +95,17 @@ namespace Adan.Client.ViewModel
         }
 
         /// <summary>
+        /// The Lua error message from the last time this script faulted
+        /// (syntax error, runtime error, or watchdog timeout), or null if
+        /// it never faulted. Bound as a tooltip on the Status text in the
+        /// dialog -- "Faulted" alone doesn't say why.
+        /// </summary>
+        public string LastError
+        {
+            get { return _scriptHost.GetScriptError(_script.Name); }
+        }
+
+        /// <summary>
         /// Gets the start command.
         /// </summary>
         [NotNull]
@@ -122,6 +133,7 @@ namespace Adan.Client.ViewModel
         public void RefreshStatus()
         {
             OnPropertyChanged("Status");
+            OnPropertyChanged("LastError");
         }
 
         private void StartCommandExecute(object obj)

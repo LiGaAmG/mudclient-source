@@ -29,6 +29,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
@@ -38,13 +39,15 @@
             <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,5">
                 <CheckBox Content="Auto-start on connect" IsChecked="{Binding Path=IsEnabled, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,15,0" />
                 <Label>Status:</Label>
-                <TextBlock Text="{Binding Path=Status}" VerticalAlignment="Center" Margin="0,0,15,0" FontWeight="Bold" />
+                <TextBlock Text="{Binding Path=Status}" ToolTip="{Binding Path=LastError}" VerticalAlignment="Center" Margin="0,0,15,0" FontWeight="Bold" />
                 <Button Content="Start" Command="{Binding Path=StartCommand}" MinWidth="60" Margin="0,0,5,0" />
                 <Button Content="Stop" Command="{Binding Path=StopCommand}" MinWidth="60" />
             </StackPanel>
-            <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,5" Foreground="#FF999999"
+            <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,5" Foreground="#FFE05050"
+                       Text="{Binding Path=LastError, StringFormat='Last error: {0}'}" />
+            <TextBlock Grid.Row="3" TextWrapping="Wrap" Margin="0,0,0,5" Foreground="#FF999999"
                        Text="Write a script that loops with Wait(ms)/WaitGroupState()/WaitRoomState()/WaitRoomChange() to react to game state. Click Start to run it now (regardless of Auto-start), Stop to halt it. Auto-start scripts begin running automatically when a tab connects to this profile. See Help for the full API." />
-            <Border Grid.Row="3" BorderBrush="#FF555555" BorderThickness="1" CornerRadius="3" Background="#FF1E1E1E">
+            <Border Grid.Row="4" BorderBrush="#FF555555" BorderThickness="1" CornerRadius="3" Background="#FF1E1E1E">
                 <Controls:LuaCodeEditor Code="{Binding Path=Code, UpdateSourceTrigger=PropertyChanged}"
                          FontFamily="Consolas" FontSize="13"
                          Background="#FF1E1E1E" BorderThickness="0"

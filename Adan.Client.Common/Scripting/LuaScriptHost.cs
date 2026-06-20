@@ -51,6 +51,7 @@ namespace Adan.Client.Common.Scripting
         {
             public KeraLua.Lua Thread;
             public ScriptRunStatus Status;
+            public string LastError;
             public DateTime TimerDueAtUtc;
         }
 
@@ -208,7 +209,8 @@ namespace Adan.Client.Common.Scripting
             var loadStatus = thread.LoadString(code, name);
             if (loadStatus != LuaStatus.OK)
             {
-                _runningScripts[name] = new RunningScript { Thread = thread, Status = ScriptRunStatus.Faulted };
+                var loadError = thread.ToString(-1);
+                _runningScripts[name] = new RunningScript { Thread = thread, Status = ScriptRunStatus.Faulted, LastError = loadError };
                 return;
             }
 
@@ -235,6 +237,19 @@ namespace Adan.Client.Common.Scripting
         {
             RunningScript script;
             return _runningScripts.TryGetValue(name, out script) ? script.Status : ScriptRunStatus.NotRunning;
+        }
+
+        /// <summary>
+        /// The Lua error message captured the last time this script's
+        /// status became Faulted (syntax error at StartScript, or a
+        /// runtime error/watchdog trip during a resume), or null if it
+        /// never faulted. Lets the UI show WHY a script died instead of
+        /// just "Faulted".
+        /// </summary>
+        public string GetScriptError(string name)
+        {
+            RunningScript script;
+            return _runningScripts.TryGetValue(name, out script) ? script.LastError : null;
         }
 
         /// <summary>
@@ -275,6 +290,13 @@ namespace Adan.Client.Common.Scripting
 
             if (status != LuaStatus.Yield)
             {
+                // The watchdog hook (OnInstructionHook) raises its error via
+                // state.Error(...) on the SAME thread that's executing --
+                // i.e. this coroutine's own thread, not the main _lua.State
+                // -- so the budget-exceeded message ends up here exactly
+                // like any other runtime error, with no special-casing
+                // needed to tell the two apart in the captured text.
+                script.LastError = script.Thread.ToString(-1);
                 script.Status = ScriptRunStatus.Faulted;
                 return;
             }
