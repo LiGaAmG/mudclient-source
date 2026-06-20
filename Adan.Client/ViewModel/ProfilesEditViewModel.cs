@@ -25,6 +25,7 @@ namespace Adan.Client.ViewModel
         private ObservableCollection<ProfileViewModel> _profiles;
         private ProfileViewModel _selectedProfile;
         private string _newProfileName;
+        private readonly IList<RootModel> _allRootModels;
 
         /// <summary>
         /// Constructor
@@ -32,9 +33,22 @@ namespace Adan.Client.ViewModel
         /// <param name="profiles">List of profiles</param>
         /// <param name="selectedProfile">Current selected profile</param>
         public ProfilesEditViewModel(ObservableCollection<ProfileViewModel> profiles, string selectedProfile)
+            : this(profiles, selectedProfile, null)
+        {
+        }
+
+        /// <param name="profiles">List of profiles</param>
+        /// <param name="selectedProfile">Current selected profile</param>
+        /// <param name="allRootModels">
+        /// Every currently-open tab's RootModel, threaded through to
+        /// ProfileOptionsViewModel so its Scripts dialog can reload
+        /// already-open tabs on save instead of requiring a reconnect.
+        /// </param>
+        public ProfilesEditViewModel(ObservableCollection<ProfileViewModel> profiles, string selectedProfile, IList<RootModel> allRootModels)
         {
             _profiles = new ObservableCollection<ProfileViewModel>(profiles);
             _selectedProfile = _profiles.FirstOrDefault(prf => prf.NameProfile == selectedProfile);
+            _allRootModels = allRootModels;
 
             AddProfileCommand = new DelegateCommand(AddProfile, false);
             DeleteProfileCommand = new DelegateCommand(DeleteProfile, false);
@@ -176,7 +190,7 @@ namespace Adan.Client.ViewModel
 
             var profileOptionDialog = new ProfileOptionsEditDialog(SelectedProfile.NameProfile)
             {
-                DataContext = new ProfileOptionsViewModel(profile),
+                DataContext = new ProfileOptionsViewModel(profile, _allRootModels),
                 Owner = owner,
             };
 

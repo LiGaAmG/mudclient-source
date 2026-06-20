@@ -67,42 +67,7 @@
             MessageConveyor = conveyor;
             _scriptHost = new Scripting.LuaScriptHost(
                 command => conveyor.PushCommand(new Commands.TextCommand(command)));
-
-            foreach (var script in profile.Scripts)
-            {
-                if (!script.IsEnabled)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    _scriptHost.LoadScript(script.Code);
-
-                    if (script.HandlerKind == ScriptHandlerKind.GroupState)
-                    {
-                        _scriptHost.RegisterGroupStateHandler("on_group_state");
-                    }
-                    else if (script.HandlerKind == ScriptHandlerKind.RoomState)
-                    {
-                        _scriptHost.RegisterRoomStateHandler("on_room_state");
-                    }
-                    else if (script.HandlerKind == ScriptHandlerKind.RoomChange)
-                    {
-                        _scriptHost.RegisterRoomChangeHandler("on_room_change");
-                    }
-                }
-                catch (Exception)
-                {
-                    // A broken script must not prevent the tab from opening --
-                    // LoadScript already routes through the watchdog-protected
-                    // RunProtected, so this only catches genuine syntax/runtime
-                    // errors (LuaScriptTimeoutException or NLua.Exceptions.LuaScriptException),
-                    // not a hang. The user finds out their script is broken when they
-                    // notice its handler never fires, not via a crashed tab. (A
-                    // follow-up plan covers surfacing this error in the UI.)
-                }
-            }
+            ReloadScripts();
 
             GroupStatus = new List<CharacterStatus>();
             RoomMonstersStatus = new List<MonsterStatus>();
@@ -146,6 +111,66 @@
             RoomMonstersStatus = new List<MonsterStatus>();
         }
         #endregion
+
+        /// <summary>
+        /// (Re)loads every enabled script from <see cref="Profile"/>.Scripts
+        /// into <see cref="ScriptHost"/>. Called once from the networked
+        /// constructor, and callable again at any time afterward (e.g. by
+        /// the Scripts dialog on save) so edits take effect on already-open
+        /// tabs without requiring a reconnect.
+        ///
+        /// First clears all three handler registrations -- without this, a
+        /// script that was disabled or had its Handler changed/removed
+        /// since the last load would leave a stale handler name registered,
+        /// pointing at a function that either no longer exists or no
+        /// longer reflects what's enabled.
+        /// </summary>
+        public void ReloadScripts()
+        {
+            if (_scriptHost == null || _profile == null)
+            {
+                return;
+            }
+
+            _scriptHost.RegisterGroupStateHandler(null);
+            _scriptHost.RegisterRoomStateHandler(null);
+            _scriptHost.RegisterRoomChangeHandler(null);
+
+            foreach (var script in _profile.Scripts)
+            {
+                if (!script.IsEnabled)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    _scriptHost.LoadScript(script.Code);
+
+                    if (script.HandlerKind == ScriptHandlerKind.GroupState)
+                    {
+                        _scriptHost.RegisterGroupStateHandler("on_group_state");
+                    }
+                    else if (script.HandlerKind == ScriptHandlerKind.RoomState)
+                    {
+                        _scriptHost.RegisterRoomStateHandler("on_room_state");
+                    }
+                    else if (script.HandlerKind == ScriptHandlerKind.RoomChange)
+                    {
+                        _scriptHost.RegisterRoomChangeHandler("on_room_change");
+                    }
+                }
+                catch (Exception)
+                {
+                    // A broken script must not prevent the tab from
+                    // reloading -- LoadScript already routes through the
+                    // watchdog-protected RunProtected, so this only catches
+                    // genuine syntax/runtime errors, not a hang. The user
+                    // finds out their script is broken when they notice its
+                    // handler never fires, not via a crashed tab.
+                }
+            }
+        }
 
         #region Properties
 

@@ -1104,7 +1104,7 @@ namespace Adan.Client
                 models.Add(new ProfileViewModel(str, str == "Default" ? true : false));
             }
 
-            var profilesViewModel = new ProfilesEditViewModel(models, models[0].NameProfile);
+            var profilesViewModel = new ProfilesEditViewModel(models, models[0].NameProfile, _allRootModels);
             var profileDialog = new ProfilesEditDialog() { DataContext = profilesViewModel, Owner = this };
 
             profileDialog.Show();

@@ -185,6 +185,7 @@ namespace Adan.Client.Common.Settings
             {
                 _groups = new List<Group>(this.Groups),
                 _variables = new List<Variable>(this.Variables),
+                _scripts = new List<ScriptDefinition>(this.Scripts),
                 CommonSettings = this.CommonSettings,
                 CommandsHistory = new List<string>(this.CommandsHistory),
             };

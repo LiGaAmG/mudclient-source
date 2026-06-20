@@ -24,15 +24,31 @@ namespace Adan.Client.ViewModel
     {
         private GroupsViewModel _groupsViewModel;
         private ListBoxItem _selectedOption;
+        private readonly IList<RootModel> _allRootModels;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="profile"></param>
-        public ProfileOptionsViewModel(ProfileHolder profile)
+        public ProfileOptionsViewModel(ProfileHolder profile) : this(profile, null)
+        {
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <param name="profile"></param>
+        /// <param name="allRootModels">
+        /// Every currently-open tab's RootModel, so saving the Scripts
+        /// dialog can call ReloadScripts() on any already-open tab using
+        /// this same profile, instead of requiring a reconnect. Null is
+        /// fine (e.g. when no tabs happen to be open at all) -- the Scripts
+        /// case in EditProfile just skips the reload step then.
+        /// </param>
+        public ProfileOptionsViewModel(ProfileHolder profile, IList<RootModel> allRootModels)
         {
             _groupsViewModel = new GroupsViewModel(profile.Groups, profile.Name, RootModel.AllActionDescriptions);
             Profile = profile;
+            _allRootModels = allRootModels;
 
             EditOptionsCommand = new DelegateCommand(EditProfile, true);
             ImportProfileCommand = new DelegateCommand(ImportProfile, true);
@@ -221,7 +237,35 @@ namespace Adan.Client.ViewModel
                     scriptsEditDialog.Closed += (s, e) =>
                     {
                         OnPropertyChanged("ScriptsCount");
+
+                        // This view model's Profile is a CLONE (see
+                        // ProfilesEditViewModel.EditProfile, which clones
+                        // before opening this dialog -- the same reason the
+                        // "Groups" case above writes AllGroup back onto the
+                        // live, SettingsHolder-tracked instance instead of
+                        // relying on SetProfile to pick up the clone's
+                        // edits). Without this assignment, SetProfile below
+                        // would save the LIVE instance's (unedited, possibly
+                        // not-yet-loaded) Scripts list straight back over
+                        // itself, silently discarding everything just typed
+                        // into the dialog.
+                        SettingsHolder.Instance.GetProfile(Profile.Name).Scripts = Profile.Scripts;
                         SettingsHolder.Instance.SetProfile(Profile.Name);
+
+                        // Apply the edit to every already-open tab using this
+                        // profile right now -- without this, a script change
+                        // would only take effect the next time a tab using
+                        // this profile is (re)connected.
+                        if (_allRootModels != null)
+                        {
+                            foreach (var rootModel in _allRootModels)
+                            {
+                                if (rootModel.Profile != null && rootModel.Profile.Name == Profile.Name)
+                                {
+                                    rootModel.ReloadScripts();
+                                }
+                            }
+                        }
                     };
                     scriptsEditDialog.Show();
                     break;
