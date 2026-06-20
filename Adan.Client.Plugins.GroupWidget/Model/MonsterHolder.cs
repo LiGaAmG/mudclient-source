@@ -81,6 +81,7 @@ namespace Adan.Client.Plugins.GroupWidget.Model
                 RootModel.RoomMonstersStatus = Characters;
 
                 _monsterManager.UpdateMonsters(this);
+                RootModel.ScriptHost.RaiseRoomStateChanged(Characters);
             }
         }
     }

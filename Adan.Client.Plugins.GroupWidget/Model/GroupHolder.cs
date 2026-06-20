@@ -80,6 +80,7 @@ namespace Adan.Client.Plugins.GroupWidget.Model
                 Characters = groupMessage.GroupMates;
                 RootModel.GroupStatus = Characters;
                 _groupManager.UpdateGroup(this);
+                RootModel.ScriptHost.RaiseGroupStateChanged(Characters);
             }
         }
     }
