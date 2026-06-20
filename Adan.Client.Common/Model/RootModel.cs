@@ -38,6 +38,8 @@
         private List<CharacterStatus> _groupStatus;
         private List<MonsterStatus> _monsterStatus;
 
+        private readonly Scripting.LuaScriptHost _scriptHost;
+
         private readonly Stack<IUndo> _undoStack;
 
         private readonly Regex _variableRegex = new Regex(@"\$(\w+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -63,6 +65,8 @@
             _profile = profile;
             _allModels = allModels;
             MessageConveyor = conveyor;
+            _scriptHost = new Scripting.LuaScriptHost(
+                command => conveyor.PushCommand(new Commands.TextCommand(command)));
 
             GroupStatus = new List<CharacterStatus>();
             RoomMonstersStatus = new List<MonsterStatus>();
@@ -83,6 +87,7 @@
             _undoStack = new Stack<IUndo>();
 
             _profile = profile;
+            _scriptHost = new Scripting.LuaScriptHost();
 
             GroupStatus = new List<CharacterStatus>();
             RoomMonstersStatus = new List<MonsterStatus>();
@@ -98,6 +103,7 @@
             _variableList = new List<Variable>();
 
             _undoStack = new Stack<IUndo>();
+            _scriptHost = new Scripting.LuaScriptHost();
 
 
             GroupStatus = new List<CharacterStatus>();
@@ -374,6 +380,15 @@
         {
             get;
             set;
+        }
+
+        /// <summary>
+        /// The per-tab Lua scripting host. One persistent, sandboxed Lua state
+        /// for the lifetime of this RootModel (i.e. this tab/connection).
+        /// </summary>
+        public Scripting.LuaScriptHost ScriptHost
+        {
+            get { return _scriptHost; }
         }
 
         /// <summary>
@@ -824,6 +839,11 @@
             if (_allModels != null && _allModels.Contains(this))
             {
                 _allModels.Remove(this);
+            }
+
+            if (_scriptHost != null)
+            {
+                _scriptHost.Dispose();
             }
 
             if (MessageConveyor != null)
