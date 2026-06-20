@@ -94,5 +94,31 @@ namespace Adan.Client.Common.Tests.Scripting
                 Assert.That(result, Is.EqualTo(5050.0));
             }
         }
+
+        [Test]
+        public void Eval_InfiniteLoopInsidePcall_StillThrowsTimeout()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.Throws<LuaScriptTimeoutException>(() =>
+                    host.Eval("while true do pcall(function() while true do end end) end"));
+            }
+        }
+
+        [Test]
+        public void Eval_AfterTimeout_SameHostCanRunNormalScriptAfterward()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.Throws<LuaScriptTimeoutException>(() =>
+                    host.Eval("while true do end"));
+
+                // The same host instance must still work correctly for a normal
+                // script after a previous call timed out -- a timeout must not
+                // leave the host's hook state (or the Lua stack) corrupted.
+                var result = host.Eval("local sum = 0 for i = 1, 100 do sum = sum + i end return sum");
+                Assert.That(result, Is.EqualTo(5050.0));
+            }
+        }
     }
 }
