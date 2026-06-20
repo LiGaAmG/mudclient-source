@@ -43,7 +43,7 @@ namespace Adan.Client.Common.Scripting
         // rather than just the innermost protected frame.
         private bool _timeoutRequested;
 
-        private readonly Action<string> _sendCommand;
+        private readonly LuaScriptHostBindings _bindings;
 
         private readonly Dictionary<string, RunningScript> _runningScripts = new Dictionary<string, RunningScript>();
 
@@ -56,13 +56,18 @@ namespace Adan.Client.Common.Scripting
         }
 
         public LuaScriptHost()
-            : this(null)
+            : this(new LuaScriptHostBindings())
         {
         }
 
         public LuaScriptHost(Action<string> sendCommand)
+            : this(new LuaScriptHostBindings { SendCommand = sendCommand })
         {
-            _sendCommand = sendCommand ?? (_ => { });
+        }
+
+        public LuaScriptHost(LuaScriptHostBindings bindings)
+        {
+            _bindings = bindings ?? new LuaScriptHostBindings();
 
             _lua = CreateSandboxedState();
 
@@ -78,6 +83,15 @@ namespace Adan.Client.Common.Scripting
             // is added back in as a global that survives -- the sweep
             // never runs again to strip it.
             _lua.RegisterFunction("SendCommand", this, GetType().GetMethod(nameof(SendCommandFromLua)));
+            _lua.RegisterFunction("SetVariable", this, GetType().GetMethod(nameof(SetVariableFromLua)));
+            _lua.RegisterFunction("ClearVariable", this, GetType().GetMethod(nameof(ClearVariableFromLua)));
+            _lua.RegisterFunction("GetVariable", this, GetType().GetMethod(nameof(GetVariableFromLua)));
+            _lua.RegisterFunction("Echo", this, GetType().GetMethod(nameof(EchoFromLua)));
+            _lua.RegisterFunction("EnableGroup", this, GetType().GetMethod(nameof(EnableGroupFromLua)));
+            _lua.RegisterFunction("DisableGroup", this, GetType().GetMethod(nameof(DisableGroupFromLua)));
+            _lua.RegisterFunction("SetStatus", this, GetType().GetMethod(nameof(SetStatusFromLua)));
+            _lua.RegisterFunction("SendToWindow", this, GetType().GetMethod(nameof(SendToWindowFromLua)));
+            _lua.RegisterFunction("SendToAllWindows", this, GetType().GetMethod(nameof(SendToAllWindowsFromLua)));
 
             // Keep a reference to the delegate for the lifetime of the host:
             // KeraLua's SetHook stores a native callback pointer derived from
@@ -360,7 +374,103 @@ namespace Adan.Client.Common.Scripting
         /// </summary>
         public void SendCommandFromLua(string command)
         {
-            _sendCommand(command);
+            if (_bindings.SendCommand != null)
+            {
+                _bindings.SendCommand(command);
+            }
+        }
+
+        /// <summary>Exposed to Lua as the global function <c>SetVariable</c>.</summary>
+        public void SetVariableFromLua(string name, string value)
+        {
+            if (_bindings.SetVariable != null)
+            {
+                _bindings.SetVariable(name, value);
+            }
+        }
+
+        /// <summary>Exposed to Lua as the global function <c>ClearVariable</c>.</summary>
+        public void ClearVariableFromLua(string name)
+        {
+            if (_bindings.ClearVariable != null)
+            {
+                _bindings.ClearVariable(name);
+            }
+        }
+
+        /// <summary>
+        /// Exposed to Lua as the global function <c>GetVariable</c>. Returns
+        /// empty string (never nil) when no GetVariable binding is set, so Lua
+        /// scripts can always safely concatenate the result without a nil check.
+        /// </summary>
+        public string GetVariableFromLua(string name)
+        {
+            return _bindings.GetVariable != null ? _bindings.GetVariable(name) : string.Empty;
+        }
+
+        /// <summary>
+        /// Exposed to Lua as the global function <c>Echo</c> -- outputs text to
+        /// the main window WITHOUT sending it to the server (unlike SendCommand).
+        /// </summary>
+        public void EchoFromLua(string text)
+        {
+            if (_bindings.Echo != null)
+            {
+                _bindings.Echo(text);
+            }
+        }
+
+        /// <summary>Exposed to Lua as the global function <c>EnableGroup</c>.</summary>
+        public void EnableGroupFromLua(string name)
+        {
+            if (_bindings.EnableGroup != null)
+            {
+                _bindings.EnableGroup(name);
+            }
+        }
+
+        /// <summary>Exposed to Lua as the global function <c>DisableGroup</c>.</summary>
+        public void DisableGroupFromLua(string name)
+        {
+            if (_bindings.DisableGroup != null)
+            {
+                _bindings.DisableGroup(name);
+            }
+        }
+
+        /// <summary>Exposed to Lua as the global function <c>SetStatus</c>.</summary>
+        public void SetStatusFromLua(string text)
+        {
+            if (_bindings.SetStatus != null)
+            {
+                _bindings.SetStatus(text);
+            }
+        }
+
+        /// <summary>
+        /// Exposed to Lua as the global function <c>SendToWindow</c> -- sends a
+        /// text command to another open tab, identified by its profile/character
+        /// name (the same name shown in the tab and used by the existing
+        /// SendToWindowAction's "window name" field).
+        /// </summary>
+        public void SendToWindowFromLua(string windowName, string text)
+        {
+            if (_bindings.SendToWindow != null)
+            {
+                _bindings.SendToWindow(windowName, text);
+            }
+        }
+
+        /// <summary>
+        /// Exposed to Lua as the global function <c>SendToAllWindows</c> -- sends
+        /// a text command to every currently open tab (including this one).
+        /// </summary>
+        public void SendToAllWindowsFromLua(string text)
+        {
+            if (_bindings.SendToAllWindows != null)
+            {
+                _bindings.SendToAllWindows(text);
+            }
         }
 
         /// <summary>

@@ -113,6 +113,7 @@
     <Compile Include="Settings\SettingsFolder.cs" />
     <Compile Include="Scripting\LuaScriptHost.cs" />
     <Compile Include="Scripting\LuaScriptHost.SandboxSetup.cs" />
+    <Compile Include="Scripting\LuaScriptHostBindings.cs" />
     <Compile Include="Scripting\LuaScriptTimeoutException.cs" />
     <Compile Include="Scripting\RoomInfo.cs" />
     <Compile Include="Scripting\ScriptRunStatus.cs" />

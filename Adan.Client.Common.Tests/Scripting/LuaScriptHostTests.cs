@@ -341,5 +341,202 @@ namespace Adan.Client.Common.Tests.Scripting
                 Assert.DoesNotThrow(() => host.RaiseRoomStateChanged(null));
             }
         }
+
+        [Test]
+        public void SetVariable_InvokesBoundDelegateWithNameAndValue()
+        {
+            string capturedName = null;
+            string capturedValue = null;
+            var bindings = new LuaScriptHostBindings
+            {
+                SetVariable = (name, value) => { capturedName = name; capturedValue = value; }
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                host.Eval("SetVariable('charname', 'Тазерал')");
+            }
+
+            Assert.That(capturedName, Is.EqualTo("charname"));
+            Assert.That(capturedValue, Is.EqualTo("Тазерал"));
+        }
+
+        [Test]
+        public void ClearVariable_InvokesBoundDelegateWithName()
+        {
+            string capturedName = null;
+            var bindings = new LuaScriptHostBindings
+            {
+                ClearVariable = name => capturedName = name
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                host.Eval("ClearVariable('charname')");
+            }
+
+            Assert.That(capturedName, Is.EqualTo("charname"));
+        }
+
+        [Test]
+        public void GetVariable_ReturnsBoundDelegateResult()
+        {
+            var bindings = new LuaScriptHostBindings
+            {
+                GetVariable = name => name == "charname" ? "Тазерал" : string.Empty
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                var result = host.Eval("return GetVariable('charname')");
+                Assert.That(result, Is.EqualTo("Тазерал"));
+            }
+        }
+
+        [Test]
+        public void GetVariable_NoBindingSet_ReturnsEmptyStringNotNil()
+        {
+            using (var host = new LuaScriptHost(new LuaScriptHostBindings()))
+            {
+                var result = host.Eval("return GetVariable('whatever') == ''");
+                Assert.That(result, Is.EqualTo(true));
+            }
+        }
+
+        [Test]
+        public void Echo_InvokesBoundDelegateWithText()
+        {
+            string capturedText = null;
+            var bindings = new LuaScriptHostBindings
+            {
+                Echo = text => capturedText = text
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                host.Eval("Echo('локальное сообщение')");
+            }
+
+            Assert.That(capturedText, Is.EqualTo("локальное сообщение"));
+        }
+
+        [Test]
+        public void EnableGroup_InvokesBoundDelegateWithName()
+        {
+            string capturedName = null;
+            var bindings = new LuaScriptHostBindings
+            {
+                EnableGroup = name => capturedName = name
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                host.Eval("EnableGroup('Heal')");
+            }
+
+            Assert.That(capturedName, Is.EqualTo("Heal"));
+        }
+
+        [Test]
+        public void DisableGroup_InvokesBoundDelegateWithName()
+        {
+            string capturedName = null;
+            var bindings = new LuaScriptHostBindings
+            {
+                DisableGroup = name => capturedName = name
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                host.Eval("DisableGroup('Heal')");
+            }
+
+            Assert.That(capturedName, Is.EqualTo("Heal"));
+        }
+
+        [Test]
+        public void SetStatus_InvokesBoundDelegateWithText()
+        {
+            string capturedText = null;
+            var bindings = new LuaScriptHostBindings
+            {
+                SetStatus = text => capturedText = text
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                host.Eval("SetStatus('busy')");
+            }
+
+            Assert.That(capturedText, Is.EqualTo("busy"));
+        }
+
+        [Test]
+        public void SendToWindow_InvokesBoundDelegateWithNameAndText()
+        {
+            string capturedName = null;
+            string capturedText = null;
+            var bindings = new LuaScriptHostBindings
+            {
+                SendToWindow = (name, text) => { capturedName = name; capturedText = text; }
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                host.Eval("SendToWindow('Heal', 'лечи меня')");
+            }
+
+            Assert.That(capturedName, Is.EqualTo("Heal"));
+            Assert.That(capturedText, Is.EqualTo("лечи меня"));
+        }
+
+        [Test]
+        public void SendToAllWindows_InvokesBoundDelegateWithText()
+        {
+            string capturedText = null;
+            var bindings = new LuaScriptHostBindings
+            {
+                SendToAllWindows = text => capturedText = text
+            };
+
+            using (var host = new LuaScriptHost(bindings))
+            {
+                host.Eval("SendToAllWindows('всем привет')");
+            }
+
+            Assert.That(capturedText, Is.EqualTo("всем привет"));
+        }
+
+        [Test]
+        public void AllNewFunctions_NoBindingsSet_DoNotThrow()
+        {
+            using (var host = new LuaScriptHost(new LuaScriptHostBindings()))
+            {
+                Assert.DoesNotThrow(() => host.Eval(@"
+                    SetVariable('a', 'b')
+                    ClearVariable('a')
+                    Echo('x')
+                    EnableGroup('g')
+                    DisableGroup('g')
+                    SetStatus('s')
+                    SendToWindow('w', 't')
+                    SendToAllWindows('t')
+                "));
+            }
+        }
+
+        [Test]
+        public void ExistingSendCommandConstructor_StillWorks()
+        {
+            // Backward-compat check: the original single-delegate constructor
+            // must keep working exactly as before -- this plan must not break
+            // any of the pre-existing tests built against it.
+            string sentCommand = null;
+            using (var host = new LuaScriptHost(cmd => sentCommand = cmd))
+            {
+                host.Eval("SendCommand('атаковать крысу')");
+                Assert.That(sentCommand, Is.EqualTo("атаковать крысу"));
+            }
+        }
     }
 }
