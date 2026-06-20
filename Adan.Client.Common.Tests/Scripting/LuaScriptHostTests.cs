@@ -74,5 +74,25 @@ namespace Adan.Client.Common.Tests.Scripting
                 Assert.Throws<NLua.Exceptions.LuaScriptException>(() => host.Eval("this is not valid lua ((("));
             }
         }
+
+        [Test]
+        public void Eval_InfiniteLoop_ThrowsInsteadOfHanging()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                Assert.Throws<LuaScriptTimeoutException>(() =>
+                    host.Eval("local x = 0 while true do x = x + 1 end"));
+            }
+        }
+
+        [Test]
+        public void Eval_NormalScript_StillWorksAfterWatchdogIsArmed()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                var result = host.Eval("local sum = 0 for i = 1, 100 do sum = sum + i end return sum");
+                Assert.That(result, Is.EqualTo(5050.0));
+            }
+        }
     }
 }

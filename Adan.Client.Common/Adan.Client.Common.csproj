@@ -112,6 +112,7 @@
     <Compile Include="Settings\SettingsFolder.cs" />
     <Compile Include="Scripting\LuaScriptHost.cs" />
     <Compile Include="Scripting\LuaScriptHost.SandboxSetup.cs" />
+    <Compile Include="Scripting\LuaScriptTimeoutException.cs" />
     <Compile Include="ConveyorUnits\ConveyorUnit.cs" />
     <Compile Include="Conveyor\MessageConveyor.cs" />
     <Compile Include="Conveyor\MessageReceivedEventArgs.cs" />
