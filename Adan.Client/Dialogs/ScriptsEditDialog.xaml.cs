@@ -3,6 +3,7 @@ namespace Adan.Client.Dialogs
     using System;
     using System.IO;
     using System.Windows;
+    using System.Windows.Threading;
 
     using Microsoft.Win32;
 
@@ -10,9 +11,25 @@ namespace Adan.Client.Dialogs
 
     public partial class ScriptsEditDialog : Window
     {
+        private readonly DispatcherTimer _statusRefreshTimer;
+
         public ScriptsEditDialog()
         {
             InitializeComponent();
+
+            _statusRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _statusRefreshTimer.Tick += HandleStatusRefreshTick;
+            _statusRefreshTimer.Start();
+            Closed += (s, e) => _statusRefreshTimer.Stop();
+        }
+
+        private void HandleStatusRefreshTick(object sender, EventArgs e)
+        {
+            var scriptsViewModel = DataContext as ScriptsViewModel;
+            if (scriptsViewModel != null)
+            {
+                scriptsViewModel.RefreshAllStatuses();
+            }
         }
 
         /// <summary>

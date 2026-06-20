@@ -229,9 +229,16 @@ namespace Adan.Client.ViewModel
                         break;
                     }
 
+                    var liveRootModel = _allRootModels != null
+                        ? _allRootModels.FirstOrDefault(m => m.Profile != null && m.Profile.Name == Profile.Name)
+                        : null;
+                    var scriptHostForDialog = liveRootModel != null
+                        ? liveRootModel.ScriptHost
+                        : new Adan.Client.Common.Scripting.LuaScriptHost();
+
                     var scriptsEditDialog = new ScriptsEditDialog
                     {
-                        DataContext = new ScriptsViewModel(Profile.Scripts),
+                        DataContext = new ScriptsViewModel(Profile.Scripts, scriptHostForDialog),
                         Owner = owner
                     };
                     // SaveRequested (Save button, dialog stays open) and

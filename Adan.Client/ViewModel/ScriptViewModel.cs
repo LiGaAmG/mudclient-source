@@ -1,26 +1,36 @@
 namespace Adan.Client.ViewModel
 {
     using Common.Model;
+    using Common.Scripting;
+    using Common.Utils;
     using Common.ViewModel;
 
     using CSLib.Net.Annotations;
     using CSLib.Net.Diagnostics;
 
     /// <summary>
-    /// Wraps a single ScriptDefinition for binding in the Scripts dialog.
+    /// Wraps a single ScriptDefinition for binding in the Scripts dialog,
+    /// plus live Start/Stop control over its LuaScriptHost coroutine.
     /// </summary>
     public class ScriptViewModel : ViewModelBase
     {
         private readonly ScriptDefinition _script;
+        private readonly LuaScriptHost _scriptHost;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ScriptViewModel"/> class.
         /// </summary>
         /// <param name="script">The script.</param>
-        public ScriptViewModel([NotNull] ScriptDefinition script)
+        /// <param name="scriptHost">The script host.</param>
+        public ScriptViewModel([NotNull] ScriptDefinition script, [NotNull] LuaScriptHost scriptHost)
         {
             Assert.ArgumentNotNull(script, "script");
+            Assert.ArgumentNotNull(scriptHost, "scriptHost");
             _script = script;
+            _scriptHost = scriptHost;
+
+            StartCommand = new DelegateCommand(StartCommandExecute, true);
+            StopCommand = new DelegateCommand(StopCommandExecute, true);
         }
 
         /// <summary>
@@ -61,7 +71,8 @@ namespace Adan.Client.ViewModel
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether this script is enabled.
+        /// Gets or sets a value indicating whether this script is enabled
+        /// (auto-started on connect).
         /// </summary>
         public bool IsEnabled
         {
@@ -74,45 +85,55 @@ namespace Adan.Client.ViewModel
         }
 
         /// <summary>
-        /// Gets or sets whether this script registers an on_group_state
-        /// handler. Independent of the other two -- check any combination.
+        /// Live runtime status -- NOT persisted. Call RefreshStatus()
+        /// periodically (see ScriptsEditDialog's DispatcherTimer) to keep
+        /// this current while the dialog is open.
         /// </summary>
-        public bool HandleGroupState
+        public ScriptRunStatus Status
         {
-            get { return _script.HandleGroupState; }
-            set
-            {
-                _script.HandleGroupState = value;
-                OnPropertyChanged("HandleGroupState");
-            }
+            get { return _scriptHost.GetScriptStatus(_script.Name); }
         }
 
         /// <summary>
-        /// Gets or sets whether this script registers an on_room_state
-        /// handler. Independent of the other two -- check any combination.
+        /// Gets the start command.
         /// </summary>
-        public bool HandleRoomState
+        [NotNull]
+        public DelegateCommand StartCommand
         {
-            get { return _script.HandleRoomState; }
-            set
-            {
-                _script.HandleRoomState = value;
-                OnPropertyChanged("HandleRoomState");
-            }
+            get;
+            private set;
         }
 
         /// <summary>
-        /// Gets or sets whether this script registers an on_room_change
-        /// handler. Independent of the other two -- check any combination.
+        /// Gets the stop command.
         /// </summary>
-        public bool HandleRoomChange
+        [NotNull]
+        public DelegateCommand StopCommand
         {
-            get { return _script.HandleRoomChange; }
-            set
-            {
-                _script.HandleRoomChange = value;
-                OnPropertyChanged("HandleRoomChange");
-            }
+            get;
+            private set;
+        }
+
+        /// <summary>
+        /// Re-reads Status from the host and raises PropertyChanged --
+        /// call this from a UI timer, since LuaScriptHost has no change
+        /// notification of its own.
+        /// </summary>
+        public void RefreshStatus()
+        {
+            OnPropertyChanged("Status");
+        }
+
+        private void StartCommandExecute(object obj)
+        {
+            _scriptHost.StartScript(_script.Name, _script.Code);
+            RefreshStatus();
+        }
+
+        private void StopCommandExecute(object obj)
+        {
+            _scriptHost.StopScript(_script.Name);
+            RefreshStatus();
         }
     }
 }

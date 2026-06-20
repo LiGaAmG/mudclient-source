@@ -5,6 +5,7 @@ namespace Adan.Client.ViewModel
     using System.Linq;
 
     using Common.Model;
+    using Common.Scripting;
     using Common.Utils;
     using Common.ViewModel;
 
@@ -12,25 +13,29 @@ namespace Adan.Client.ViewModel
     using CSLib.Net.Diagnostics;
 
     /// <summary>
-    /// View model for the Scripts editor dialog -- a flat list of global
-    /// Lua scripts, not nested under any trigger/alias Group.
+    /// View model for the Scripts editor dialog -- a flat list of named
+    /// coroutine scripts, not nested under any trigger/alias Group.
     /// </summary>
     public class ScriptsViewModel : ViewModelBase
     {
         private readonly List<ScriptDefinition> _backingList;
+        private readonly LuaScriptHost _scriptHost;
         private ScriptViewModel _selectedScript;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ScriptsViewModel"/> class.
         /// </summary>
         /// <param name="backingList">The backing list.</param>
-        public ScriptsViewModel([NotNull] List<ScriptDefinition> backingList)
+        /// <param name="scriptHost">The script host used for live Start/Stop/Status.</param>
+        public ScriptsViewModel([NotNull] List<ScriptDefinition> backingList, [NotNull] LuaScriptHost scriptHost)
         {
             Assert.ArgumentNotNull(backingList, "backingList");
+            Assert.ArgumentNotNull(scriptHost, "scriptHost");
 
             _backingList = backingList;
+            _scriptHost = scriptHost;
             Scripts = new ObservableCollection<ScriptViewModel>(
-                backingList.Select(s => new ScriptViewModel(s)));
+                backingList.Select(s => new ScriptViewModel(s, scriptHost)));
 
             AddScriptCommand = new DelegateCommand(AddScriptCommandExecute, true);
             DeleteScriptCommand = new DelegateCommand(DeleteScriptCommandExecute, false);
@@ -81,11 +86,20 @@ namespace Adan.Client.ViewModel
             private set;
         }
 
+        /// <summary>Called from ScriptsEditDialog's DispatcherTimer.</summary>
+        public void RefreshAllStatuses()
+        {
+            foreach (var scriptViewModel in Scripts)
+            {
+                scriptViewModel.RefreshStatus();
+            }
+        }
+
         private void AddScriptCommandExecute(object obj)
         {
             var newScript = new ScriptDefinition { Name = "New script" };
             _backingList.Add(newScript);
-            var newViewModel = new ScriptViewModel(newScript);
+            var newViewModel = new ScriptViewModel(newScript, _scriptHost);
             Scripts.Add(newViewModel);
             SelectedScript = newViewModel;
         }
@@ -97,6 +111,7 @@ namespace Adan.Client.ViewModel
                 return;
             }
 
+            _scriptHost.StopScript(SelectedScript.Script.Name);
             _backingList.Remove(SelectedScript.Script);
             Scripts.Remove(SelectedScript);
             SelectedScript = null;
