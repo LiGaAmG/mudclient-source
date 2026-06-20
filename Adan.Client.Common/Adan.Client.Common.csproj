@@ -229,6 +229,14 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
+    <!-- KeraLua is a managed P/Invoke wrapper around the native Lua 5.4
+         runtime, it does not work without this native DLL sitting next
+         to the executable. Adan.Client builds as Platform=x86, so the
+         win-x86 native build is the right one. -->
+    <None Include="..\packages\KeraLua.1.4.1\runtimes\win-x86\native\lua54.dll">
+      <Link>lua54.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Page Include="Controls\ActionEditorControl.xaml">
