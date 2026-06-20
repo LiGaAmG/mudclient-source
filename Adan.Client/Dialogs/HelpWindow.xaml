@@ -37,7 +37,8 @@
         </DataTemplate>
 
         <DataTemplate x:Key="HelpTopicEntryTemplate">
-            <TextBlock Text="{Binding Path=Topic.Title}" Margin="10,1,0,1" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Path=Topic.Title}" Margin="10,1,0,1" TextWrapping="Wrap"
+                       Foreground="#FFD4D4D4" />
         </DataTemplate>
 
         <controls:HelpListEntryTemplateSelector x:Key="HelpListEntryTemplateSelector"
@@ -63,7 +64,8 @@
                   ItemsSource="{Binding Path=Entries}"
                   SelectedItem="{Binding Path=SelectedEntry}"
                   ItemTemplateSelector="{StaticResource HelpListEntryTemplateSelector}"
-                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  Background="#FF1E1E1E">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Style.Triggers>
