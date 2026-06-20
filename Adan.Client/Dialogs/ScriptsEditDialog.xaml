@@ -1,0 +1,67 @@
+<Window x:Class="Adan.Client.Dialogs.ScriptsEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Scripts"
+        Width="700" Height="500"
+        WindowStartupLocation="CenterOwner"
+        Style="{StaticResource DefaultWindowStyle}">
+    <Grid Margin="5">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ListBox Grid.Column="0" Grid.Row="0"
+                  ItemsSource="{Binding Path=Scripts}"
+                  SelectedItem="{Binding Path=SelectedScript}"
+                  DisplayMemberPath="Name" Margin="0,0,5,5" />
+
+        <Grid Grid.Column="1" Grid.Row="0" DataContext="{Binding Path=SelectedScript}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                <Label>Name:</Label>
+                <TextBox Width="250" Text="{Binding Path=Name, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,5">
+                <CheckBox Content="Enabled" IsChecked="{Binding Path=IsEnabled, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,15,0" />
+                <Label>Handler:</Label>
+                <ComboBox Width="150" SelectedValue="{Binding Path=HandlerKind, Mode=TwoWay}" SelectedValuePath="Content">
+                    <ComboBoxItem Content="None" />
+                    <ComboBoxItem Content="GroupState" />
+                    <ComboBoxItem Content="RoomState" />
+                </ComboBox>
+            </StackPanel>
+            <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,5" Foreground="#FF999999"
+                       Text="GroupState scripts must define a function named exactly on_group_state(group). RoomState scripts must define on_room_state(monsters). See Help for the full API." />
+            <Border Grid.Row="3" BorderBrush="#FF555555" BorderThickness="1" CornerRadius="3" Background="#FF1E1E1E">
+                <TextBox Text="{Binding Path=Code, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" AcceptsTab="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas" FontSize="13"
+                         Background="#FF1E1E1E" Foreground="#FFD4D4D4" BorderThickness="0"
+                         CaretBrush="White" Padding="4"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+            </Border>
+        </Grid>
+
+        <StackPanel Grid.Column="0" Grid.Row="1" Orientation="Horizontal" Margin="0,5,0,0">
+            <Button Command="{Binding Path=AddScriptCommand}" MinWidth="60" Margin="0,0,5,0">Add</Button>
+            <Button Command="{Binding Path=DeleteScriptCommand}" MinWidth="60">Delete</Button>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+            <Button Click="HandleHelpClick" MinWidth="60" Margin="0,0,5,0">Help</Button>
+            <Button Click="HandleCloseClick" IsCancel="True" MinWidth="60">Close</Button>
+        </StackPanel>
+    </Grid>
+</Window>
