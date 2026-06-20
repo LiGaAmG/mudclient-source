@@ -18,8 +18,7 @@ namespace Adan.Client.Common.Tests.Model
                 {
                     Name = "Auto-heal",
                     Code = "function on_group_state(group)\n  -- heal logic\nend",
-                    IsEnabled = true,
-                    HandlerKind = ScriptHandlerKind.GroupState
+                    IsEnabled = true
                 }
             };
 
@@ -41,7 +40,6 @@ namespace Adan.Client.Common.Tests.Model
             Assert.That(roundTripped[0].Name, Is.EqualTo("Auto-heal"));
             Assert.That(roundTripped[0].Code, Is.EqualTo("function on_group_state(group)\n  -- heal logic\nend"));
             Assert.That(roundTripped[0].IsEnabled, Is.True);
-            Assert.That(roundTripped[0].HandlerKind, Is.EqualTo(ScriptHandlerKind.GroupState));
         }
 
         [Test]
@@ -51,7 +49,6 @@ namespace Adan.Client.Common.Tests.Model
             Assert.That(script.Name, Is.EqualTo(string.Empty));
             Assert.That(script.Code, Is.EqualTo(string.Empty));
             Assert.That(script.IsEnabled, Is.False);
-            Assert.That(script.HandlerKind, Is.EqualTo(ScriptHandlerKind.None));
         }
     }
 }

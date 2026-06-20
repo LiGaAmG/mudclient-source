@@ -124,17 +124,13 @@
         #endregion
 
         /// <summary>
-        /// (Re)loads every enabled script from <see cref="Profile"/>.Scripts
-        /// into <see cref="ScriptHost"/>. Called once from the networked
-        /// constructor, and callable again at any time afterward (e.g. by
-        /// the Scripts dialog on save) so edits take effect on already-open
-        /// tabs without requiring a reconnect.
-        ///
-        /// First clears all three handler registrations -- without this, a
-        /// script that was disabled or had its Handler changed/removed
-        /// since the last load would leave a stale handler name registered,
-        /// pointing at a function that either no longer exists or no
-        /// longer reflects what's enabled.
+        /// (Re)applies every script's enabled/disabled state from
+        /// <see cref="Profile"/>.Scripts onto <see cref="ScriptHost"/>:
+        /// enabled scripts are (re)started as coroutines, disabled ones are
+        /// stopped. Called once from the networked constructor, and
+        /// callable again at any time afterward (e.g. by the Scripts dialog
+        /// on save) so edits take effect on already-open tabs without
+        /// requiring a reconnect.
         /// </summary>
         public void ReloadScripts()
         {
@@ -143,51 +139,27 @@
                 return;
             }
 
-            _scriptHost.RegisterGroupStateHandler(null);
-            _scriptHost.RegisterRoomStateHandler(null);
-            _scriptHost.RegisterRoomChangeHandler(null);
-
             foreach (var script in _profile.Scripts)
             {
-                if (!script.IsEnabled)
+                if (script.IsEnabled)
                 {
-                    continue;
-                }
-
-                try
-                {
-                    _scriptHost.LoadScript(script.Code);
-
-                    // The three Handle* flags are independent -- a single
-                    // script can register for any combination of packet
-                    // types at once (e.g. define both on_group_state and
-                    // on_room_state in the same script and check both
-                    // boxes), unlike the old single-choice HandlerKind
-                    // dropdown this replaces. HandlerKind is still read as
-                    // a fallback for scripts saved before this existed.
-                    if (script.HandleGroupState || script.HandlerKind == ScriptHandlerKind.GroupState)
+                    try
                     {
-                        _scriptHost.RegisterGroupStateHandler("on_group_state");
+                        _scriptHost.StartScript(script.Name, script.Code);
                     }
-
-                    if (script.HandleRoomState || script.HandlerKind == ScriptHandlerKind.RoomState)
+                    catch (Exception)
                     {
-                        _scriptHost.RegisterRoomStateHandler("on_room_state");
-                    }
-
-                    if (script.HandleRoomChange || script.HandlerKind == ScriptHandlerKind.RoomChange)
-                    {
-                        _scriptHost.RegisterRoomChangeHandler("on_room_change");
+                        // StartScript itself already catches Lua-level errors
+                        // (LoadString failures, watchdog trips on the first leg)
+                        // and reports them via GetScriptStatus == Faulted instead
+                        // of throwing -- this catch is defense in depth only,
+                        // e.g. against an unexpected non-Lua exception, so one
+                        // broken script can never prevent the tab from opening.
                     }
                 }
-                catch (Exception)
+                else
                 {
-                    // A broken script must not prevent the tab from
-                    // reloading -- LoadScript already routes through the
-                    // watchdog-protected RunProtected, so this only catches
-                    // genuine syntax/runtime errors, not a hang. The user
-                    // finds out their script is broken when they notice its
-                    // handler never fires, not via a crashed tab.
+                    _scriptHost.StopScript(script.Name);
                 }
             }
         }
