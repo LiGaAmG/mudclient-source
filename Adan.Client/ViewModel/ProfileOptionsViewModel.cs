@@ -273,9 +273,36 @@ namespace Adan.Client.ViewModel
                     {
                         OnPropertyChanged("TriggersCount");
                         SettingsHolder.Instance.SetProfile(_groupsViewModel.Name);
+                        RefreshTriggerCacheOnLiveTabs();
                     };
                     triggerEditDialog.Show();
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Adding/editing/removing a trigger replaces the TextTrigger instance inside
+        /// the (live, shared -- ProfileHolder.Clone() only copies the Groups list, not
+        /// the Group objects it holds) Group.Triggers list, but nothing on that path
+        /// invalidates RootModel's cached EnabledTriggersOrderedByPriority snapshot --
+        /// unlike EnableGroup/DisableGroup, which call RecalculatedEnabledTriggersPriorities()
+        /// directly. SetProfile's ProfilesChanged event does eventually force a recalculation,
+        /// but only for whichever RootModel happens to still hold a reference equal-by-name;
+        /// relying on that round trip left edited triggers matching against their pre-edit
+        /// pattern until something unrelated (toggling a group, reconnecting) forced a rebuild.
+        /// Recalculate directly here instead, for every open tab using this profile.
+        /// </summary>
+        private void RefreshTriggerCacheOnLiveTabs()
+        {
+            if (_allRootModels == null || Profile == null)
+                return;
+
+            foreach (var rootModel in _allRootModels)
+            {
+                if (rootModel.Profile != null && rootModel.Profile.Name == Profile.Name)
+                {
+                    rootModel.RecalculatedEnabledTriggersPriorities();
+                }
             }
         }
 
