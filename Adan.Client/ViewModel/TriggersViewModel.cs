@@ -64,6 +64,18 @@ namespace Adan.Client.ViewModel
 
         #endregion
 
+        /// <summary>
+        /// Raised right after a trigger is actually added, edited or deleted (not on
+        /// Cancel), so a listener can refresh RootModel's cached trigger-matching state
+        /// immediately instead of waiting for this whole Triggers list window to close.
+        /// </summary>
+        public event System.EventHandler TriggersChanged;
+
+        private void OnTriggersChanged()
+        {
+            TriggersChanged?.Invoke(this, System.EventArgs.Empty);
+        }
+
         #region Properties
 
         public string SearchText
@@ -183,7 +195,10 @@ namespace Adan.Client.ViewModel
             trigerEditDialog.Closed += (s, e) =>
             {
                 if (trigerEditDialog.Save)
+                {
                     triggerToAdd.TriggersGroup.AddTrigger(triggerToAdd);
+                    OnTriggersChanged();
+                }
             };
         }
 
@@ -204,6 +219,8 @@ namespace Adan.Client.ViewModel
                 groupViewModel.RemoveTrigger(SelectedTrigger);
                 break;
             }
+
+            OnTriggersChanged();
         }
 
         private void EditTriggerCommandExecute([NotNull] object obj)
@@ -236,6 +253,7 @@ namespace Adan.Client.ViewModel
 
                 originalTrigger.TriggersGroup.RemoveTrigger(originalTrigger);
                 SelectedTrigger = (TriggerViewModel)trigerEditDialog.DataContext;
+                OnTriggersChanged();
             };
         }
 

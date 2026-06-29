@@ -279,9 +279,11 @@ namespace Adan.Client.ViewModel
                     substitutionsEditDialog.Show();
                     break;
                 case "Triggers":
+                    var triggersViewModel = new TriggersViewModel(_groupsViewModel.Groups, RootModel.AllActionDescriptions);
+                    triggersViewModel.TriggersChanged += (s, e) => RefreshTriggerCacheOnLiveTabs();
                     var triggerEditDialog = new TriggersEditDialog
                     {
-                        DataContext = new TriggersViewModel(_groupsViewModel.Groups, RootModel.AllActionDescriptions),
+                        DataContext = triggersViewModel,
                         Owner = owner
                     };
                     triggerEditDialog.Closed += (s, e) =>
