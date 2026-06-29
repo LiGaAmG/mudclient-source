@@ -229,7 +229,6 @@
                 _zlibDecompressionStream = new ZlibStream(_compressedDataStream, CompressionMode.Decompress, true);
                 return 5;
             }
-
             return -1;
         }
     }
