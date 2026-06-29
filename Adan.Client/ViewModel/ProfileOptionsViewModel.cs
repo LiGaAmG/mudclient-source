@@ -60,10 +60,25 @@ namespace Adan.Client.ViewModel
         /// </summary>
         /// <param name="name">Name of the profile (e.g. "Global")</param>
         /// <param name="groups">List of profile groups</param>
-        public ProfileOptionsViewModel(string name, List<Group> groups)
+        public ProfileOptionsViewModel(string name, List<Group> groups) : this(name, groups, null)
+        {
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <param name="name">Name of the profile (e.g. "Global")</param>
+        /// <param name="groups">List of profile groups</param>
+        /// <param name="allRootModels">
+        /// Every currently-open tab's RootModel, so editing a trigger in the global
+        /// groups (which every profile's RootModel.Groups pulls in regardless of its
+        /// own Profile.Name) can refresh the cached trigger list on all of them. Null
+        /// is fine -- the refresh step just gets skipped, same as a closed-tabs session.
+        /// </param>
+        public ProfileOptionsViewModel(string name, List<Group> groups, IList<RootModel> allRootModels)
         {
             _groupsViewModel = new GroupsViewModel(groups, name, RootModel.AllActionDescriptions);
             Profile = null;
+            _allRootModels = allRootModels;
 
             EditOptionsCommand = new DelegateCommand(EditProfile, true);
             ImportProfileCommand = new DelegateCommand(ImportProfile, true);
@@ -294,12 +309,15 @@ namespace Adan.Client.ViewModel
         /// </summary>
         private void RefreshTriggerCacheOnLiveTabs()
         {
-            if (_allRootModels == null || Profile == null)
+            if (_allRootModels == null)
                 return;
 
             foreach (var rootModel in _allRootModels)
             {
-                if (rootModel.Profile != null && rootModel.Profile.Name == Profile.Name)
+                // Profile == null means this is the global groups editor (RootModel.Groups
+                // pulls those in for every profile via Profile.Groups.Concat(GlobalGroups)),
+                // so every open tab needs a refresh, not just ones on a matching profile.
+                if (Profile == null || (rootModel.Profile != null && rootModel.Profile.Name == Profile.Name))
                 {
                     rootModel.RecalculatedEnabledTriggersPriorities();
                 }

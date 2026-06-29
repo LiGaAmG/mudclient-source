@@ -991,7 +991,7 @@ namespace Adan.Client
 
             var globalProfileDialog = new ProfileOptionsEditDialog("Global")
             {
-                DataContext = new ProfileOptionsViewModel("Global", SettingsHolder.Instance.Settings.GlobalGroups),
+                DataContext = new ProfileOptionsViewModel("Global", SettingsHolder.Instance.Settings.GlobalGroups, _allRootModels),
                 Owner = this,
             };
 
