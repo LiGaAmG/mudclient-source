@@ -45,8 +45,12 @@ namespace Adan.Client.ConveyorUnits
 
         private List<TriggerEntry> _orderedTriggers = null;
         private Dictionary<(char, char), string[]> _twoCharLiteralGroups = null;
-        private int _lastIndexedTriggerCount = -1;
-        private int _lastEnabledGroupCount = -1;
+
+        // RootModel.RecalculatedEnabledTriggersPriorities() always returns a brand new
+        // List<TriggerBase> instance, so comparing by reference catches in-place edits
+        // (same trigger count, same group count, different TextTrigger object) that a
+        // count-based staleness check would silently miss.
+        private IEnumerable<TriggerBase> _lastIndexedTriggers = null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TriggerUnit"/> class.
@@ -86,26 +90,17 @@ namespace Adan.Client.ConveyorUnits
 
             var textMsg = message as TextMessage;
 
-            // Проверяем актуальность индекса по кол-ву включённых групп и суммарному кол-ву триггеров
+            // Проверяем актуальность индекса по ссылке на список из RootModel: он
+            // меняется при любом RecalculatedEnabledTriggersPriorities() (enable/disable
+            // группы или явное обновление после редактирования триггера), не только
+            // при изменении количества триггеров/групп.
             var rootModel = Conveyor.RootModel;
-            int enabledGroupCount = 0;
-            int totalTriggerCount = 0;
-            foreach (var g in rootModel.Groups)
-            {
-                if (g.IsEnabled)
-                {
-                    enabledGroupCount++;
-                    totalTriggerCount += g.Triggers.Count;
-                }
-            }
+            var currentTriggers = rootModel.EnabledTriggersOrderedByPriority;
 
-            if (_orderedTriggers == null
-                || totalTriggerCount != _lastIndexedTriggerCount
-                || enabledGroupCount != _lastEnabledGroupCount)
+            if (_orderedTriggers == null || !ReferenceEquals(currentTriggers, _lastIndexedTriggers))
             {
-                RebuildIndex(rootModel.EnabledTriggersOrderedByPriority);
-                _lastIndexedTriggerCount = totalTriggerCount;
-                _lastEnabledGroupCount = enabledGroupCount;
+                RebuildIndex(currentTriggers);
+                _lastIndexedTriggers = currentTriggers;
             }
 
             string text = textMsg?.InnerText ?? string.Empty;
