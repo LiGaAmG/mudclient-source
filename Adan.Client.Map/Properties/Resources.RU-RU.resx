@@ -294,6 +294,12 @@
   <data name="RouteCommandHelp" xml:space="preserve">
     <value>справка</value>
   </data>
+  <data name="RouteCommandLookahead" xml:space="preserve">
+    <value>лукахед</value>
+  </data>
+  <data name="RouteHelpLookahead" xml:space="preserve">
+    <value>"маршрут лукахед N" - включить лукахед на N комнат вперёд. "маршрут лукахед 0" - выключить. "маршрут лукахед" - показать текущее значение.</value>
+  </data>
   <data name="RouteAlreadyExistsQuestion" xml:space="preserve">
     <value>Маршрут из '{0}' в '{1}' уже существует. Переписать?</value>
   </data>

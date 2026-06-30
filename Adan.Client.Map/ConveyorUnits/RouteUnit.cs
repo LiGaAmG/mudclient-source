@@ -1,10 +1,13 @@
-﻿namespace Adan.Client.Map.ConveyorUnits
+namespace Adan.Client.Map.ConveyorUnits
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
     using Common.Commands;
     using Common.Conveyor;
     using Common.ConveyorUnits;
+    using Common.Messages;
+    using Common.Themes;
     using CSLib.Net.Annotations;
     using CSLib.Net.Diagnostics;
     using Properties;
@@ -16,136 +19,175 @@
     {
         private readonly RouteManager _routeManager;
 
-        private readonly char[] _splitChars = { ' ' };
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="RouteUnit"/> class.
-        /// </summary>
         public RouteUnit([NotNull] RouteManager routeManager, MessageConveyor conveyor)
             : base(conveyor)
         {
             Assert.ArgumentNotNull(routeManager, "routeManager");
-
             _routeManager = routeManager;
         }
 
-        /// <summary>
-        /// Gets a set of message types that this unit can handle.
-        /// </summary>
-        public override IEnumerable<int> HandledMessageTypes
-        {
-            get
-            {
-                return Enumerable.Empty<int>();
-            }
-        }
+        public override IEnumerable<int> HandledMessageTypes => Enumerable.Empty<int>();
 
-        /// <summary>
-        /// Gets a set of command types that this unit can handle.
-        /// </summary>
         public override IEnumerable<int> HandledCommandTypes
-        {
-            get
-            {
-                return Enumerable.Repeat(BuiltInCommandTypes.TextCommand, 1);
-            }
-        }
-        
+            => Enumerable.Repeat(BuiltInCommandTypes.TextCommand, 1);
+
         public override void HandleCommand(Command command, bool isImport = false)
         {
             Assert.ArgumentNotNull(command, "command");
 
             var textCommand = command as TextCommand;
-            if (textCommand == null)
-            {
-                return;
-            }
-            
-            var splittedCommands = textCommand.CommandText.Split(_splitChars, System.StringSplitOptions.RemoveEmptyEntries);
+            if (textCommand == null) return;
 
-            if (splittedCommands.Length < 2)
-            {
-                return;
-            }
+            var text = textCommand.CommandText.Trim();
 
-            if (string.Equals(splittedCommands[0], Resources.RouteCommandGoto))
+            // "идти <комната>" — внутризонная навигация (без # и без префикса маршрут)
+            var gotoCmd = Resources.RouteCommandGoto;
+            if (text.StartsWith(gotoCmd + " ", StringComparison.OrdinalIgnoreCase)
+                && !text.StartsWith(Resources.RouteCommandPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                _routeManager.NavigateToRoom(string.Join(" ", splittedCommands.Skip(1)));
+                var room = text.Substring(gotoCmd.Length).Trim();
+                _routeManager.NavigateToRoom(room);
                 command.Handled = true;
                 return;
             }
 
-            if (!string.Equals(splittedCommands[0], Resources.RouteCommandPrefix))
-            {
-                return;
-            }
+            // Strip optional leading '#' so both "маршрут X" and "#маршрут X" work.
+            var stripped = text.TrimStart('#');
+            var prefix = Resources.RouteCommandPrefix;
 
-            if (string.Equals(splittedCommands[1], Resources.RouteCommandHelp))
+            // Must start with "маршрут " or be exactly "маршрут"
+            if (!stripped.StartsWith(prefix + " ", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(stripped, prefix, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var args = stripped.Length > prefix.Length
+                ? stripped.Substring(prefix.Length).Trim()
+                : string.Empty;
+
+            // "#route help"
+            if (string.Equals(args, Resources.RouteCommandHelp, StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrEmpty(args))
             {
-                _routeManager.PrintHelp();
+                PrintHelp();
                 command.Handled = true;
                 return;
             }
 
-            if (string.Equals(splittedCommands[1], Resources.RouteCommandStartRecording) && _routeManager.CanCreateNewRoute)
+            // "#route start [name]"
+            if (args.StartsWith(Resources.RouteCommandStartRecording, StringComparison.OrdinalIgnoreCase))
             {
-                if (splittedCommands.Length > 2)
-                {
-                    _routeManager.StartNewRouteRecording(string.Join(" ", splittedCommands.Skip(2)));
-                }
+                var name = args.Length > Resources.RouteCommandStartRecording.Length
+                    ? args.Substring(Resources.RouteCommandStartRecording.Length).Trim()
+                    : string.Empty;
+
+                if (!string.IsNullOrEmpty(name))
+                    _routeManager.StartNewRouteRecording(name);
                 else
-                {
                     _routeManager.StartNewRouteRecording();
-                }
 
                 command.Handled = true;
                 return;
             }
 
-            if (string.Equals(splittedCommands[1], Resources.RouteCommandStopRecording) && _routeManager.CanStopCurrentRouteRecording)
+            // "#route stoprecording [name]"
+            if (args.StartsWith(Resources.RouteCommandStopRecording, StringComparison.OrdinalIgnoreCase))
             {
-                if (splittedCommands.Length > 2)
-                {
-                    _routeManager.StopRouteRecording(string.Join(" ", splittedCommands.Skip(2)));
-                }
+                var name = args.Length > Resources.RouteCommandStopRecording.Length
+                    ? args.Substring(Resources.RouteCommandStopRecording.Length).Trim()
+                    : string.Empty;
+
+                if (!string.IsNullOrEmpty(name))
+                    _routeManager.StopRouteRecording(name);
                 else
-                {
                     _routeManager.StopRouteRecording();
-                }
 
                 command.Handled = true;
                 return;
             }
 
-            if (string.Equals(splittedCommands[1], Resources.RouteCommandCancelRecording) && _routeManager.CanCancelCurrentRouteRecording)
+            // "#route cancel"
+            if (string.Equals(args, Resources.RouteCommandCancelRecording, StringComparison.OrdinalIgnoreCase))
             {
                 _routeManager.CancelRouteRecording();
-
                 command.Handled = true;
                 return;
             }
 
-            if (string.Equals(splittedCommands[1], Resources.RouteCommandGoto) && _routeManager.CanStartRoute)
+            // "#route goto [dest]"
+            if (args.StartsWith(Resources.RouteCommandGoto, StringComparison.OrdinalIgnoreCase))
             {
-                if (splittedCommands.Length > 2)
-                {
-                    _routeManager.GotoDestination(string.Join(" ", splittedCommands.Skip(2)));
-                }
+                var dest = args.Length > Resources.RouteCommandGoto.Length
+                    ? args.Substring(Resources.RouteCommandGoto.Length).Trim()
+                    : string.Empty;
+
+                if (!string.IsNullOrEmpty(dest))
+                    _routeManager.GotoDestination(dest);
                 else
-                {
                     _routeManager.GotoDestination();
-                }
 
                 command.Handled = true;
                 return;
             }
 
-            if (string.Equals(splittedCommands[1], Resources.RouteCommandStop) && _routeManager.CanStopCurrentRoute)
+            // "#route stop"
+            if (string.Equals(args, Resources.RouteCommandStop, StringComparison.OrdinalIgnoreCase))
             {
                 _routeManager.StopRoutingToDestination();
+                command.Handled = true;
+                return;
+            }
+
+            // "#route lookahead [N|off]"
+            if (args.StartsWith(Resources.RouteCommandLookahead, StringComparison.OrdinalIgnoreCase))
+            {
+                var lookaheadArg = args.Length > Resources.RouteCommandLookahead.Length
+                    ? args.Substring(Resources.RouteCommandLookahead.Length).Trim()
+                    : string.Empty;
+
+                if (string.IsNullOrEmpty(lookaheadArg))
+                {
+                    PrintLookaheadStatus();
+                }
+                else if (string.Equals(lookaheadArg, "off", StringComparison.OrdinalIgnoreCase)
+                         || lookaheadArg == "0")
+                {
+                    _routeManager.SetLookahead(0);
+                    Say("Лукахед маршрута выключен.");
+                }
+                else if (int.TryParse(lookaheadArg, out int depth) && depth > 0)
+                {
+                    _routeManager.SetLookahead(depth);
+                    Say(string.Format("Лукахед маршрута: {0} комнат(ы) вперёд.", _routeManager.LookaheadSize));
+                }
 
                 command.Handled = true;
+                return;
             }
+        }
+
+        private void PrintHelp()
+        {
+            Say(Resources.RouteHelpGoto);
+            Say(Resources.RouteHelpStartRecording);
+            Say(Resources.RouteHelpStopRecording);
+            Say(Resources.RouteHelpCancelRecording);
+            Say(Resources.RouteHelpRoute);
+            Say(Resources.RouteHelpStopRoute);
+            Say(Resources.RouteHelpLookahead);
+            Say(Resources.RouteHelpHelp);
+        }
+
+        private void PrintLookaheadStatus()
+        {
+            if (_routeManager.LookaheadSize > 0)
+                Say(string.Format("Лукахед: включён, {0} комнат(ы) вперёд.", _routeManager.LookaheadSize));
+            else
+                Say("Лукахед: выключен. Включить: #route lookahead N");
+        }
+
+        private void Say(string text)
+        {
+            base.PushMessageToConveyor(new InfoMessage(text, TextColor.BrightYellow));
         }
     }
 }

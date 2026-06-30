@@ -55,5 +55,17 @@ namespace Adan.Client.Map.Properties {
                 this["MapZoomLevel"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int RouteLookaheadSize {
+            get {
+                return ((int)(this["RouteLookaheadSize"]));
+            }
+            set {
+                this["RouteLookaheadSize"] = value;
+            }
+        }
     }
 }

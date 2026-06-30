@@ -43,6 +43,11 @@
         private string _currentRouteTarget = string.Empty;
         private IList<Route> _allRoutes = new List<Route>();
 
+        // Route lookahead (pipeline): how many commands to keep in flight ahead of confirmed position.
+        // 0 = disabled (classic one-step mode). Persisted in Settings.
+        private int _lookaheadSize = Properties.Settings.Default.RouteLookaheadSize;
+        private int _pipelineDepth;  // commands currently in the server queue
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RouteManager"/> class.
@@ -652,6 +657,7 @@
             _currentRouteTarget = selectedRouteDestination;
             _rootModel.PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteStarted, selectedRouteDestination), TextColor.BrightYellow));
             _groupMembersCountOnRouteStart = _rootModel.GroupStatus.Count(g => g.InSameRoom);
+            _pipelineDepth = 0;
 
             UpdateCurrentRoom(_currentRoom, _currentZone);
 
@@ -688,6 +694,7 @@
 
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteStopped, TextColor.BrightYellow));
             _currentRouteTarget = string.Empty;
+            _pipelineDepth = 0;
         }
 
         /// <summary>
@@ -733,20 +740,29 @@
         /// <summary>
         /// Prints the help.
         /// </summary>
+        public int LookaheadSize => _lookaheadSize;
+
         public void PrintHelp()
         {
-            if (_rootModel == null)
-            {
-                return;
-            }
-
+            if (_rootModel == null) return;
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpGoto, TextColor.BrightYellow));
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpStartRecording, TextColor.BrightYellow));
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpStopRecording, TextColor.BrightYellow));
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpCancelRecording, TextColor.BrightYellow));
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpRoute, TextColor.BrightYellow));
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpStopRoute, TextColor.BrightYellow));
+            _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpLookahead, TextColor.BrightYellow));
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpHelp, TextColor.BrightYellow));
+        }
+
+        /// <summary>
+        /// Sets the lookahead depth. 0 = disabled. Output is handled by the caller (RouteUnit).
+        /// </summary>
+        public void SetLookahead(int size)
+        {
+            _lookaheadSize = Math.Max(0, Math.Min(size, 10));
+            Properties.Settings.Default.RouteLookaheadSize = _lookaheadSize;
+            Properties.Settings.Default.Save();
         }
 
         /// <summary>
@@ -827,6 +843,42 @@
             return result;
         }
 
+        // Sends additional route commands to fill the server queue up to _lookaheadSize.
+        // Called after the first step is already sent (pipelineDepth >= 1).
+        private void FillPipeline(Route route, bool gotoStart, int confirmedIndex)
+        {
+            while (_pipelineDepth < _lookaheadSize)
+            {
+                int fromOffset = _pipelineDepth;
+                int fromIndex = gotoStart ? confirmedIndex - fromOffset : confirmedIndex + fromOffset;
+                int toIndex = gotoStart ? fromIndex - 1 : fromIndex + 1;
+
+                if (toIndex < 0 || toIndex >= route.RouteRoomIdentifiers.Count)
+                    break;
+
+                int fromRoomId = route.RouteRoomIdentifiers[fromIndex];
+                int toRoomId = route.RouteRoomIdentifiers[toIndex];
+
+                var fromRoomVm = _currentZone?.AllRooms.FirstOrDefault(r => r.RoomId == fromRoomId);
+                if (fromRoomVm == null)
+                    break;
+
+                var fromExit = fromRoomVm.Room.Exits.FirstOrDefault(ex => ex.RoomId == toRoomId);
+                if (fromExit == null)
+                    break;
+
+                GotoDirection(fromExit.Direction);
+                _pipelineDepth++;
+
+                // Don't overshoot: stop after queuing the step that reaches the destination
+                bool isTarget = _allRoutes.Any(r =>
+                    (r.StartRoomId == toRoomId && string.Equals(_currentRouteTarget, r.StartName, StringComparison.CurrentCultureIgnoreCase))
+                    || (r.EndRoomId == toRoomId && string.Equals(_currentRouteTarget, r.EndName, StringComparison.CurrentCultureIgnoreCase)));
+                if (isTarget)
+                    break;
+            }
+        }
+
         private void GotoDirection(ExitDirection exitDirection)
         {
             // Маячок пути шага: маршрут решил и отправляет направление
@@ -862,25 +914,44 @@
             _rootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
         }
 
+        // pointName -> routes that start or end there; rebuilt in RebuildRouteIndexes
+        private Dictionary<string, List<Route>> _routesByPoint = new Dictionary<string, List<Route>>(StringComparer.OrdinalIgnoreCase);
+
         private void RebuildRouteIndexes()
         {
             _routeEndRoomIdentifiers.Clear();
             _routeRoomIdentifiers.Clear();
+
+            // Build adjacency lookup so TraverseRoute is O(degree) not O(N)
+            _routesByPoint.Clear();
             foreach (var route in _allRoutes)
             {
+                if (!_routesByPoint.TryGetValue(route.StartName, out var startList))
+                    _routesByPoint[route.StartName] = startList = new List<Route>();
+                startList.Add(route);
+
+                if (!_routesByPoint.TryGetValue(route.EndName, out var endList))
+                    _routesByPoint[route.EndName] = endList = new List<Route>();
+                endList.Add(route);
+
                 _routeEndRoomIdentifiers.Add(route.EndRoomId);
                 _routeEndRoomIdentifiers.Add(route.StartRoomId);
                 _routeRoomIdentifiers.UnionWith(route.RouteRoomIdentifiers);
+
                 route.RoutePointsAvailableFromStart.Clear();
                 route.RoutePointsAvailableFromEnd.Clear();
                 route.RoomIdentifiersSet.Clear();
                 route.RoomIdentifiersSet.UnionWith(route.RouteRoomIdentifiers);
-                var visitedRoutePoints = new HashSet<string> { route.StartName };
+            }
+
+            foreach (var route in _allRoutes)
+            {
+                var visitedRoutePoints = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { route.StartName };
                 var visitedRoutes = new HashSet<Route> { route };
                 route.RoutePointsAvailableFromStart[route.StartName] = 0;
                 TraverseRoute(route.StartName, visitedRoutePoints, visitedRoutes, route.RoutePointsAvailableFromStart, 1);
 
-                visitedRoutePoints = new HashSet<string> { route.EndName };
+                visitedRoutePoints = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { route.EndName };
                 visitedRoutes = new HashSet<Route> { route };
                 route.RoutePointsAvailableFromEnd[route.EndName] = 0;
                 TraverseRoute(route.EndName, visitedRoutePoints, visitedRoutes, route.RoutePointsAvailableFromEnd, 1);
@@ -889,28 +960,29 @@
 
         private void TraverseRoute([NotNull] string routePointName, [NotNull] ISet<string> visitedRoutePoints, [NotNull] ISet<Route> visitedRoutes, [NotNull] IDictionary<string, int> routePointsAvailabilityList, int currentDepth)
         {
-            Assert.ArgumentNotNullOrWhiteSpace(routePointName, "routePointName");
-            Assert.ArgumentNotNull(visitedRoutePoints, "visitedRoutePoints");
-            Assert.ArgumentNotNull(visitedRoutes, "visitedRoutes");
-            Assert.ArgumentNotNull(routePointsAvailabilityList, "routePointsAvailabilityList");
+            if (!_routesByPoint.TryGetValue(routePointName, out var neighbors))
+                return;
 
-            foreach (var nextRoute in _allRoutes.Except(visitedRoutes))
+            foreach (var nextRoute in neighbors)
             {
-                if (nextRoute.StartName == routePointName && !visitedRoutePoints.Contains(nextRoute.EndName))
-                {
-                    visitedRoutes.Add(nextRoute);
-                    visitedRoutePoints.Add(nextRoute.EndName);
-                    routePointsAvailabilityList[nextRoute.EndName] = currentDepth;
-                    TraverseRoute(nextRoute.EndName, visitedRoutePoints, visitedRoutes, routePointsAvailabilityList, currentDepth + 1);
-                }
+                if (visitedRoutes.Contains(nextRoute))
+                    continue;
 
-                if (nextRoute.EndName == routePointName && !visitedRoutePoints.Contains(nextRoute.StartName))
-                {
-                    visitedRoutes.Add(nextRoute);
-                    visitedRoutePoints.Add(nextRoute.StartName);
-                    routePointsAvailabilityList[nextRoute.StartName] = currentDepth;
-                    TraverseRoute(nextRoute.StartName, visitedRoutePoints, visitedRoutes, routePointsAvailabilityList, currentDepth + 1);
-                }
+                string neighbor = null;
+                if (nextRoute.StartName.Equals(routePointName, StringComparison.OrdinalIgnoreCase)
+                    && !visitedRoutePoints.Contains(nextRoute.EndName))
+                    neighbor = nextRoute.EndName;
+                else if (nextRoute.EndName.Equals(routePointName, StringComparison.OrdinalIgnoreCase)
+                    && !visitedRoutePoints.Contains(nextRoute.StartName))
+                    neighbor = nextRoute.StartName;
+
+                if (neighbor == null)
+                    continue;
+
+                visitedRoutes.Add(nextRoute);
+                visitedRoutePoints.Add(neighbor);
+                routePointsAvailabilityList[neighbor] = currentDepth;
+                TraverseRoute(neighbor, visitedRoutePoints, visitedRoutes, routePointsAvailabilityList, currentDepth + 1);
             }
         }
 
@@ -1060,20 +1132,32 @@
                 }
                 else
                 {
+                    // One room confirmed: one in-flight command consumed
+                    if (_pipelineDepth > 0)
+                        _pipelineDepth--;
+
                     var currentRoomIndex = minRoute.RouteRoomIdentifiers.IndexOf(newCurrentRoom.RoomId);
-                    int nextRoomId = gotoStart
-                                         ? minRoute.RouteRoomIdentifiers[currentRoomIndex - 1]
-                                         : minRoute.RouteRoomIdentifiers[currentRoomIndex + 1];
-                    var exit = newCurrentRoom.Room.Exits.FirstOrDefault(ex => ex.RoomId == nextRoomId);
-                    if (exit == null)
+
+                    // Only send next command if pipeline is empty.
+                    // When lookahead is active the next command is already in-flight from a previous FillPipeline call.
+                    if (_pipelineDepth == 0)
                     {
-                        _rootModel.PushMessageToConveyor(new ErrorMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetIsNotAvailable, _currentRouteTarget)));
-                        StopRoutingToDestination();
-                    }
-                    else
-                    {
+                        int nextRoomId = gotoStart
+                                             ? minRoute.RouteRoomIdentifiers[currentRoomIndex - 1]
+                                             : minRoute.RouteRoomIdentifiers[currentRoomIndex + 1];
+                        var exit = newCurrentRoom.Room.Exits.FirstOrDefault(ex => ex.RoomId == nextRoomId);
+                        if (exit == null)
+                        {
+                            _rootModel.PushMessageToConveyor(new ErrorMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetIsNotAvailable, _currentRouteTarget)));
+                            StopRoutingToDestination();
+                            return;
+                        }
                         GotoDirection(exit.Direction);
+                        _pipelineDepth++;
                     }
+
+                    if (_lookaheadSize > 0)
+                        FillPipeline(minRoute, gotoStart, currentRoomIndex);
                 }
             }
 

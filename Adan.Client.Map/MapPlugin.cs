@@ -123,7 +123,7 @@ namespace Adan.Client.Map
             _zoneManager = new ZoneManager(_mapControl, MainWindowEx, _routeManager, _herbManager);
             _herbManager?.SetZoneManager(_zoneManager);
             initializationStatusModel.PluginInitializationStatus = "Routes loading";
-            _routeManager.LoadRoutes();
+            Task.Factory.StartNew(() => { try { _routeManager.LoadRoutes(); } catch (Exception) { } });
 
             Task.Factory.StartNew(() =>
                 {

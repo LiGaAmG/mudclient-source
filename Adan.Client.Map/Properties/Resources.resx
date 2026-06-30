@@ -271,30 +271,36 @@
     <value>stoprecording</value>
   </data>
   <data name="RouteHelpCancelRecording" xml:space="preserve">
-    <value>"route cancel" - stops recording current route without saving it.</value>
+    <value>"#route cancel" - stops recording current route without saving it.</value>
   </data>
   <data name="RouteHelpGoto" xml:space="preserve">
     <value>"goto &lt;room alias|room name&gt;" - navigates to the room with specified alias/name inside current zone.</value>
   </data>
   <data name="RouteHelpRoute" xml:space="preserve">
-    <value>"route goto &lt;point name&gt;" - starts routing to specified point.</value>
+    <value>"#route goto &lt;point name&gt;" - starts routing to specified point.</value>
   </data>
   <data name="RouteHelpStartRecording" xml:space="preserve">
-    <value>"route start &lt;start point name&gt;" - start recording new route.</value>
+    <value>"#route start &lt;start point name&gt;" - start recording new route.</value>
   </data>
   <data name="RouteHelpStopRecording" xml:space="preserve">
-    <value>"route stoprecording &lt;end point name&gt;" - stops recording current route.</value>
+    <value>"#route stoprecording &lt;end point name&gt;" - stops recording current route.</value>
   </data>
   <data name="RouteHelpStopRoute" xml:space="preserve">
-    <value>"route stop" - stops routing current route.</value>
+    <value>"#route stop" - stops routing current route.</value>
   </data>
   <data name="RouteHelpHelp" xml:space="preserve">
-    <value>"route help" - display this help.</value>
+    <value>"#route help" - display this help.</value>
   </data>
   <data name="RouteSpecifiedRoomDoesNotExists" xml:space="preserve">
     <value>Specified room does not exists.</value>
   </data>
   <data name="RouteCommandHelp" xml:space="preserve">
     <value>help</value>
+  </data>
+  <data name="RouteCommandLookahead" xml:space="preserve">
+    <value>lookahead</value>
+  </data>
+  <data name="RouteHelpLookahead" xml:space="preserve">
+    <value>"#route lookahead N" - enable N-room lookahead (pipeline). "#route lookahead off" or "#route lookahead 0" - disable. "#route lookahead" - show current setting.</value>
   </data>
 </root>

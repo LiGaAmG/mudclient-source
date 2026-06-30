@@ -248,6 +248,15 @@ namespace Adan.Client.Map.Properties {
                 return ResourceManager.GetString("RouteCommandHelp", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to lookahead.
+        /// </summary>
+        public static string RouteCommandLookahead {
+            get {
+                return ResourceManager.GetString("RouteCommandLookahead", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to route.
@@ -399,6 +408,15 @@ namespace Adan.Client.Map.Properties {
         public static string RouteHelpStopRoute {
             get {
                 return ResourceManager.GetString("RouteHelpStopRoute", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &quot;route lookahead N&quot; - enable N-room lookahead. &quot;route lookahead off&quot; - disable..
+        /// </summary>
+        public static string RouteHelpLookahead {
+            get {
+                return ResourceManager.GetString("RouteHelpLookahead", resourceCulture);
             }
         }
         
