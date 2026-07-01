@@ -334,6 +334,7 @@ namespace Adan.Client.Map
             _maxDangerLevel = maxDangerLevel;
             _homeRoomId = _currentRoom.RoomId;
             _homeZone = _currentZone;
+            _travelTargetWaypoint = null;
 
             // Build cross-zone herb map from disk
             var allHerbZones = _zoneManager?.ScanAllHerbRooms(maxDangerLevel) ?? new List<KeyValuePair<int, List<int>>>();
@@ -389,6 +390,7 @@ namespace Adan.Client.Map
             _state = GatherState.Idle;
             _pendingRoomsInZone.Clear();
             _pendingZones = null;
+            _travelTargetWaypoint = null;
             _routeManager.StopRoutingToDestination();
             PushInfo("Сбор травы остановлен.");
         }
@@ -672,7 +674,7 @@ namespace Adan.Client.Map
                 if (PauseForLowMovesIfNeeded())
                     return;
 
-                bool started = _routeManager.GotoDestination(_travelTargetWaypoint);
+                bool started = _routeManager.GotoDestination(_travelTargetWaypoint, useLookahead: false);
                 if (!started)
                 {
                     PushInfo(string.Format(CultureInfo.InvariantCulture,
@@ -712,7 +714,7 @@ namespace Adan.Client.Map
             if (PauseForLowMovesIfNeeded())
                 return;
 
-            bool started = _routeManager.GotoDestination(_travelTargetWaypoint);
+            bool started = _routeManager.GotoDestination(_travelTargetWaypoint, useLookahead: false);
             if (!started)
             {
                 PushInfo(string.Format(CultureInfo.InvariantCulture,
@@ -832,7 +834,7 @@ namespace Adan.Client.Map
                 if (PauseForLowMovesIfNeeded())
                     return;
 
-                bool started = _routeManager.GotoDestination(waypoint);
+                bool started = _routeManager.GotoDestination(waypoint, useLookahead: false);
                 if (!started)
                 {
                     PushInfo(string.Format(CultureInfo.InvariantCulture,
@@ -983,7 +985,7 @@ namespace Adan.Client.Map
                 if (PauseForLowMovesIfNeeded())
                     return;
 
-                _routeManager.GotoDestination(waypoint);
+                _routeManager.GotoDestination(waypoint, useLookahead: false);
             }
             else
             {
@@ -1169,6 +1171,7 @@ namespace Adan.Client.Map
             _state = GatherState.Idle;
             _pendingRoomsInZone.Clear();
             _pendingZones = null;
+            _travelTargetWaypoint = null;
             _routeManager.StopRoutingToDestination();
         }
 
@@ -1242,7 +1245,7 @@ namespace Adan.Client.Map
                     }
                     else if (!string.IsNullOrEmpty(_travelTargetWaypoint))
                     {
-                        bool started = _routeManager.GotoDestination(_travelTargetWaypoint);
+                        bool started = _routeManager.GotoDestination(_travelTargetWaypoint, useLookahead: false);
                         if (!started)
                         {
                             PushInfo(string.Format(CultureInfo.InvariantCulture,

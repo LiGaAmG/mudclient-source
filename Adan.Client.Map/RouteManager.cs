@@ -48,6 +48,11 @@
         private int _lookaheadSize = Properties.Settings.Default.RouteLookaheadSize;
         private int _pipelineDepth;  // commands currently in the server queue
 
+        // Lookahead applies only to explicit user "маршрут идти" commands.
+        // Herb-driven automated travel needs synchronous per-room control (it reacts
+        // to each room individually), so it requests useLookahead: false.
+        private int _effectiveLookahead;
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RouteManager"/> class.
@@ -593,10 +598,13 @@
         /// Starts routing to some destination.
         /// </summary>
         /// <param name="selectedRouteDestination">The selected route destination.</param>
+        /// <param name="useLookahead">Whether to apply the user-configured lookahead pipeline.
+        /// Automated callers (herb gatherer) should pass false — they react per-room and don't
+        /// tolerate moves being sent ahead of confirmation.</param>
         /// <returns>
         ///   <c>true</c> if routing was started; otherwise - <c>false</c>.
         /// </returns>
-        public bool GotoDestination([NotNull] string selectedRouteDestination)
+        public bool GotoDestination([NotNull] string selectedRouteDestination, bool useLookahead = true)
         {
             Assert.ArgumentNotNull(selectedRouteDestination, "selectedRouteDestination");
 
@@ -630,7 +638,7 @@
 
                 if (matches.Count == 1)
                 {
-                    return GotoDestination(matches[0]);
+                    return GotoDestination(matches[0], useLookahead);
                 }
 
                 if (matches.Count > 1)
@@ -645,7 +653,7 @@
                     var res = dialog.ShowDialog();
                     if (res.HasValue && res.Value && !string.IsNullOrEmpty(SelectedRouteDestination))
                     {
-                        return GotoDestination(SelectedRouteDestination);
+                        return GotoDestination(SelectedRouteDestination, useLookahead);
                     }
                     return false;
                 }
@@ -657,6 +665,7 @@
             _currentRouteTarget = selectedRouteDestination;
             _rootModel.PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteStarted, selectedRouteDestination), TextColor.BrightYellow));
             _groupMembersCountOnRouteStart = _rootModel.GroupStatus.Count(g => g.InSameRoom);
+            _effectiveLookahead = useLookahead ? _lookaheadSize : 0;
             _pipelineDepth = 0;
 
             UpdateCurrentRoom(_currentRoom, _currentZone);
@@ -695,6 +704,7 @@
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteStopped, TextColor.BrightYellow));
             _currentRouteTarget = string.Empty;
             _pipelineDepth = 0;
+            _effectiveLookahead = 0;
         }
 
         /// <summary>
@@ -847,7 +857,7 @@
         // Called after the first step is already sent (pipelineDepth >= 1).
         private void FillPipeline(Route route, bool gotoStart, int confirmedIndex)
         {
-            while (_pipelineDepth < _lookaheadSize)
+            while (_pipelineDepth < _effectiveLookahead)
             {
                 int fromOffset = _pipelineDepth;
                 int fromIndex = gotoStart ? confirmedIndex - fromOffset : confirmedIndex + fromOffset;
@@ -1156,7 +1166,7 @@
                         _pipelineDepth++;
                     }
 
-                    if (_lookaheadSize > 0)
+                    if (_effectiveLookahead > 0)
                         FillPipeline(minRoute, gotoStart, currentRoomIndex);
                 }
             }
