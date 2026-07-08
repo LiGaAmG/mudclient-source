@@ -53,6 +53,14 @@
         // to each room individually), so it requests useLookahead: false.
         private int _effectiveLookahead;
 
+        // Track which route+direction the current pipeline was built for.
+        // FillPipeline is skipped when minRoute switches mid-pipeline: the in-flight
+        // commands for the OLD route are already on the server and can't be cancelled;
+        // adding new commands for a DIFFERENT route would send directions relative to
+        // a future position, not the actual character position when they execute.
+        private Route _pipelineRoute;
+        private bool _pipelineGotoStart;
+
         // Background tab route state: routes keep running even when the tab is not displayed.
         private sealed class BgTabContext
         {
@@ -64,6 +72,8 @@
             public RoomViewModel CurrentRoom;
             public ZoneViewModel CurrentZone;
             public bool IsUpdateInProgress;
+            public Route PipelineRoute;
+            public bool PipelineGotoStart;
             public readonly Queue<Tuple<RoomViewModel, ZoneViewModel>> PendingUpdates
                 = new Queue<Tuple<RoomViewModel, ZoneViewModel>>();
             public BgTabContext(RootModel rootModel) { RootModel = rootModel; }
@@ -722,6 +732,7 @@
             _currentRouteTarget = string.Empty;
             _pipelineDepth = 0;
             _effectiveLookahead = 0;
+            _pipelineRoute = null;
         }
 
         /// <summary>
@@ -832,6 +843,7 @@
             _currentRouteTarget = string.Empty;
             _pipelineDepth = 0;
             _effectiveLookahead = 0;
+            _pipelineRoute = null;
 
             _rootModel = rootModel;
 
@@ -966,6 +978,14 @@
                 int fromRoomId = route.RouteRoomIdentifiers[fromIndex];
                 int toRoomId = route.RouteRoomIdentifiers[toIndex];
 
+                // Don't pre-fill a command that departs FROM a junction room.
+                // When we physically arrive at a junction we may need to switch routes — the
+                // direction on the current route might be wrong.  Stopping here means we arrive
+                // at the junction with pd=0 and re-evaluate direction cleanly.
+                bool fromIsJunction = _allRoutes.Any(r => r.StartRoomId == fromRoomId || r.EndRoomId == fromRoomId);
+                if (fromIsJunction)
+                    break;
+
                 var fromRoomVm = _currentZone?.AllRooms.FirstOrDefault(r => r.RoomId == fromRoomId);
                 if (fromRoomVm == null)
                     break;
@@ -977,7 +997,7 @@
                 GotoDirection(fromExit.Direction);
                 _pipelineDepth++;
 
-                // Don't overshoot: stop after queuing the step that reaches the destination
+                // Don't overshoot: stop after queuing the step that reaches the destination.
                 bool isTarget = _allRoutes.Any(r =>
                     (r.StartRoomId == toRoomId && string.Equals(_currentRouteTarget, r.StartName, StringComparison.CurrentCultureIgnoreCase))
                     || (r.EndRoomId == toRoomId && string.Equals(_currentRouteTarget, r.EndName, StringComparison.CurrentCultureIgnoreCase)));
@@ -1015,12 +1035,34 @@
                 { gotoStart = false; minLen = route.RoutePointsAvailableFromEnd[ctx.RouteTarget]; minRoute = route; }
             }
 
+            // Same intermediate-room override as the main tab: if _pipelineRoute is set and
+            // the current room is a non-junction intermediate room on that route, stay on it.
+            if (!targetAchieved && minRoute != null && ctx.PipelineRoute != null
+                && minRoute != ctx.PipelineRoute
+                && ctx.PipelineRoute.RoomIdentifiersSet.Contains(newRoom.RoomId))
+            {
+                bool atTransitJunction = ctx.PipelineGotoStart
+                    ? ctx.PipelineRoute.StartRoomId == newRoom.RoomId
+                    : ctx.PipelineRoute.EndRoomId == newRoom.RoomId;
+                if (!atTransitJunction)
+                {
+                    bool canReach = ctx.PipelineRoute.RoutePointsAvailableFromStart.ContainsKey(ctx.RouteTarget)
+                                 || ctx.PipelineRoute.RoutePointsAvailableFromEnd.ContainsKey(ctx.RouteTarget);
+                    if (canReach)
+                    {
+                        minRoute = ctx.PipelineRoute;
+                        gotoStart = ctx.PipelineGotoStart;
+                    }
+                }
+            }
+
             if (targetAchieved)
             {
                 ctx.RootModel.PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetAchieved, ctx.RouteTarget), TextColor.BrightYellow));
                 ctx.RouteTarget = string.Empty;
                 ctx.PipelineDepth = 0;
                 ctx.EffectiveLookahead = 0;
+                ctx.PipelineRoute = null;
                 _bgTabContexts.Remove(ctx.RootModel.Uid);
             }
             else if (minRoute == null)
@@ -1054,6 +1096,8 @@
                         return;
                     }
                     GotoDirectionVia(ctx.RootModel, exit.Direction);
+                    ctx.PipelineRoute = minRoute;
+                    ctx.PipelineGotoStart = gotoStart;
                     ctx.PipelineDepth++;
                 }
 
@@ -1065,15 +1109,19 @@
                         int fi = gotoStart ? idx - off : idx + off;
                         int ti = gotoStart ? fi - 1 : fi + 1;
                         if (ti < 0 || ti >= minRoute.RouteRoomIdentifiers.Count) break;
-                        var fvm = ctx.CurrentZone?.AllRooms.FirstOrDefault(r => r.RoomId == minRoute.RouteRoomIdentifiers[fi]);
+                        int bgFromRoomId = minRoute.RouteRoomIdentifiers[fi];
+                        int bgToRoomId = minRoute.RouteRoomIdentifiers[ti];
+                        bool fromIsJunction = _allRoutes.Any(r => r.StartRoomId == bgFromRoomId || r.EndRoomId == bgFromRoomId);
+                        if (fromIsJunction) break;
+                        var fvm = ctx.CurrentZone?.AllRooms.FirstOrDefault(r => r.RoomId == bgFromRoomId);
                         if (fvm == null) break;
-                        var fex = fvm.Room.Exits.FirstOrDefault(ex => ex.RoomId == minRoute.RouteRoomIdentifiers[ti]);
+                        var fex = fvm.Room.Exits.FirstOrDefault(ex => ex.RoomId == bgToRoomId);
                         if (fex == null) break;
                         GotoDirectionVia(ctx.RootModel, fex.Direction);
                         ctx.PipelineDepth++;
                         bool isTarget = _allRoutes.Any(r =>
-                            (r.StartRoomId == minRoute.RouteRoomIdentifiers[ti] && string.Equals(ctx.RouteTarget, r.StartName, StringComparison.CurrentCultureIgnoreCase))
-                            || (r.EndRoomId == minRoute.RouteRoomIdentifiers[ti] && string.Equals(ctx.RouteTarget, r.EndName, StringComparison.CurrentCultureIgnoreCase)));
+                            (r.StartRoomId == bgToRoomId && string.Equals(ctx.RouteTarget, r.StartName, StringComparison.CurrentCultureIgnoreCase))
+                            || (r.EndRoomId == bgToRoomId && string.Equals(ctx.RouteTarget, r.EndName, StringComparison.CurrentCultureIgnoreCase)));
                         if (isTarget) break;
                     }
                 }
@@ -1336,6 +1384,30 @@
                     }
                 }
 
+                // If minRoute switched away from _pipelineRoute but the current room is still
+                // an intermediate room on _pipelineRoute (not yet at its junction endpoint),
+                // stay on _pipelineRoute. Without this, a room shared by two routes (e.g. 15048
+                // appears in both мт+→эдорас and эдорас→изен) causes a premature route switch
+                // that skips the required junction (эдорас) when pipelineDepth reaches 0.
+                if (!targetAchieved && minRoute != null && _pipelineRoute != null
+                    && minRoute != _pipelineRoute
+                    && _pipelineRoute.RoomIdentifiersSet.Contains(newCurrentRoom.RoomId))
+                {
+                    bool atTransitJunction = _pipelineGotoStart
+                        ? _pipelineRoute.StartRoomId == newCurrentRoom.RoomId
+                        : _pipelineRoute.EndRoomId == newCurrentRoom.RoomId;
+                    if (!atTransitJunction)
+                    {
+                        bool canReach = _pipelineRoute.RoutePointsAvailableFromStart.ContainsKey(_currentRouteTarget)
+                                     || _pipelineRoute.RoutePointsAvailableFromEnd.ContainsKey(_currentRouteTarget);
+                        if (canReach)
+                        {
+                            minRoute = _pipelineRoute;
+                            gotoStart = _pipelineGotoStart;
+                        }
+                    }
+                }
+
                 if (targetAchieved)
                 {
                     _rootModel.PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetAchieved, _currentRouteTarget), TextColor.BrightYellow));
@@ -1374,10 +1446,16 @@
                             return;
                         }
                         GotoDirection(exit.Direction);
+                        _pipelineRoute = minRoute;
+                        _pipelineGotoStart = gotoStart;
                         _pipelineDepth++;
                     }
 
-                    if (_effectiveLookahead > 0)
+                    // Only fill ahead when we're still on the same route that started the pipeline.
+                    // If minRoute switched while pd > 0, in-flight commands belong to a different route;
+                    // adding lookahead for the new route would send directions computed relative to a
+                    // future room position that the character won't actually be in when they execute.
+                    if (_effectiveLookahead > 0 && minRoute == _pipelineRoute && gotoStart == _pipelineGotoStart)
                         FillPipeline(minRoute, gotoStart, currentRoomIndex);
                 }
             }
