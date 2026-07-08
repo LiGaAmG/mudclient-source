@@ -592,6 +592,25 @@ namespace Adan.Client.Common.Scripting
         /// </summary>
         public void RaiseRoomChanged(int roomId, int zoneId, RoomInfo roomInfo)
         {
+            _lua["__last_room_id"] = (double)roomId;
+            _lua["__last_zone_id"] = (double)zoneId;
+
+            // Skip expensive Lua table construction when no script is waiting on
+            // a room change -- avoids N+2 DoString("return {}") calls per step
+            // on routes even when no scripts are running at all.
+            bool anyWaiting = false;
+            foreach (var pair in _runningScripts)
+            {
+                if (pair.Value.Status == ScriptRunStatus.WaitingOnRoomChange)
+                {
+                    anyWaiting = true;
+                    break;
+                }
+            }
+
+            if (!anyWaiting)
+                return;
+
             object roomTable = null;
             if (roomInfo != null)
             {
@@ -621,8 +640,6 @@ namespace Adan.Client.Common.Scripting
                 roomTable = table;
             }
 
-            _lua["__last_room_id"] = (double)roomId;
-            _lua["__last_zone_id"] = (double)zoneId;
             _lua["__last_room"] = roomTable;
             ResumeAllWaitingOn(ScriptRunStatus.WaitingOnRoomChange);
         }

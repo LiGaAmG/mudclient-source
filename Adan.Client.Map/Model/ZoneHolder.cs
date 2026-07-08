@@ -92,10 +92,12 @@ namespace Adan.Client.Map.Model
                     if (!string.IsNullOrEmpty(zoneName))
                         RootModel.CurrentZoneName = zoneName;
 
-                    RootModel.ScriptHost.RaiseRoomChanged(RoomId, ZoneId, BuildRoomInfo(zoneViewModel, zoneName));
-
                     _zoneManager.ExecuteRoomAction(this);
                     _zoneManager.UpdateControl(this);
+
+                    // Lua room-change AFTER the route command so routing never waits
+                    // for Lua table construction or coroutine resumption.
+                    RootModel.ScriptHost.RaiseRoomChanged(RoomId, ZoneId, BuildRoomInfo(zoneViewModel, zoneName));
 
                     sw.Stop();
                     // Маячок пути шага: вся обработка смены комнаты (зона+травник+маршрут+карта)
