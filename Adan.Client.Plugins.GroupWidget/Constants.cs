@@ -65,7 +65,7 @@ namespace Adan.Client.Plugins.GroupWidget
                                   new AffectDescription("GroupAccuracy", "Групповая точность", "групповая точность", "GroupAccuracy"),
                                   new AffectDescription("Tornado", Resources.Tornado, "торнадо", "Tornado") { IsRoundBased = true },
                                   new AffectDescription("Thirst", Resources.HungerThirst, new List<string> {"жажда", "голод"},new List<string> { "Thirst", "Hunger"}) { IsRoundBased = false },
-                                  new AffectDescription("Calm",            "Успокоение",          "успокоение",            "Calm"),
+                                  new AffectDescription("Calm",            "Успокоение",          "успокоение",            "Calm") { IsRoundBased = true },
                                   new AffectDescription("Sanctify",        "Освящение",           "освящение",             "Sanctify"),
                                   new AffectDescription("MagicShield",     "Магический щит",      "магический щит",        "MagicShield"),
                                   new AffectDescription("IceShield",       "Ледяной щит",         "ледяной щит",           "IceShield"),

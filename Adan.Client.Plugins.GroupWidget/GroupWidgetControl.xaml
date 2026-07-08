@@ -105,6 +105,10 @@
                         </Setter.Value>
                     </Setter>
                     <Style.Triggers>
+                        <!-- Спящая строка пула: скрыта, контейнер живёт для переиспользования -->
+                        <DataTrigger Binding="{Binding IsActive}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
                         <Trigger Property="ItemsControl.AlternationIndex" Value="0">
                             <Setter Property="Background" Value="Black">
                             </Setter>

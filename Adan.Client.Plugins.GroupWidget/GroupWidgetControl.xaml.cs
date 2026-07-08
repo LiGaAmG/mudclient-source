@@ -96,17 +96,16 @@ namespace Adan.Client.Plugins.GroupWidget
             {
                 if (DataContext != null)
                 {
-                    var groupWidgetControl = (GroupStatusViewModel)DataContext;
-
-                    if (groupWidgetControl.SelectedGroupMate == null
-                        || groupWidgetControl.GroupMates.IndexOf(groupWidgetControl.SelectedGroupMate) == groupWidgetControl.GroupMates.Count - 1)
+                    var vm = (GroupStatusViewModel)DataContext;
+                    var active = vm.GroupMates.Where(m => m.IsActive).ToList();
+                    if (vm.SelectedGroupMate == null || active.IndexOf(vm.SelectedGroupMate) == active.Count - 1)
                     {
-                        groupWidgetControl.SelectedGroupMate = groupWidgetControl.GroupMates.FirstOrDefault();
+                        vm.SelectedGroupMate = active.FirstOrDefault();
                         return;
                     }
 
-                    var index = groupWidgetControl.GroupMates.IndexOf(groupWidgetControl.SelectedGroupMate);
-                    groupWidgetControl.SelectedGroupMate = groupWidgetControl.GroupMates[index + 1];
+                    var index = active.IndexOf(vm.SelectedGroupMate);
+                    vm.SelectedGroupMate = active[index + 1];
                 }
             };
 
@@ -114,7 +113,7 @@ namespace Adan.Client.Plugins.GroupWidget
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         public void PreviousGroupMate()
         {
@@ -122,17 +121,16 @@ namespace Adan.Client.Plugins.GroupWidget
             {
                 if (DataContext != null)
                 {
-                    var groupWidgetControl = (GroupStatusViewModel)DataContext;
-
-                    if (groupWidgetControl.SelectedGroupMate == null
-                        || groupWidgetControl.GroupMates.IndexOf(groupWidgetControl.SelectedGroupMate) == 0)
+                    var vm = (GroupStatusViewModel)DataContext;
+                    var active = vm.GroupMates.Where(m => m.IsActive).ToList();
+                    if (vm.SelectedGroupMate == null || active.IndexOf(vm.SelectedGroupMate) == 0)
                     {
-                        groupWidgetControl.SelectedGroupMate = groupWidgetControl.GroupMates.LastOrDefault();
+                        vm.SelectedGroupMate = active.LastOrDefault();
                         return;
                     }
 
-                    var index = groupWidgetControl.GroupMates.IndexOf(groupWidgetControl.SelectedGroupMate);
-                    groupWidgetControl.SelectedGroupMate = groupWidgetControl.GroupMates[index - 1];
+                    var index = active.IndexOf(vm.SelectedGroupMate);
+                    vm.SelectedGroupMate = active[index - 1];
                 }
             };
 

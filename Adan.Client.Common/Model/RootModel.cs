@@ -581,11 +581,24 @@
                 return GetMonsterIdTarget(variableName);
             }
 
-            if (variableName.Equals("MonsterLast", StringComparison.OrdinalIgnoreCase))
+            if (variableName.StartsWith("MonsterLast", StringComparison.OrdinalIgnoreCase))
             {
-                if (RoomMonstersStatus.Count == 0)
-                    return string.Empty;
-                return GetMonsterOrGroupMateTarget("Monster" + RoomMonstersStatus.Count, "Monster", SelectedRoomMonster, RoomMonstersStatus);
+                var filter = variableName.Substring("MonsterLast".Length);
+                if (string.IsNullOrEmpty(filter))
+                {
+                    if (RoomMonstersStatus.Count == 0)
+                        return string.Empty;
+                    return GetMonsterOrGroupMateTarget("Monster" + RoomMonstersStatus.Count, "Monster", SelectedRoomMonster, RoomMonstersStatus);
+                }
+
+                int count = 0;
+                foreach (var m in RoomMonstersStatus)
+                {
+                    if (m.Name != null && NameMatchesFilter(m.Name, filter))
+                        count++;
+                }
+                if (count == 0) return string.Empty;
+                return count == 1 ? filter : count + "." + filter;
             }
 
             if (variableName.StartsWith("Monster", StringComparison.OrdinalIgnoreCase))
@@ -618,6 +631,17 @@
             }
 
             return variablesList.Count > 0 ? variablesList[variablesList.Count - 1].Value : ("$" + variableName);
+        }
+
+        private static bool NameMatchesFilter(string name, string filter)
+        {
+            var words = name.Split(' ');
+            foreach (var word in words)
+            {
+                if (word.StartsWith(filter, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
         }
 
         private string GetMonsterIdTarget(string variableName)

@@ -185,19 +185,27 @@
                     break;
                 }
 
-                if (position < GroupMates.Count && GroupMates[position].Name == characterStatus.Name)
+                if (position < GroupMates.Count)
                 {
-                    GroupMates[position].UpdateFromModel(characterStatus, position + 1);
-                    if (SelectedGroupMate != null && SelectedGroupMate == GroupMates[position])
+                    var existing = GroupMates[position];
+                    if (existing.IsActive && existing.Name == characterStatus.Name)
                     {
-                        RootModel.SelectedGroupMate = characterStatus;
+                        existing.UpdateFromModel(characterStatus, position + 1);
+                        if (SelectedGroupMate != null && SelectedGroupMate == existing)
+                            RootModel.SelectedGroupMate = characterStatus;
                     }
-
+                    else
+                    {
+                        if (SelectedGroupMate == existing)
+                            SelectedGroupMate = null;
+                        existing.Reassign(characterStatus, position + 1);
+                        existing.IsActive = true;
+                    }
                 }
                 else
                 {
                     var affectsList = _displayedAffectNames.Select(af => Constants.AllAffects.First(a => a.Name == af));
-                    GroupMates.Insert(position, new GroupMateViewModel(characterStatus, affectsList, position + 1, AffectsPanelWidth) { DisplayNumber = DisplayNumber, MemTimeVisibleSetting = MemTimeVisible });
+                    GroupMates.Add(new GroupMateViewModel(characterStatus, affectsList, position + 1, AffectsPanelWidth) { DisplayNumber = DisplayNumber, MemTimeVisibleSetting = MemTimeVisible });
                 }
 
                 position++;
@@ -205,12 +213,14 @@
 
             for (int i = position; i < GroupMates.Count; i++)
             {
-                if (SelectedGroupMate != null && SelectedGroupMate == GroupMates[position])
-                {
-                    SelectedGroupMate = null;
-                }
+                var spare = GroupMates[i];
+                if (!spare.IsActive)
+                    continue;
 
-                GroupMates.RemoveAt(position);
+                if (SelectedGroupMate == spare)
+                    SelectedGroupMate = null;
+
+                spare.IsActive = false;
             }
 
             MoreItemsAvailable = moreItemsAvailable;
