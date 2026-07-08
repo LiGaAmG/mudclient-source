@@ -94,6 +94,9 @@ namespace Adan.Client.Map.Model
 
                     _zoneManager.ExecuteRoomAction(this);
                     _zoneManager.UpdateControl(this);
+                    // Route background processing: drives routes on tabs not currently displayed.
+                    if (zoneViewModel != null)
+                        _zoneManager.RouteManager?.ProcessRoomChangeForTab(RootModel, zoneViewModel.AllRooms.FirstOrDefault(r => r.RoomId == RoomId), zoneViewModel);
 
                     // Lua room-change AFTER the route command so routing never waits
                     // for Lua table construction or coroutine resumption.

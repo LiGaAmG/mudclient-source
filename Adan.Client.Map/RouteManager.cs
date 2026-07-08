@@ -44,14 +44,31 @@
         private IList<Route> _allRoutes = new List<Route>();
 
         // Route lookahead (pipeline): how many commands to keep in flight ahead of confirmed position.
-        // 0 = disabled (classic one-step mode). Persisted in Settings.
-        private int _lookaheadSize = Properties.Settings.Default.RouteLookaheadSize;
+        // 0 = disabled (classic one-step mode). Per-tab: each uid has its own value.
+        private readonly Dictionary<string, int> _lookaheadPerUid = new Dictionary<string, int>();
         private int _pipelineDepth;  // commands currently in the server queue
 
         // Lookahead applies only to explicit user "маршрут идти" commands.
         // Herb-driven automated travel needs synchronous per-room control (it reacts
         // to each room individually), so it requests useLookahead: false.
         private int _effectiveLookahead;
+
+        // Background tab route state: routes keep running even when the tab is not displayed.
+        private sealed class BgTabContext
+        {
+            public readonly RootModel RootModel;
+            public string RouteTarget = string.Empty;
+            public int PipelineDepth;
+            public int EffectiveLookahead;
+            public int GroupMembersCountOnStart;
+            public RoomViewModel CurrentRoom;
+            public ZoneViewModel CurrentZone;
+            public bool IsUpdateInProgress;
+            public readonly Queue<Tuple<RoomViewModel, ZoneViewModel>> PendingUpdates
+                = new Queue<Tuple<RoomViewModel, ZoneViewModel>>();
+            public BgTabContext(RootModel rootModel) { RootModel = rootModel; }
+        }
+        private readonly Dictionary<string, BgTabContext> _bgTabContexts = new Dictionary<string, BgTabContext>();
 
 
         /// <summary>
@@ -665,7 +682,7 @@
             _currentRouteTarget = selectedRouteDestination;
             _rootModel.PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteStarted, selectedRouteDestination), TextColor.BrightYellow));
             _groupMembersCountOnRouteStart = _rootModel.GroupStatus.Count(g => g.InSameRoom);
-            _effectiveLookahead = useLookahead ? _lookaheadSize : 0;
+            _effectiveLookahead = useLookahead ? GetLookahead() : 0;
             _pipelineDepth = 0;
 
             UpdateCurrentRoom(_currentRoom, _currentZone);
@@ -750,7 +767,7 @@
         /// <summary>
         /// Prints the help.
         /// </summary>
-        public int LookaheadSize => _lookaheadSize;
+        public int LookaheadSize => GetLookahead();
 
         public void PrintHelp()
         {
@@ -765,14 +782,20 @@
             _rootModel.PushMessageToConveyor(new InfoMessage(Resources.RouteHelpHelp, TextColor.BrightYellow));
         }
 
+        private int GetLookahead()
+        {
+            if (_rootModel != null && _lookaheadPerUid.TryGetValue(_rootModel.Uid, out int v))
+                return v;
+            return 0;
+        }
+
         /// <summary>
-        /// Sets the lookahead depth. 0 = disabled. Output is handled by the caller (RouteUnit).
+        /// Sets the lookahead depth for the current tab. 0 = disabled.
         /// </summary>
         public void SetLookahead(int size)
         {
-            _lookaheadSize = Math.Max(0, Math.Min(size, 10));
-            Properties.Settings.Default.RouteLookaheadSize = _lookaheadSize;
-            Properties.Settings.Default.Save();
+            if (_rootModel == null) return;
+            _lookaheadPerUid[_rootModel.Uid] = Math.Max(0, Math.Min(size, 10));
         }
 
         /// <summary>
@@ -782,8 +805,82 @@
         public void OutputWindowChanged(RootModel rootModel)
         {
             CancelRouteRecording();
-            StopRoutingToDestination();
+
+            // Move active routing state into background context so the route keeps running.
+            if (_rootModel != null)
+            {
+                if (!string.IsNullOrEmpty(_currentRouteTarget))
+                {
+                    var bg = new BgTabContext(_rootModel)
+                    {
+                        RouteTarget = _currentRouteTarget,
+                        PipelineDepth = _pipelineDepth,
+                        EffectiveLookahead = _effectiveLookahead,
+                        GroupMembersCountOnStart = _groupMembersCountOnRouteStart,
+                        CurrentRoom = _currentRoom,
+                        CurrentZone = _currentZone,
+                    };
+                    _bgTabContexts[_rootModel.Uid] = bg;
+                }
+                else
+                {
+                    _bgTabContexts.Remove(_rootModel.Uid);
+                }
+            }
+
+            // Clear active state (no announcements — route continues in bg).
+            _currentRouteTarget = string.Empty;
+            _pipelineDepth = 0;
+            _effectiveLookahead = 0;
+
             _rootModel = rootModel;
+
+            // Restore routing state for the tab we're switching to.
+            if (_rootModel != null && _bgTabContexts.TryGetValue(_rootModel.Uid, out var saved))
+            {
+                _bgTabContexts.Remove(_rootModel.Uid);
+                _currentRouteTarget = saved.RouteTarget;
+                _pipelineDepth = 0;  // pipeline state unknown after background run; reset and resync
+                _effectiveLookahead = saved.EffectiveLookahead;
+                _groupMembersCountOnRouteStart = saved.GroupMembersCountOnStart;
+                _currentRoom = saved.CurrentRoom;
+                _currentZone = saved.CurrentZone;
+                // Kick off next step from last known position.
+                if (_currentRoom != null && _currentZone != null)
+                    UpdateCurrentRoom(_currentRoom, _currentZone);
+            }
+        }
+
+        /// <summary>
+        /// Called by ZoneHolder for EVERY room change on any tab, regardless of which tab is displayed.
+        /// Processes background routing for tabs that are not currently active.
+        /// </summary>
+        public void ProcessRoomChangeForTab([NotNull] RootModel tabRootModel, [CanBeNull] RoomViewModel room, [NotNull] ZoneViewModel zone)
+        {
+            Assert.ArgumentNotNull(tabRootModel, "tabRootModel");
+            Assert.ArgumentNotNull(zone, "zone");
+
+            // Active tab is handled by the normal UpdateCurrentRoom path via MapControl.
+            if (_rootModel != null && tabRootModel.Uid == _rootModel.Uid)
+                return;
+
+            if (!_bgTabContexts.TryGetValue(tabRootModel.Uid, out var ctx))
+                return;  // No active route for this background tab.
+
+            if (ctx.IsUpdateInProgress || ctx.PendingUpdates.Count > 0)
+            {
+                ctx.PendingUpdates.Enqueue(Tuple.Create(room, zone));
+                return;
+            }
+
+            ctx.IsUpdateInProgress = true;
+            ProcessBgTabInternal(ctx, zone, room);
+            while (ctx.PendingUpdates.Count > 0)
+            {
+                var u = ctx.PendingUpdates.Dequeue();
+                ProcessBgTabInternal(ctx, u.Item2, u.Item1);
+            }
+            ctx.IsUpdateInProgress = false;
         }
 
         [NotNull]
@@ -887,6 +984,120 @@
                 if (isTarget)
                     break;
             }
+        }
+
+        private void ProcessBgTabInternal(BgTabContext ctx, ZoneViewModel newZone, RoomViewModel newRoom)
+        {
+            if (string.IsNullOrEmpty(ctx.RouteTarget) || newRoom == null)
+            {
+                ctx.CurrentRoom = newRoom;
+                ctx.CurrentZone = newZone;
+                return;
+            }
+
+            var routesHere = _allRoutes.Where(r => r.RoomIdentifiersSet.Contains(newRoom.RoomId));
+            Route minRoute = null;
+            int minLen = int.MaxValue;
+            bool gotoStart = false;
+            bool targetAchieved = false;
+
+            foreach (var route in routesHere)
+            {
+                if (route.StartRoomId == newRoom.RoomId && string.Equals(ctx.RouteTarget, route.StartName, StringComparison.CurrentCultureIgnoreCase)) { targetAchieved = true; break; }
+                if (route.EndRoomId == newRoom.RoomId && string.Equals(ctx.RouteTarget, route.EndName, StringComparison.CurrentCultureIgnoreCase)) { targetAchieved = true; break; }
+
+                if (route.RoutePointsAvailableFromStart.ContainsKey(ctx.RouteTarget) && route.StartRoomId != newRoom.RoomId
+                    && route.RoutePointsAvailableFromStart[ctx.RouteTarget] < minLen)
+                { gotoStart = true; minLen = route.RoutePointsAvailableFromStart[ctx.RouteTarget]; minRoute = route; }
+
+                if (route.RoutePointsAvailableFromEnd.ContainsKey(ctx.RouteTarget) && route.EndRoomId != newRoom.RoomId
+                    && route.RoutePointsAvailableFromEnd[ctx.RouteTarget] < minLen)
+                { gotoStart = false; minLen = route.RoutePointsAvailableFromEnd[ctx.RouteTarget]; minRoute = route; }
+            }
+
+            if (targetAchieved)
+            {
+                ctx.RootModel.PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetAchieved, ctx.RouteTarget), TextColor.BrightYellow));
+                ctx.RouteTarget = string.Empty;
+                ctx.PipelineDepth = 0;
+                ctx.EffectiveLookahead = 0;
+                _bgTabContexts.Remove(ctx.RootModel.Uid);
+            }
+            else if (minRoute == null)
+            {
+                ctx.RootModel.PushMessageToConveyor(new ErrorMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetIsNotAvailable, ctx.RouteTarget)));
+                ctx.RouteTarget = string.Empty;
+                _bgTabContexts.Remove(ctx.RootModel.Uid);
+            }
+            else if (ctx.RootModel.GroupStatus.Count(gr => gr.InSameRoom) != ctx.GroupMembersCountOnStart
+                     || ctx.RootModel.GroupStatus.Any(gr => gr.InSameRoom && gr.MovesPercent < 2))
+            {
+                ctx.RootModel.PushMessageToConveyor(new ErrorMessage(Resources.RouteGroupMateLostOrTired));
+                ctx.RouteTarget = string.Empty;
+                _bgTabContexts.Remove(ctx.RootModel.Uid);
+            }
+            else
+            {
+                if (ctx.PipelineDepth > 0) ctx.PipelineDepth--;
+
+                var idx = minRoute.RouteRoomIdentifiers.IndexOf(newRoom.RoomId);
+                if (ctx.PipelineDepth == 0)
+                {
+                    int nextId = gotoStart ? minRoute.RouteRoomIdentifiers[idx - 1] : minRoute.RouteRoomIdentifiers[idx + 1];
+                    var exit = newRoom.Room.Exits.FirstOrDefault(ex => ex.RoomId == nextId);
+                    if (exit == null)
+                    {
+                        ctx.RootModel.PushMessageToConveyor(new ErrorMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetIsNotAvailable, ctx.RouteTarget)));
+                        ctx.RouteTarget = string.Empty;
+                        _bgTabContexts.Remove(ctx.RootModel.Uid);
+                        ctx.CurrentRoom = newRoom; ctx.CurrentZone = newZone;
+                        return;
+                    }
+                    GotoDirectionVia(ctx.RootModel, exit.Direction);
+                    ctx.PipelineDepth++;
+                }
+
+                if (ctx.EffectiveLookahead > 0)
+                {
+                    while (ctx.PipelineDepth < ctx.EffectiveLookahead)
+                    {
+                        int off = ctx.PipelineDepth;
+                        int fi = gotoStart ? idx - off : idx + off;
+                        int ti = gotoStart ? fi - 1 : fi + 1;
+                        if (ti < 0 || ti >= minRoute.RouteRoomIdentifiers.Count) break;
+                        var fvm = ctx.CurrentZone?.AllRooms.FirstOrDefault(r => r.RoomId == minRoute.RouteRoomIdentifiers[fi]);
+                        if (fvm == null) break;
+                        var fex = fvm.Room.Exits.FirstOrDefault(ex => ex.RoomId == minRoute.RouteRoomIdentifiers[ti]);
+                        if (fex == null) break;
+                        GotoDirectionVia(ctx.RootModel, fex.Direction);
+                        ctx.PipelineDepth++;
+                        bool isTarget = _allRoutes.Any(r =>
+                            (r.StartRoomId == minRoute.RouteRoomIdentifiers[ti] && string.Equals(ctx.RouteTarget, r.StartName, StringComparison.CurrentCultureIgnoreCase))
+                            || (r.EndRoomId == minRoute.RouteRoomIdentifiers[ti] && string.Equals(ctx.RouteTarget, r.EndName, StringComparison.CurrentCultureIgnoreCase)));
+                        if (isTarget) break;
+                    }
+                }
+            }
+
+            ctx.CurrentRoom = newRoom;
+            ctx.CurrentZone = newZone;
+        }
+
+        private void GotoDirectionVia(RootModel rootModel, ExitDirection exitDirection)
+        {
+            Common.Conveyor.PerfLog.WriteTotal("ROUTE_STEP", 0, exitDirection.ToString());
+            Common.Conveyor.PerfStats.RoomWaitStarted();
+            switch (exitDirection)
+            {
+                case ExitDirection.North: rootModel.PushCommandToConveyor(new TextCommand("north")); break;
+                case ExitDirection.South: rootModel.PushCommandToConveyor(new TextCommand("south")); break;
+                case ExitDirection.East:  rootModel.PushCommandToConveyor(new TextCommand("east"));  break;
+                case ExitDirection.West:  rootModel.PushCommandToConveyor(new TextCommand("west"));  break;
+                case ExitDirection.Up:    rootModel.PushCommandToConveyor(new TextCommand("up"));    break;
+                case ExitDirection.Down:  rootModel.PushCommandToConveyor(new TextCommand("down"));  break;
+                default: rootModel.PushMessageToConveyor(new ErrorMessage(Resources.RoomNavigationError)); break;
+            }
+            rootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
         }
 
         private void GotoDirection(ExitDirection exitDirection)

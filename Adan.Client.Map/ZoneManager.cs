@@ -40,6 +40,7 @@
         [CanBeNull]
         private readonly Window _mainWindow;
         private readonly RouteManager _routeManger;
+        public RouteManager RouteManager => _routeManger;
         private readonly HerbManager _herbManager;
         private readonly ConcurrentDictionary<int, ZoneViewModel> _loadedZones = new ConcurrentDictionary<int, ZoneViewModel>();
         private readonly Timer _timer;
