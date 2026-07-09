@@ -360,6 +360,7 @@ namespace Adan.Client.Map
             orderedZones.AddRange(allHerbZones.Where(kv => kv.Key != _currentZone.Id));
 
             _pendingZones = new List<KeyValuePair<int, List<int>>>(orderedZones);
+            OptimizeTour();
 
             string dangerText = maxDangerLevel == HerbDangerLevel.Safe ? "безопасные"
                               : maxDangerLevel == HerbDangerLevel.Dangerous ? "безопасные + опасные"
@@ -847,7 +848,7 @@ namespace Adan.Client.Map
 
         private KeyValuePair<int, List<int>> PickNearestPendingZone()
         {
-            // If currently in one of the pending zones — pick it first (already there)
+            // If currently in one of the pending zones — pick it first (already there, free)
             var currentEntry = _pendingZones.FirstOrDefault(kv => kv.Key == _currentZone.Id);
             if (currentEntry.Value != null)
             {
@@ -855,61 +856,172 @@ namespace Adan.Client.Map
                 return currentEntry;
             }
 
-            // Find waypoint for each pending zone and pick the one with shortest route distance
-            // from our current waypoint (_travelTargetWaypoint, or null if starting fresh).
-            string fromWaypoint = _travelTargetWaypoint;
-
-            // If no previous waypoint, try to find waypoint for current zone as starting reference
-            if (string.IsNullOrEmpty(fromWaypoint) && _currentZone != null)
-                fromWaypoint = FindWaypointForZone(_currentZone.Id);
-
-            if (string.IsNullOrEmpty(fromWaypoint))
-            {
-                var first = _pendingZones[0];
-                _pendingZones.RemoveAt(0);
-                PushInfo($"[травник] нет точки отсчёта — берём первую зону из списка: {first.Key}");
-                return first;
-            }
-
-            int bestDist = int.MaxValue;
-            int bestIdx = 0;
-
-            for (int i = 0; i < _pendingZones.Count; i++)
-            {
-                string wp = FindWaypointForZone(_pendingZones[i].Key);
-                if (wp == null)
-                {
-                    PushInfo($"[травник] зона {_pendingZones[i].Key}: нет вейпоинта, пропускаем в расчёте");
-                    continue;
-                }
-
-                int dist = GetRoutDistance(fromWaypoint, wp);
-                PushInfo($"[травник] зона {_pendingZones[i].Key} через '{wp}': {dist} комнат от '{fromWaypoint}'");
-                if (dist < bestDist)
-                {
-                    bestDist = dist;
-                    bestIdx = i;
-                }
-            }
-
-            var chosen = _pendingZones[bestIdx];
-            _pendingZones.RemoveAt(bestIdx);
-            PushInfo($"[травник] → выбрана зона {chosen.Key} через '{FindWaypointForZone(chosen.Key)}' ({bestDist} комнат)");
+            // List is pre-sorted by OptimizeTour at startup — just take the first reachable zone.
+            var chosen = _pendingZones[0];
+            _pendingZones.RemoveAt(0);
             return chosen;
         }
 
         /// <summary>
-        /// Returns the actual room count distance between two named waypoints by doing
-        /// a Dijkstra search over the route graph, using route.RouteRoomIdentifiers.Count
-        /// as edge weight. This gives a much better estimate than hop count.
+        /// Sorts _pendingZones into an optimal visit order using greedy nearest-neighbor + 2-opt.
+        /// Called once at startup. Zones without waypoints are placed at the end.
         /// </summary>
+        private void OptimizeTour()
+        {
+            string fromWp = _travelTargetWaypoint;
+            if (string.IsNullOrEmpty(fromWp))
+                fromWp = FindWaypointForZone(_currentZone?.Id ?? 0);
+
+            // Partition into zones we can route to and zones we can't
+            var withWp  = new List<(int idx, string wp)>();
+            for (int i = 0; i < _pendingZones.Count; i++)
+            {
+                string wp = FindWaypointForZone(_pendingZones[i].Key);
+                if (wp != null) withWp.Add((i, wp));
+            }
+
+            if (withWp.Count < 2)
+                return; // nothing to optimise
+
+            int n = withWp.Count;
+            string[] wps = withWp.Select(t => t.wp).ToArray();
+
+            // Run one Dijkstra per waypoint to build full distance matrix (n+1 runs total)
+            var d0 = new int[n]; // distance from starting position to zone i
+            if (!string.IsNullOrEmpty(fromWp))
+            {
+                var startDists = GetAllDistancesFrom(fromWp);
+                for (int i = 0; i < n; i++)
+                    d0[i] = startDists.TryGetValue(wps[i], out int v) ? v : int.MaxValue / 2;
+            }
+
+            var d = new int[n, n];
+            for (int i = 0; i < n; i++)
+            {
+                var row = GetAllDistancesFrom(wps[i]);
+                for (int j = 0; j < n; j++)
+                    d[i, j] = i == j ? 0 : (row.TryGetValue(wps[j], out int v) ? v : int.MaxValue / 2);
+            }
+
+            // Greedy nearest-neighbour to get initial tour
+            var visited = new bool[n];
+            var tour = new int[n];
+            int prev = -1;
+            for (int step = 0; step < n; step++)
+            {
+                int best = -1, bestCost = int.MaxValue;
+                for (int j = 0; j < n; j++)
+                {
+                    if (visited[j]) continue;
+                    int cost = prev < 0 ? d0[j] : d[prev, j];
+                    if (cost < bestCost) { bestCost = cost; best = j; }
+                }
+                if (best < 0) break;
+                tour[step] = best;
+                visited[best] = true;
+                prev = best;
+            }
+
+            // 2-opt improvement: repeatedly swap pairs of edges if it reduces total path length.
+            // Edges considered: start→t[0], t[i]→t[i+1].
+            bool improved = true;
+            while (improved)
+            {
+                improved = false;
+
+                // Case 1: swap start edge with some later edge (reverses prefix [0..j])
+                for (int j = 1; j < n - 1; j++)
+                {
+                    int before = d0[tour[0]] + d[tour[j], tour[j + 1]];
+                    int after  = d0[tour[j]] + d[tour[0], tour[j + 1]];
+                    if (after < before)
+                    {
+                        Array.Reverse(tour, 0, j + 1);
+                        improved = true;
+                    }
+                }
+
+                // Case 2: standard 2-opt on interior edges
+                for (int i = 0; i < n - 1; i++)
+                {
+                    for (int j = i + 2; j < n; j++)
+                    {
+                        int before = d[tour[i], tour[i + 1]]
+                                   + (j + 1 < n ? d[tour[j], tour[j + 1]] : 0);
+                        int after  = d[tour[i], tour[j]]
+                                   + (j + 1 < n ? d[tour[i + 1], tour[j + 1]] : 0);
+                        if (after < before)
+                        {
+                            Array.Reverse(tour, i + 1, j - i);
+                            improved = true;
+                        }
+                    }
+                }
+            }
+
+            // Rebuild _pendingZones: optimised zones first, then zones without waypoints
+            var noWp = _pendingZones.Where(kv => FindWaypointForZone(kv.Key) == null).ToList();
+            _pendingZones = tour.Select(idx => _pendingZones[withWp[idx].idx])
+                               .Concat(noWp)
+                               .ToList();
+
+            // Log total distance + zone order for diagnostics
+            int total = d0[tour[0]];
+            for (int i = 0; i < n - 1; i++) total += d[tour[i], tour[i + 1]];
+            var orderNames = _pendingZones.Select(kv => FindWaypointForZone(kv.Key) ?? $"з{kv.Key}");
+            PushInfo($"Маршрут оптимизирован: {n} зон, ~{total} комнат. Порядок: {string.Join(" → ", orderNames)}");
+        }
+
+        /// <summary>
+        /// Runs Dijkstra from fromWaypoint and returns distances to ALL reachable waypoints.
+        /// Used to build the distance matrix for 2-opt optimisation.
+        /// </summary>
+        private Dictionary<string, int> GetAllDistancesFrom(string fromWaypoint)
+        {
+            var dist = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase)
+            {
+                [fromWaypoint] = 0
+            };
+            var queue = new SortedSet<(int cost, string node)>(Comparer<(int, string)>.Create((a, b) =>
+                a.Item1 != b.Item1 ? a.Item1.CompareTo(b.Item1) : string.Compare(a.Item2, b.Item2, StringComparison.Ordinal)));
+            queue.Add((0, fromWaypoint));
+
+            while (queue.Count > 0)
+            {
+                var (cost, node) = queue.Min;
+                queue.Remove(queue.Min);
+
+                if (dist.TryGetValue(node, out int known) && known < cost)
+                    continue;
+
+                foreach (var route in _routeManager.AllRoutes)
+                {
+                    string neighbour = null;
+                    if (string.Equals(route.StartName, node, StringComparison.CurrentCultureIgnoreCase))
+                        neighbour = route.EndName;
+                    else if (string.Equals(route.EndName, node, StringComparison.CurrentCultureIgnoreCase))
+                        neighbour = route.StartName;
+
+                    if (neighbour == null) continue;
+
+                    int edgeCost = route.RouteRoomIdentifiers.Count;
+                    int newCost = cost + edgeCost;
+                    if (!dist.TryGetValue(neighbour, out int existing) || newCost < existing)
+                    {
+                        dist[neighbour] = newCost;
+                        queue.Add((newCost, neighbour));
+                    }
+                }
+            }
+
+            return dist;
+        }
+
         private int GetRoutDistance(string fromWaypoint, string toWaypoint)
         {
             if (string.Equals(fromWaypoint, toWaypoint, StringComparison.CurrentCultureIgnoreCase))
                 return 0;
 
-            // Build adjacency on demand: waypoint -> list of (neighbour, roomCount)
-            // We use Dijkstra with room count as cost.
             var dist = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase)
             {
                 [fromWaypoint] = 0
