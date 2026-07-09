@@ -50,6 +50,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
         private string _lastShownObjectName = string.Empty;
 
+        // Отображение лор-предметов в тексте (тултипы + подсветка). Отключается командой "лор выкл".
+        private bool _loreEnabled = true;
         // Подсветка лор-предметов жёлтым цветом. Можно отключить командой "лор цвет выкл".
         private bool _loreHighlightEnabled = true;
         // Автозапись места дропа при подборе вещи из трупа. Отключается командой "лор дроп выкл".
@@ -315,6 +317,17 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                                       ? string.Empty
                                       : commandText.Remove(0, Resources.LoreCommand.Length + 1).Trim().Replace(" ", "_").Replace("\"", string.Empty);
 
+                // "лор вкл" / "лор выкл"
+                if (searchQuery.Equals("вкл", StringComparison.CurrentCultureIgnoreCase)
+                    || searchQuery.Equals("выкл", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    _loreEnabled = searchQuery.Equals("вкл", StringComparison.CurrentCultureIgnoreCase);
+                    PushMessageToConveyor(new InfoMessage(
+                        _loreEnabled ? "Лор вещей в тексте включён." : "Лор вещей в тексте выключен.",
+                        TextColor.BrightYellow));
+                    return;
+                }
+
                 // "лор цвет вкл" / "лор цвет выкл"
                 if (searchQuery.Equals("цвет_вкл", StringComparison.CurrentCultureIgnoreCase)
                     || searchQuery.Equals("цвет_выкл", StringComparison.CurrentCultureIgnoreCase))
@@ -510,6 +523,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             PushMessageToConveyor(new InfoMessage("    пример: лорд небольшой крысы, Свалка в Минас-Моргуле", TextColor.Cyan));
             PushMessageToConveyor(new InfoMessage("  лорд удалить N              — удалить место дропа по номеру", TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage("    пример: лорд удалить 2", TextColor.Cyan));
+            PushMessageToConveyor(new InfoMessage(string.Format("  лор вкл/выкл                — показывать лор вещей в тексте (сейчас: {0})", _loreEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage(string.Format("  лор цвет вкл/выкл           — подсветка [предметов] жёлтым (сейчас: {0})", _loreHighlightEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage(string.Format("  лор дроп вкл/выкл           — автозапись места дропа при подборе (сейчас: {0})", _loreDropEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage("──────────────────────────────────────────────────────────", TextColor.BrightWhite));
@@ -661,7 +675,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             }
 
             var loreCache = _loreTooltipsByObjectName; // читаем volatile-ссылку один раз
-            if (loreCache.Count == 0 || textMessage.MessageBlocks.Count == 0)
+            if (!_loreEnabled || loreCache.Count == 0 || textMessage.MessageBlocks.Count == 0)
             {
                 return;
             }
