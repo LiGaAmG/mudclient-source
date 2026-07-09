@@ -815,7 +815,17 @@ namespace Adan.Client.Map
                 _state = GatherState.TravelingToZone;
 
                 PushInfo(string.Format(CultureInfo.InvariantCulture,
-                    "Двигаемся в зону {0} через '{1}' ({2} клеток)...", zoneId, waypoint, herbRoomIds.Count));
+                    "Двигаемся в зону {0} через '{1}' ({2} клеток, осталось зон: {3})...", zoneId, waypoint, herbRoomIds.Count, _pendingZones.Count));
+                try
+                {
+                    var logPath = System.IO.Path.Combine(
+                        System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
+                        "herb_route.txt");
+                    System.IO.File.AppendAllText(logPath,
+                        $"  → зона {zoneId} через '{waypoint}' (осталось {_pendingZones.Count} зон)\n",
+                        System.Text.Encoding.UTF8);
+                }
+                catch { /* ignore */ }
 
                 // If we're in an arbitrary herb room not on any route, navigate to nearest
                 // route endpoint in this zone before calling GotoDestination.
@@ -965,11 +975,29 @@ namespace Adan.Client.Map
                                .Concat(noWp)
                                .ToList();
 
-            // Log total distance + zone order for diagnostics
+            // Log total distance + zone order to file for diagnostics
             int total = d0[tour[0]];
             for (int i = 0; i < n - 1; i++) total += d[tour[i], tour[i + 1]];
-            var orderNames = _pendingZones.Select(kv => FindWaypointForZone(kv.Key) ?? $"з{kv.Key}");
-            PushInfo($"Маршрут оптимизирован: {n} зон, ~{total} комнат. Порядок: {string.Join(" → ", orderNames)}");
+            try
+            {
+                var logPath = System.IO.Path.Combine(
+                    System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
+                    "herb_route.txt");
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"=== Травник маршрут {DateTime.Now:dd.MM.yyyy HH:mm:ss} ===");
+                sb.AppendLine($"Всего зон: {n}, ~{total} комнат");
+                sb.AppendLine();
+                for (int i = 0; i < _pendingZones.Count; i++)
+                {
+                    var kv = _pendingZones[i];
+                    string wp = FindWaypointForZone(kv.Key) ?? $"[нет waypoint]";
+                    int dist = i < n ? (i == 0 ? (d0.Length > 0 ? d0[tour[0]] : 0) : d[tour[i-1], tour[i]]) : -1;
+                    sb.AppendLine($"  {i+1,2}. зона {kv.Key,4} → {wp}");
+                }
+                System.IO.File.WriteAllText(logPath, sb.ToString(), System.Text.Encoding.UTF8);
+                PushInfo($"[травник] Маршрут ({n} зон, ~{total} комнат) сохранён: {logPath}");
+            }
+            catch { /* ignore */ }
         }
 
         /// <summary>
