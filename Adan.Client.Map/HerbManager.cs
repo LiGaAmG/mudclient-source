@@ -867,6 +867,7 @@ namespace Adan.Client.Map
             {
                 var first = _pendingZones[0];
                 _pendingZones.RemoveAt(0);
+                PushInfo($"[травник] нет точки отсчёта — берём первую зону из списка: {first.Key}");
                 return first;
             }
 
@@ -876,9 +877,14 @@ namespace Adan.Client.Map
             for (int i = 0; i < _pendingZones.Count; i++)
             {
                 string wp = FindWaypointForZone(_pendingZones[i].Key);
-                if (wp == null) continue;
+                if (wp == null)
+                {
+                    PushInfo($"[травник] зона {_pendingZones[i].Key}: нет вейпоинта, пропускаем в расчёте");
+                    continue;
+                }
 
                 int dist = GetRoutDistance(fromWaypoint, wp);
+                PushInfo($"[травник] зона {_pendingZones[i].Key} через '{wp}': {dist} комнат от '{fromWaypoint}'");
                 if (dist < bestDist)
                 {
                     bestDist = dist;
@@ -888,6 +894,7 @@ namespace Adan.Client.Map
 
             var chosen = _pendingZones[bestIdx];
             _pendingZones.RemoveAt(bestIdx);
+            PushInfo($"[травник] → выбрана зона {chosen.Key} через '{FindWaypointForZone(chosen.Key)}' ({bestDist} комнат)");
             return chosen;
         }
 
