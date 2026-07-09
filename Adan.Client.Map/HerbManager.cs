@@ -896,21 +896,22 @@ namespace Adan.Client.Map
             int n = withWp.Count;
             string[] wps = withWp.Select(t => t.wp).ToArray();
 
-            // Run one Dijkstra per waypoint to build full distance matrix (n+1 runs total)
-            var d0 = new int[n]; // distance from starting position to zone i
-            if (!string.IsNullOrEmpty(fromWp))
-            {
-                var startDists = GetAllDistancesFrom(fromWp);
-                for (int i = 0; i < n; i++)
-                    d0[i] = startDists.TryGetValue(wps[i], out int v) ? v : int.MaxValue / 2;
-            }
-
-            var d = new int[n, n];
+            // Use long to avoid overflow when summing large distances for unreachable zones
+            const long Inf = (long)int.MaxValue / 2;
+            var d = new long[n, n];
             for (int i = 0; i < n; i++)
             {
                 var row = GetAllDistancesFrom(wps[i]);
                 for (int j = 0; j < n; j++)
-                    d[i, j] = i == j ? 0 : (row.TryGetValue(wps[j], out int v) ? v : int.MaxValue / 2);
+                    d[i, j] = i == j ? 0L : (row.TryGetValue(wps[j], out int v) ? v : Inf);
+            }
+
+            var d0L = new long[n];
+            if (!string.IsNullOrEmpty(fromWp))
+            {
+                var startDists = GetAllDistancesFrom(fromWp);
+                for (int i = 0; i < n; i++)
+                    d0L[i] = startDists.TryGetValue(wps[i], out int v) ? v : Inf;
             }
 
             // Greedy nearest-neighbour to get initial tour
@@ -919,11 +920,12 @@ namespace Adan.Client.Map
             int prev = -1;
             for (int step = 0; step < n; step++)
             {
-                int best = -1, bestCost = int.MaxValue;
+                int best = -1;
+                long bestCost = long.MaxValue;
                 for (int j = 0; j < n; j++)
                 {
                     if (visited[j]) continue;
-                    int cost = prev < 0 ? d0[j] : d[prev, j];
+                    long cost = prev < 0 ? d0L[j] : d[prev, j];
                     if (cost < bestCost) { bestCost = cost; best = j; }
                 }
                 if (best < 0) break;
@@ -933,7 +935,6 @@ namespace Adan.Client.Map
             }
 
             // 2-opt improvement: repeatedly swap pairs of edges if it reduces total path length.
-            // Edges considered: start→t[0], t[i]→t[i+1].
             bool improved = true;
             while (improved)
             {
@@ -942,8 +943,8 @@ namespace Adan.Client.Map
                 // Case 1: swap start edge with some later edge (reverses prefix [0..j])
                 for (int j = 1; j < n - 1; j++)
                 {
-                    int before = d0[tour[0]] + d[tour[j], tour[j + 1]];
-                    int after  = d0[tour[j]] + d[tour[0], tour[j + 1]];
+                    long before = d0L[tour[0]] + d[tour[j], tour[j + 1]];
+                    long after  = d0L[tour[j]] + d[tour[0], tour[j + 1]];
                     if (after < before)
                     {
                         Array.Reverse(tour, 0, j + 1);
@@ -956,10 +957,10 @@ namespace Adan.Client.Map
                 {
                     for (int j = i + 2; j < n; j++)
                     {
-                        int before = d[tour[i], tour[i + 1]]
-                                   + (j + 1 < n ? d[tour[j], tour[j + 1]] : 0);
-                        int after  = d[tour[i], tour[j]]
-                                   + (j + 1 < n ? d[tour[i + 1], tour[j + 1]] : 0);
+                        long before = d[tour[i], tour[i + 1]]
+                                    + (j + 1 < n ? d[tour[j], tour[j + 1]] : 0L);
+                        long after  = d[tour[i], tour[j]]
+                                    + (j + 1 < n ? d[tour[i + 1], tour[j + 1]] : 0L);
                         if (after < before)
                         {
                             Array.Reverse(tour, i + 1, j - i);
@@ -976,7 +977,7 @@ namespace Adan.Client.Map
                                .ToList();
 
             // Log total distance + zone order to file for diagnostics
-            int total = d0[tour[0]];
+            long total = d0L[tour[0]];
             for (int i = 0; i < n - 1; i++) total += d[tour[i], tour[i + 1]];
             try
             {
@@ -991,7 +992,6 @@ namespace Adan.Client.Map
                 {
                     var kv = _pendingZones[i];
                     string wp = FindWaypointForZone(kv.Key) ?? $"[нет waypoint]";
-                    int dist = i < n ? (i == 0 ? (d0.Length > 0 ? d0[tour[0]] : 0) : d[tour[i-1], tour[i]]) : -1;
                     sb.AppendLine($"  {i+1,2}. зона {kv.Key,4} → {wp}");
                 }
                 System.IO.File.WriteAllText(logPath, sb.ToString(), System.Text.Encoding.UTF8);
