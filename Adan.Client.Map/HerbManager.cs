@@ -36,6 +36,10 @@ namespace Adan.Client.Map
         private readonly Timer _moveRecoveryTimer;
         private int _lastSeenRoomId;
 
+        // Travel timeout: skip zone if we haven't arrived after this many seconds
+        private readonly Timer _travelTimeoutTimer;
+        private const double TravelTimeoutMs = 120_000; // 2 minutes
+
         public HerbManager([NotNull] RouteManager routeManager)
         {
             Assert.ArgumentNotNull(routeManager, "routeManager");
@@ -52,6 +56,9 @@ namespace Adan.Client.Map
 
             _autoRepeatTimer = new Timer { AutoReset = false, Interval = AutoRepeatDelayMs };
             _autoRepeatTimer.Elapsed += OnAutoRepeatTimerElapsed;
+
+            _travelTimeoutTimer = new Timer { AutoReset = false, Interval = TravelTimeoutMs };
+            _travelTimeoutTimer.Elapsed += OnTravelTimeoutElapsed;
 
             _herbDetectionTimer = new Timer { AutoReset = false, Interval = 2500 };
             _herbDetectionTimer.Elapsed += OnHerbDetectionTimerElapsed;
@@ -384,6 +391,7 @@ namespace Adan.Client.Map
             _retryMoveTimer.Stop();
             _moveRecoveryTimer.Stop();
             _autoRepeatTimer.Stop();
+            _travelTimeoutTimer.Stop();
             _autoRepeat = false;
             _waitingForHerbCollection = false;
             _waitingForHerbDetection = false;
@@ -711,6 +719,7 @@ namespace Adan.Client.Map
             // RouteManager stops itself when it reaches the destination room.
             if (_currentZone.Id == _travelTargetZoneId && !_routeManager.CanStopCurrentRoute)
             {
+                _travelTimeoutTimer.Stop();
                 _zoneEntryRoomId = _currentRoom.RoomId;
                 PushInfo(string.Format(CultureInfo.InvariantCulture, "Прибыли в зону {0}. Начинаем сбор...", _currentZone.Name));
                 _state = GatherState.GatheringInZone;
@@ -862,6 +871,8 @@ namespace Adan.Client.Map
 
                 PushInfo(string.Format(CultureInfo.InvariantCulture,
                     "Двигаемся в зону {0} через '{1}' ({2} клеток, осталось зон: {3})...", zoneId, waypoint, herbRoomIds.Count, _pendingZones.Count));
+                _travelTimeoutTimer.Stop();
+                _travelTimeoutTimer.Start();
                 try
                 {
                     var logPath = System.IO.Path.Combine(
@@ -1429,6 +1440,7 @@ namespace Adan.Client.Map
             _herbDetectionTimer.Stop();
             _retryMoveTimer.Stop();
             _moveRecoveryTimer.Stop();
+            _travelTimeoutTimer.Stop();
             _waitingForHerbCollection = false;
             _waitingForHerbDetection = false;
             _waitingForMoveRecovery = false;
@@ -1484,6 +1496,19 @@ namespace Adan.Client.Map
                 "Мувы восстановились до {0:0.#}%. Травник продолжает маршрут.",
                 self.MovesPercent));
             ResumeAfterMoveRecovery();
+        }
+
+        private void OnTravelTimeoutElapsed(object sender, ElapsedEventArgs e)
+        {
+            if (_state != GatherState.TravelingToZone && _state != GatherState.ReturningToZoneEntry)
+                return;
+
+            _routeManager.StopRoutingToDestination();
+            PushInfo(string.Format(CultureInfo.InvariantCulture,
+                "Таймаут: не удалось добраться до зоны {0} ('{1}') за {2} сек — пропускаем.",
+                _travelTargetZoneId, _travelTargetWaypoint, (int)(TravelTimeoutMs / 1000)));
+            _state = GatherState.GatheringInZone;
+            EnterNextZone();
         }
 
         private void ResumeAfterMoveRecovery()

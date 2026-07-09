@@ -61,6 +61,16 @@
         private Route _pipelineRoute;
         private bool _pipelineGotoStart;
 
+        // Room visited two navigation steps ago — used to detect A→B→A→B oscillation.
+        // A true loop is confirmed when newCurrentRoom == _roomTwoStepsAgo AND nextRoomId == _currentRoom.
+        // This avoids false positives on legitimate dead-end zones (arrive at W, gather, leave via W).
+        private int _roomTwoStepsAgo;
+
+        // Route debug log — toggled with "маршрут лог", written to file for post-analysis.
+        private bool _routeLogEnabled;
+        private string _routeLogPath;
+        private StreamWriter _routeLogWriter;
+
         // Background tab route state: routes keep running even when the tab is not displayed.
         private sealed class BgTabContext
         {
@@ -733,6 +743,57 @@
             _pipelineDepth = 0;
             _effectiveLookahead = 0;
             _pipelineRoute = null;
+            _roomTwoStepsAgo = 0;
+        }
+
+        public void EnableRouteLog()
+        {
+            if (_routeLogEnabled)
+            {
+                var cur = _routeLogPath ?? "?";
+                _rootModel?.PushMessageToConveyor(new InfoMessage(
+                    string.Format(CultureInfo.InvariantCulture, "Лог маршрута уже включён: {0}", cur),
+                    TextColor.BrightYellow));
+                return;
+            }
+            var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            _routeLogPath = Path.Combine(docs, string.Format(CultureInfo.InvariantCulture,
+                "route-debug-{0:yyyyMMdd-HHmmss}.log", DateTime.Now));
+            _routeLogWriter = new StreamWriter(_routeLogPath, append: false, encoding: Encoding.UTF8) { AutoFlush = true };
+            _routeLogEnabled = true;
+            _routeLogWriter.WriteLine("=== Route debug log {0} ===", DateTime.Now);
+            _rootModel?.PushMessageToConveyor(new InfoMessage(
+                string.Format(CultureInfo.InvariantCulture, "Лог маршрута включён: {0}", _routeLogPath),
+                TextColor.BrightYellow));
+        }
+
+        public void DisableRouteLog()
+        {
+            if (!_routeLogEnabled)
+            {
+                _rootModel?.PushMessageToConveyor(new InfoMessage("Лог маршрута не был включён.", TextColor.BrightYellow));
+                return;
+            }
+            _routeLogWriter?.WriteLine("=== Log closed {0} ===", DateTime.Now);
+            _routeLogWriter?.Dispose();
+            _routeLogWriter = null;
+            _routeLogEnabled = false;
+            _rootModel?.PushMessageToConveyor(new InfoMessage(
+                string.Format(CultureInfo.InvariantCulture, "Лог маршрута выключен. Файл: {0}", _routeLogPath),
+                TextColor.BrightYellow));
+        }
+
+        private void RouteLog(string fmt, params object[] args)
+        {
+            if (!_routeLogEnabled || _routeLogWriter == null) return;
+            try
+            {
+                var msg = args.Length > 0
+                    ? string.Format(CultureInfo.InvariantCulture, fmt, args)
+                    : fmt;
+                _routeLogWriter.WriteLine("[{0:HH:mm:ss.fff}] {1}", DateTime.Now, msg);
+            }
+            catch { /* best-effort */ }
         }
 
         /// <summary>
@@ -1215,43 +1276,59 @@
 
             foreach (var route in _allRoutes)
             {
-                var visitedRoutePoints = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { route.StartName };
-                var visitedRoutes = new HashSet<Route> { route };
-                route.RoutePointsAvailableFromStart[route.StartName] = 0;
-                TraverseRoute(route.StartName, visitedRoutePoints, visitedRoutes, route.RoutePointsAvailableFromStart, 1);
-
-                visitedRoutePoints = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { route.EndName };
-                visitedRoutes = new HashSet<Route> { route };
-                route.RoutePointsAvailableFromEnd[route.EndName] = 0;
-                TraverseRoute(route.EndName, visitedRoutePoints, visitedRoutes, route.RoutePointsAvailableFromEnd, 1);
+                TraverseRouteWeighted(route.StartName, route.RoutePointsAvailableFromStart);
+                TraverseRouteWeighted(route.EndName, route.RoutePointsAvailableFromEnd);
             }
         }
 
-        private void TraverseRoute([NotNull] string routePointName, [NotNull] ISet<string> visitedRoutePoints, [NotNull] ISet<Route> visitedRoutes, [NotNull] IDictionary<string, int> routePointsAvailabilityList, int currentDepth)
+        // Dijkstra over the waypoint graph; edge weight = number of rooms in the route.
+        // Replaces the old hop-count BFS — мм+ no longer looks "cheap" just because
+        // it has many connections; a 200-room detour now costs 200, not 1.
+        private void TraverseRouteWeighted(string startPoint, IDictionary<string, int> distanceMap)
         {
-            if (!_routesByPoint.TryGetValue(routePointName, out var neighbors))
-                return;
+            distanceMap.Clear();
+            distanceMap[startPoint] = 0;
 
-            foreach (var nextRoute in neighbors)
+            // Priority queue: SortedDictionary<dist, Queue<pointName>>
+            var pending = new SortedDictionary<int, Queue<string>>();
+            var startQ = new Queue<string>();
+            startQ.Enqueue(startPoint);
+            pending[0] = startQ;
+
+            while (pending.Count > 0)
             {
-                if (visitedRoutes.Contains(nextRoute))
+                var first = pending.First();
+                int curDist = first.Key;
+                string curPoint = first.Value.Dequeue();
+                if (first.Value.Count == 0)
+                    pending.Remove(curDist);
+
+                // Stale entry — a shorter path was already found.
+                if (distanceMap.TryGetValue(curPoint, out int recorded) && recorded < curDist)
                     continue;
 
-                string neighbor = null;
-                if (nextRoute.StartName.Equals(routePointName, StringComparison.OrdinalIgnoreCase)
-                    && !visitedRoutePoints.Contains(nextRoute.EndName))
-                    neighbor = nextRoute.EndName;
-                else if (nextRoute.EndName.Equals(routePointName, StringComparison.OrdinalIgnoreCase)
-                    && !visitedRoutePoints.Contains(nextRoute.StartName))
-                    neighbor = nextRoute.StartName;
-
-                if (neighbor == null)
+                if (!_routesByPoint.TryGetValue(curPoint, out var routes))
                     continue;
 
-                visitedRoutes.Add(nextRoute);
-                visitedRoutePoints.Add(neighbor);
-                routePointsAvailabilityList[neighbor] = currentDepth;
-                TraverseRoute(neighbor, visitedRoutePoints, visitedRoutes, routePointsAvailabilityList, currentDepth + 1);
+                foreach (var nextRoute in routes)
+                {
+                    string neighbor;
+                    if (nextRoute.StartName.Equals(curPoint, StringComparison.OrdinalIgnoreCase))
+                        neighbor = nextRoute.EndName;
+                    else if (nextRoute.EndName.Equals(curPoint, StringComparison.OrdinalIgnoreCase))
+                        neighbor = nextRoute.StartName;
+                    else
+                        continue;
+
+                    int newDist = curDist + nextRoute.RouteRoomIdentifiers.Count;
+                    if (!distanceMap.TryGetValue(neighbor, out int existing) || newDist < existing)
+                    {
+                        distanceMap[neighbor] = newDist;
+                        if (!pending.TryGetValue(newDist, out var q))
+                            pending[newDist] = q = new Queue<string>();
+                        q.Enqueue(neighbor);
+                    }
+                }
             }
         }
 
@@ -1342,6 +1419,14 @@
 
             if (!string.IsNullOrEmpty(_currentRouteTarget) && newCurrentRoom != null)
             {
+                RouteLog("ROOM {0} | prev={1} | prev2={2} | target={3} | pd={4} | pipeRoute={5}",
+                    newCurrentRoom.RoomId,
+                    _currentRoom?.RoomId.ToString(CultureInfo.InvariantCulture) ?? "-",
+                    _roomTwoStepsAgo,
+                    _currentRouteTarget,
+                    _pipelineDepth,
+                    _pipelineRoute != null ? (_pipelineRoute.StartName + "→" + _pipelineRoute.EndName) : "-");
+
                 var routesContainigCurrentRoom = _allRoutes.Where(r => r.RoomIdentifiersSet.Contains(newCurrentRoom.RoomId));
                 Route minRoute = null;
                 int minDestinationLength = int.MaxValue;
@@ -1364,25 +1449,52 @@
 
                     if (route.RoutePointsAvailableFromStart.ContainsKey(_currentRouteTarget))
                     {
-                        if (route.StartRoomId != newCurrentRoom.RoomId
-                            && route.RoutePointsAvailableFromStart[_currentRouteTarget] < minDestinationLength)
+                        if (route.StartRoomId != newCurrentRoom.RoomId)
                         {
-                            gotoStart = true;
-                            minDestinationLength = route.RoutePointsAvailableFromStart[_currentRouteTarget];
-                            minRoute = route;
+                            int dist = route.RoutePointsAvailableFromStart[_currentRouteTarget];
+                            // Penalize backward traversal only when we JUST arrived via this route
+                            // (pipeline route). That prevents bouncing back along the same route,
+                            // but allows a different route that happens to end here to be selected
+                            // normally (e.g. пригорка→мт+ at мт+ after arriving via мм+→мт+).
+                            if (route.EndRoomId == newCurrentRoom.RoomId && route == _pipelineRoute)
+                                dist += route.RouteRoomIdentifiers.Count;
+                            if (dist < minDestinationLength)
+                            {
+                                gotoStart = true;
+                                minDestinationLength = dist;
+                                minRoute = route;
+                            }
                         }
                     }
 
                     if (route.RoutePointsAvailableFromEnd.ContainsKey(_currentRouteTarget))
                     {
-                        if (route.EndRoomId != newCurrentRoom.RoomId && route.RoutePointsAvailableFromEnd[_currentRouteTarget] < minDestinationLength)
+                        if (route.EndRoomId != newCurrentRoom.RoomId)
                         {
-                            gotoStart = false;
-                            minDestinationLength = route.RoutePointsAvailableFromEnd[_currentRouteTarget];
-                            minRoute = route;
+                            int dist = route.RoutePointsAvailableFromEnd[_currentRouteTarget];
+                            if (dist < minDestinationLength)
+                            {
+                                gotoStart = false;
+                                minDestinationLength = dist;
+                                minRoute = route;
+                            }
                         }
                     }
                 }
+
+                RouteLog("  candidates: {0}", string.Join(", ", _allRoutes
+                    .Where(r => r.RoomIdentifiersSet.Contains(newCurrentRoom.RoomId))
+                    .Select(r => string.Format(CultureInfo.InvariantCulture,
+                        "{0}→{1}(dist={2})",
+                        r.StartName, r.EndName,
+                        r.RoutePointsAvailableFromStart.ContainsKey(_currentRouteTarget)
+                            ? r.RoutePointsAvailableFromStart[_currentRouteTarget].ToString(CultureInfo.InvariantCulture)
+                            : r.RoutePointsAvailableFromEnd.ContainsKey(_currentRouteTarget)
+                                ? r.RoutePointsAvailableFromEnd[_currentRouteTarget].ToString(CultureInfo.InvariantCulture)
+                                : "n/a"))));
+                RouteLog("  selected: {0} gotoStart={1} dist={2} targetAchieved={3}",
+                    minRoute != null ? (minRoute.StartName + "→" + minRoute.EndName) : "NULL",
+                    gotoStart, minDestinationLength, targetAchieved);
 
                 // If minRoute switched away from _pipelineRoute but the current room is still
                 // an intermediate room on _pipelineRoute (not yet at its junction endpoint),
@@ -1402,6 +1514,7 @@
                                      || _pipelineRoute.RoutePointsAvailableFromEnd.ContainsKey(_currentRouteTarget);
                         if (canReach)
                         {
+                            RouteLog("  PIPELINE PROTECT: staying on {0}→{1} (not at junction)", _pipelineRoute.StartName, _pipelineRoute.EndName);
                             minRoute = _pipelineRoute;
                             gotoStart = _pipelineGotoStart;
                         }
@@ -1438,13 +1551,61 @@
                         int nextRoomId = gotoStart
                                              ? minRoute.RouteRoomIdentifiers[currentRoomIndex - 1]
                                              : minRoute.RouteRoomIdentifiers[currentRoomIndex + 1];
+
+                        RouteLog("  nextRoom={0} idx={1}/{2}", nextRoomId, currentRoomIndex, minRoute.RouteRoomIdentifiers.Count - 1);
+
+                        // Oscillation detection: confirmed A→B→A→B loop when:
+                        //   - route says go back to where we just came from (_currentRoom)
+                        //   - AND we were at this very room (_roomTwoStepsAgo) two steps ago
+                        // Dead-end zones are safe: after W→herb→W the next step is outward (not herb), so condition is false.
+                        if (_currentRoom != null
+                            && nextRoomId == _currentRoom.RoomId
+                            && _roomTwoStepsAgo != 0
+                            && newCurrentRoom.RoomId == _roomTwoStepsAgo)
+                        {
+                            RouteLog("  OSCILLATION DETECTED: {0}→{1}→{0} loop, next={1}", newCurrentRoom.RoomId, _currentRoom.RoomId);
+
+                            // Try any exit that is NOT back to the previous room and leads toward target via some route.
+                            var fwdExit = newCurrentRoom.Room.Exits
+                                .Where(ex => ex.RoomId != 0 && ex.RoomId != _currentRoom.RoomId)
+                                .FirstOrDefault(ex => _allRoutes.Any(r =>
+                                    r.RoomIdentifiersSet.Contains(ex.RoomId) &&
+                                    (r.RoutePointsAvailableFromStart.ContainsKey(_currentRouteTarget) ||
+                                     r.RoutePointsAvailableFromEnd.ContainsKey(_currentRouteTarget))));
+
+                            if (fwdExit != null)
+                            {
+                                RouteLog("  OSCILLATION BREAK: going to {0} via {1}", fwdExit.RoomId, fwdExit.Direction);
+                                _rootModel.PushMessageToConveyor(new InfoMessage(
+                                    string.Format(CultureInfo.InvariantCulture,
+                                        "Обход петли маршрута в комнате {0} (A→B→A→B).", newCurrentRoom.RoomId),
+                                    TextColor.BrightYellow));
+                                GotoDirection(fwdExit.Direction);
+                                _pipelineRoute = null;
+                                _pipelineDepth++;
+                                _roomTwoStepsAgo = 0; // reset to avoid re-triggering immediately
+                                var prevZoneEarly = _currentZone;
+                                _currentRoom = newCurrentRoom;
+                                _currentZone = newCurrentZone;
+                                if (prevZoneEarly == null || prevZoneEarly.Id != _currentZone.Id)
+                                    UpdateCurrentZoneRooms();
+                                return;
+                            }
+                            else
+                            {
+                                RouteLog("  OSCILLATION: no forward exit found, falling through (dead end?)");
+                            }
+                        }
+
                         var exit = newCurrentRoom.Room.Exits.FirstOrDefault(ex => ex.RoomId == nextRoomId);
                         if (exit == null)
                         {
+                            RouteLog("  ERROR: no exit to nextRoom={0}", nextRoomId);
                             _rootModel.PushMessageToConveyor(new ErrorMessage(string.Format(CultureInfo.InvariantCulture, Resources.RouteTargetIsNotAvailable, _currentRouteTarget)));
                             StopRoutingToDestination();
                             return;
                         }
+                        RouteLog("  SEND: {0} → room {1}", exit.Direction, nextRoomId);
                         GotoDirection(exit.Direction);
                         _pipelineRoute = minRoute;
                         _pipelineGotoStart = gotoStart;
@@ -1461,6 +1622,7 @@
             }
 
             var prevZone = _currentZone;
+            _roomTwoStepsAgo = _currentRoom?.RoomId ?? 0;
             _currentRoom = newCurrentRoom;
             _currentZone = newCurrentZone;
             if (prevZone == null || prevZone.Id != _currentZone.Id)

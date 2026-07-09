@@ -137,6 +137,20 @@ namespace Adan.Client.Map.ConveyorUnits
                 return;
             }
 
+            // "маршрут лог" / "маршрут лог стоп"
+            if (string.Equals(args, "лог", StringComparison.OrdinalIgnoreCase))
+            {
+                _routeManager.EnableRouteLog();
+                command.Handled = true;
+                return;
+            }
+            if (string.Equals(args, "лог стоп", StringComparison.OrdinalIgnoreCase))
+            {
+                _routeManager.DisableRouteLog();
+                command.Handled = true;
+                return;
+            }
+
             // "#route lookahead [N|off]"
             if (args.StartsWith(Resources.RouteCommandLookahead, StringComparison.OrdinalIgnoreCase))
             {
