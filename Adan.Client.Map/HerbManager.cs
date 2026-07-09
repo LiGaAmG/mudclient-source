@@ -1023,11 +1023,12 @@ namespace Adan.Client.Map
                 {
                     int X = tour[i];
                     // edges that disappear when X is removed
-                    long eAX = i == 0     ? d0L[X]              : d[tour[i-1], X];
-                    long eXB = i == n-1   ? 0L                  : d[X, tour[i+1]];
-                    // edge that appears to bridge the gap
-                    long eAB = (i == 0 || i == n-1) ? 0L
-                             : (i == 1 ? d0L[tour[i+1]] : d[tour[i-1], tour[i+1]]);
+                    long eAX = i == 0   ? d0L[X]          : d[tour[i-1], X];
+                    long eXB = i == n-1 ? 0L               : d[X, tour[i+1]];
+                    // edge that appears to bridge the gap left by removal
+                    long eAB = i == 0   ? (n > 1 ? d0L[tour[1]] : 0L)
+                             : i == n-1 ? 0L
+                             : d[tour[i-1], tour[i+1]];
 
                     // try inserting X at every other gap: before position 0 (j=-1), or between j and j+1
                     for (int j = -1; j < n - 1 && !improved; j++)
