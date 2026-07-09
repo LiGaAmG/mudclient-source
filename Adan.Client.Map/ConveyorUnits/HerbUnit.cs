@@ -38,6 +38,7 @@ namespace Adan.Client.Map.ConveyorUnits
         private const string CmdAutoStop         = "авто стоп";
         private const string CmdInvis            = "невидимость";
         private const string CmdInvisOff         = "невидимость выкл";
+        private const string CmdDebug            = "дебаг";
         private const string ArgDangerous        = "опасно";
         private const string ArgVeryDangerous    = "очень опасно";
 
@@ -177,6 +178,14 @@ namespace Adan.Client.Map.ConveyorUnits
                     _herbManager.SetInvisibilityCommand(invisCmd);
                     command.Handled = true;
                 }
+                return;
+            }
+
+            // "травник дебаг"
+            if (string.Equals(args, CmdDebug, System.StringComparison.OrdinalIgnoreCase))
+            {
+                _herbManager.ShowDebugRoute();
+                command.Handled = true;
                 return;
             }
 

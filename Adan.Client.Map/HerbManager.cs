@@ -412,6 +412,51 @@ namespace Adan.Client.Map
             NavigateHome();
         }
 
+        public void ShowDebugRoute()
+        {
+            if (_rootModel == null || _currentZone == null) { PushError("Нет данных о текущей зоне."); return; }
+
+            var allHerbZones = _zoneManager?.ScanAllHerbRooms(HerbDangerLevel.VeryDangerous)
+                               ?? new List<KeyValuePair<int, List<int>>>();
+            if (!allHerbZones.Any()) { PushInfo("Нет отмеченных травяных клеток."); return; }
+
+            foreach (var kv in allHerbZones)
+                if (kv.Key != _currentZone.Id) _zoneManager.GetZone(kv.Key);
+
+            // Build zone list (same as StartGathering) into a LOCAL copy
+            var orderedZones = new List<KeyValuePair<int, List<int>>>();
+            var cur = allHerbZones.FirstOrDefault(kv => kv.Key == _currentZone.Id);
+            if (cur.Value != null) orderedZones.Add(cur);
+            orderedZones.AddRange(allHerbZones.Where(kv => kv.Key != _currentZone.Id));
+
+            // Compute optimized tour on the local copy without touching _pendingZones
+            var savedPending    = _pendingZones;
+            var savedWaypoint   = _travelTargetWaypoint;
+            _pendingZones       = new List<KeyValuePair<int, List<int>>>(orderedZones);
+            _travelTargetWaypoint = null;
+
+            // Run OptimizeTour — it modifies _pendingZones in place and writes herb_route.txt
+            OptimizeTour();
+            var optimized = new List<KeyValuePair<int, List<int>>>(_pendingZones);
+
+            _pendingZones         = savedPending;
+            _travelTargetWaypoint = savedWaypoint;
+
+            // Display the route in the client window
+            PushInfo("─── Маршрут травника (дебаг, без старта) ─────────");
+            string fromLabel = FindWaypointForZone(_currentZone.Id) ?? $"зона {_currentZone.Id}";
+            PushInfo($"  Старт: {fromLabel}");
+            for (int i = 0; i < optimized.Count; i++)
+            {
+                var kv = optimized[i];
+                string wp = FindWaypointForZone(kv.Key);
+                string label = wp != null ? $"'{wp}'" : $"[нет waypoint] зона {kv.Key}";
+                PushInfo($"  {i+1,2}. зона {kv.Key,4} → {label} ({kv.Value.Count} клеток)");
+            }
+            PushInfo("  Подробно с расстояниями — см. Desktop\\herb_route.txt");
+            PushInfo("──────────────────────────────────────────────────");
+        }
+
         public void ShowHelp()
         {
             if (_rootModel == null) return;
@@ -422,6 +467,7 @@ namespace Adan.Client.Map
             PushInfo("  травник стоп               — остановить сбор (сбрасывает автоповтор)");
             PushInfo("  травник домой              — вернуться в точку старта");
             PushInfo("  травник список             — показать все отмеченные клетки");
+            PushInfo("  травник дебаг              — показать оптимальный маршрут без старта");
             PushInfo("  травник авто               — включить автоповтор (каждые 10 мин)");
             PushInfo("  травник авто стоп          — выключить автоповтор");
             PushInfo("─── Травник — настройка ──────────────────────────");
