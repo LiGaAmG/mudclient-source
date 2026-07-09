@@ -1244,16 +1244,37 @@ namespace Adan.Client.Map
 
             foreach (var route in _routeManager.AllRoutes)
             {
-                if (zoneRoomIds.Contains(route.StartRoomId) && !_zoneIdToWaypoint.ContainsKey(zone.Id))
+                if (zoneRoomIds.Contains(route.StartRoomId))
                 {
                     _zoneIdToWaypoint[zone.Id] = route.StartName;
-                    break;
+                    return;
                 }
-                if (zoneRoomIds.Contains(route.EndRoomId) && !_zoneIdToWaypoint.ContainsKey(zone.Id))
+                if (zoneRoomIds.Contains(route.EndRoomId))
                 {
                     _zoneIdToWaypoint[zone.Id] = route.EndName;
-                    break;
+                    return;
                 }
+            }
+
+            // Fallback: zone rooms are inside a route (not at endpoints) — pick the nearest endpoint
+            foreach (var route in _routeManager.AllRoutes)
+            {
+                var routeRooms = route.RouteRoomIdentifiers;
+                int idx = -1;
+                for (int i = 0; i < routeRooms.Count; i++)
+                {
+                    if (zoneRoomIds.Contains(routeRooms[i]))
+                    {
+                        idx = i;
+                        break;
+                    }
+                }
+                if (idx < 0) continue;
+
+                // Pick Start or End based on which end is closer to the found room
+                string waypoint = idx <= routeRooms.Count / 2 ? route.StartName : route.EndName;
+                _zoneIdToWaypoint[zone.Id] = waypoint;
+                return;
             }
         }
 
