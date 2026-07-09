@@ -52,6 +52,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
         // Подсветка лор-предметов жёлтым цветом. Можно отключить командой "лор цвет выкл".
         private bool _loreHighlightEnabled = true;
+        // Автозапись места дропа при подборе вещи из трупа. Отключается командой "лор дроп выкл".
+        private bool _loreDropEnabled = true;
         private static readonly string LoreColorConfigFileName = "_color.cfg";
 
         // Volatile: фоновый таймер атомарно заменяет весь словарь новой версией.
@@ -325,6 +327,17 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     return;
                 }
 
+                // "лор дроп вкл" / "лор дроп выкл"
+                if (searchQuery.Equals("дроп_вкл", StringComparison.CurrentCultureIgnoreCase)
+                    || searchQuery.Equals("дроп_выкл", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    _loreDropEnabled = searchQuery.Equals("дроп_вкл", StringComparison.CurrentCultureIgnoreCase);
+                    PushMessageToConveyor(new InfoMessage(
+                        _loreDropEnabled ? "Автозапись мест дропа включена." : "Автозапись мест дропа выключена.",
+                        TextColor.BrightYellow));
+                    return;
+                }
+
                 // "лор" / "lore" без аргументов или с "?" / "help" / "справка" — показать список команд
                 if (string.IsNullOrEmpty(searchQuery)
                     || searchQuery.Equals("?", StringComparison.CurrentCultureIgnoreCase)
@@ -498,6 +511,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             PushMessageToConveyor(new InfoMessage("  лорд удалить N              — удалить место дропа по номеру", TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage("    пример: лорд удалить 2", TextColor.Cyan));
             PushMessageToConveyor(new InfoMessage(string.Format("  лор цвет вкл/выкл           — подсветка [предметов] жёлтым (сейчас: {0})", _loreHighlightEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
+            PushMessageToConveyor(new InfoMessage(string.Format("  лор дроп вкл/выкл           — автозапись места дропа при подборе (сейчас: {0})", _loreDropEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage("──────────────────────────────────────────────────────────", TextColor.BrightWhite));
         }
 
@@ -633,7 +647,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 }
 
                 // Record drop location — быстрый pre-check перед regex
-                if (rawText.IndexOf("из трупа", StringComparison.Ordinal) >= 0)
+                if (_loreDropEnabled && rawText.IndexOf("из трупа", StringComparison.Ordinal) >= 0)
                 {
                     var pickupMatch = _pickupFromCorpseRx.Match(rawText);
                     if (pickupMatch.Success)
