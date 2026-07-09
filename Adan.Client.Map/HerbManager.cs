@@ -980,13 +980,13 @@ namespace Adan.Client.Map
                 prev = best;
             }
 
-            // 2-opt improvement: repeatedly swap pairs of edges if it reduces total path length.
+            // 2-opt + Or-opt (1-node relocation): iterate until no improvement found.
             bool improved = true;
             while (improved)
             {
                 improved = false;
 
-                // Case 1: swap start edge with some later edge (reverses prefix [0..j])
+                // ── 2-opt Case 1: reverse prefix [0..j] ──────────────────────────
                 for (int j = 1; j < n - 1; j++)
                 {
                     long before = d0L[tour[0]] + d[tour[j], tour[j + 1]];
@@ -998,7 +998,7 @@ namespace Adan.Client.Map
                     }
                 }
 
-                // Case 2: standard 2-opt on interior edges
+                // ── 2-opt Case 2: reverse interior segment [i+1..j] ─────────────
                 for (int i = 0; i < n - 1; i++)
                 {
                     for (int j = i + 2; j < n; j++)
@@ -1010,6 +1010,46 @@ namespace Adan.Client.Map
                         if (after < before)
                         {
                             Array.Reverse(tour, i + 1, j - i);
+                            improved = true;
+                        }
+                    }
+                }
+
+                // ── Or-opt: relocate single node to best other position ───────────
+                // delta(i, insertAfter j) = new_cost - old_cost:
+                //   remove X=tour[i] from its spot → bridge prev→next
+                //   insert X between tour[j] and tour[j+1]  (j=-1 means insert at front)
+                for (int i = 0; i < n && !improved; i++)
+                {
+                    int X = tour[i];
+                    // edges that disappear when X is removed
+                    long eAX = i == 0     ? d0L[X]              : d[tour[i-1], X];
+                    long eXB = i == n-1   ? 0L                  : d[X, tour[i+1]];
+                    // edge that appears to bridge the gap
+                    long eAB = (i == 0 || i == n-1) ? 0L
+                             : (i == 1 ? d0L[tour[i+1]] : d[tour[i-1], tour[i+1]]);
+
+                    // try inserting X at every other gap: before position 0 (j=-1), or between j and j+1
+                    for (int j = -1; j < n - 1 && !improved; j++)
+                    {
+                        if (j == i - 1 || j == i) continue; // same spot
+
+                        // edges that disappear at insertion point
+                        long eCD = j == -1 ? d0L[tour[0]] : d[tour[j], tour[j+1]];
+                        // edges that appear after insertion
+                        long eCX = j == -1 ? d0L[X]       : d[tour[j], X];
+                        long eXD = j == -1 ? d[X, tour[0]] : d[X, tour[j+1]];
+
+                        long delta = eAB + eCX + eXD - eAX - eXB - eCD;
+                        if (delta < 0)
+                        {
+                            // Apply: remove from i, insert after j
+                            var list = new System.Collections.Generic.List<int>(tour);
+                            list.RemoveAt(i);
+                            // after removal, insertion index in the shortened list
+                            int insertAt = j < i ? j + 1 : j; // j<i → j+1 because we removed before j
+                            list.Insert(insertAt, X);
+                            list.CopyTo(tour);
                             improved = true;
                         }
                     }
