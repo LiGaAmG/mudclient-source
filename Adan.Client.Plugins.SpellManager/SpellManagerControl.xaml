@@ -66,6 +66,12 @@
                     Click="ExecutePlanButton_Click"/>
             <Button x:Name="ForgetAndRememorizeButton" Content="Забыть и перезаучить"
                     Click="ForgetAndRememorizeButton_Click"/>
+            <TextBlock Text="Префикс:" Foreground="#FFAAAAAA" VerticalAlignment="Center" Margin="8,0,3,0"/>
+            <TextBox Text="{Binding SpellPrefix, UpdateSourceTrigger=PropertyChanged}"
+                     Width="28" MaxLength="2"
+                     Background="#FF2A2A2A" Foreground="White" BorderBrush="#FF555555"
+                     VerticalContentAlignment="Center" Padding="3,1"
+                     ToolTip="Спецсимвол для точного совпадения имени (обычно ! . или ,)"/>
         </StackPanel>
 
         <!-- Slots row -->

@@ -83,6 +83,22 @@ namespace Adan.Client.Plugins.SpellManager
             }
         }
 
+        private string _spellPrefix = "!";
+        public string SpellPrefix
+        {
+            get { return _spellPrefix; }
+            set
+            {
+                var v = string.IsNullOrEmpty(value) ? "!" : value;
+                if (_spellPrefix != v)
+                {
+                    _spellPrefix = v;
+                    OnPropertyChanged("SpellPrefix");
+                    Save();
+                }
+            }
+        }
+
         private int _counterFontSize = 11;
         public int CounterFontSize
         {
@@ -454,7 +470,7 @@ namespace Adan.Client.Plugins.SpellManager
 
                 int canSchedule = Math.Min(needed, free);
                 for (int i = 0; i < canSchedule; i++)
-                    rootModel.PushCommandToConveyor(new TextCommand("зауч !" + spell.Name));
+                    rootModel.PushCommandToConveyor(new TextCommand("зауч " + _spellPrefix + spell.Name));
                 available[circle] -= canSchedule;
             }
             rootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
@@ -481,19 +497,19 @@ namespace Adan.Client.Plugins.SpellManager
                     // Сначала отменяем лишнее из очереди (зауч стоп — по одной)
                     int stopCount = Math.Min(diff, spell.Memorizing);
                     for (int i = 0; i < stopCount; i++)
-                        rootModel.PushCommandToConveyor(new TextCommand("зауч стоп !" + spell.Name));
+                        rootModel.PushCommandToConveyor(new TextCommand("зауч стоп " + _spellPrefix + spell.Name));
 
                     // Остаток забываем из заученных (зауч забыть — тоже по одной)
                     int forgetCount = diff - stopCount;
                     for (int i = 0; i < forgetCount; i++)
-                        rootModel.PushCommandToConveyor(new TextCommand("зауч забыть !" + spell.Name));
+                        rootModel.PushCommandToConveyor(new TextCommand("зауч забыть " + _spellPrefix + spell.Name));
                 }
                 else
                 {
                     // Нужно дозаучить
                     if (spell.Circle <= 0) continue;
                     for (int i = 0; i < -diff; i++)
-                        rootModel.PushCommandToConveyor(new TextCommand("зауч !" + spell.Name));
+                        rootModel.PushCommandToConveyor(new TextCommand("зауч " + _spellPrefix + spell.Name));
                 }
             }
             rootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
@@ -521,6 +537,7 @@ namespace Adan.Client.Plugins.SpellManager
                 var doc = new XDocument(
                     new XElement("SpellPlan",
                         new XAttribute("counterFontSize", _counterFontSize),
+                        new XAttribute("spellPrefix", _spellPrefix),
                         Spells.Select(sp =>
                             new XElement("Spell",
                                 new XAttribute("name", sp.Name),
@@ -552,6 +569,7 @@ namespace Adan.Client.Plugins.SpellManager
                 if (doc.Root == null) return;
 
                 _counterFontSize = (int?)doc.Root.Attribute("counterFontSize") ?? 11;
+                _spellPrefix = (string)doc.Root.Attribute("spellPrefix") ?? "!";
 
                 foreach (var el in doc.Root.Elements("Spell"))
                 {
