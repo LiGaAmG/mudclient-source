@@ -988,12 +988,21 @@ namespace Adan.Client.Map
                 sb.AppendLine($"=== Травник маршрут {DateTime.Now:dd.MM.yyyy HH:mm:ss} ===");
                 sb.AppendLine($"Всего зон: {n}, ~{total} комнат");
                 sb.AppendLine();
-                for (int i = 0; i < _pendingZones.Count; i++)
+                sb.AppendLine($"Старт: {fromWp ?? "неизвестно"}");
+                sb.AppendLine("Порядок (оптимизированный):");
+                for (int i = 0; i < n; i++)
                 {
+                    // after rebuild: _pendingZones[i] came from withWp[tour[i]]
                     var kv = _pendingZones[i];
-                    string wp = FindWaypointForZone(kv.Key) ?? $"[нет waypoint]";
-                    sb.AppendLine($"  {i+1,2}. зона {kv.Key,4} → {wp}");
+                    string wp = wps[tour[i]];
+                    long dist2 = i == 0 ? d0L[tour[0]] : d[tour[i-1], tour[i]];
+                    string distStr = dist2 >= Inf ? "∞" : dist2.ToString();
+                    sb.AppendLine($"  {i+1,2}. +{distStr,4} зона {kv.Key,4} → {wp}");
                 }
+                sb.AppendLine();
+                sb.AppendLine("Зоны без waypoint (пропускаются):");
+                foreach (var kv in _pendingZones.Skip(n))
+                    sb.AppendLine($"       зона {kv.Key,4} → [нет waypoint]");
                 System.IO.File.WriteAllText(logPath, sb.ToString(), System.Text.Encoding.UTF8);
                 PushInfo($"[травник] Маршрут ({n} зон, ~{total} комнат) сохранён: {logPath}");
             }
