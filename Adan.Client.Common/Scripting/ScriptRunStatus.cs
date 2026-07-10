@@ -26,6 +26,9 @@ namespace Adan.Client.Common.Scripting
         /// <summary>Suspended inside WaitRoomChange().</summary>
         WaitingOnRoomChange,
 
+        /// <summary>Suspended inside WaitText(), waiting for the next text line from the server.</summary>
+        WaitingOnText,
+
         /// <summary>The coroutine's chunk ran to completion (returned
         /// without yielding again) -- a one-shot script, not an error.</summary>
         Finished,

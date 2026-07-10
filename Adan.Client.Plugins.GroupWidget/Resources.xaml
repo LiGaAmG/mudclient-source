@@ -6418,22 +6418,8 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <!-- Sanctify — крест (освящение) -->
-    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Sanctify" Stretch="Uniform">
-        <VisualBrush.Visual>
-            <Canvas Height="26" Width="26">
-                <Path Data="M8,0 L16,0 L16,8 L24,8 L24,16 L16,16 L16,24 L8,24 L8,16 L0,16 L0,8 L8,8 Z"
-                      Width="24" Height="24" Canvas.Left="1" Canvas.Top="1" Stretch="Fill" StrokeThickness="0">
-                    <Path.Fill>
-                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
-                            <GradientStop Color="#FFFFF9C0" Offset="0"/>
-                            <GradientStop Color="#FFFFC800" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Path.Fill>
-                </Path>
-            </Canvas>
-        </VisualBrush.Visual>
-    </VisualBrush>
+    <!-- Sanctify — нимб над головой -->
+    <ImageBrush x:Key="Brush_Sanctify" ImageSource="Images/sanctify.png" Stretch="Uniform" />
     <!-- MagicShield — щит со звездой (магический щит) -->
     <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_MagicShield" Stretch="Uniform">
         <VisualBrush.Visual>

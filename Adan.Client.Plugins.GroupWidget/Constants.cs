@@ -74,7 +74,7 @@ namespace Adan.Client.Plugins.GroupWidget
                                   new AffectDescription("DarkProtection",  "Защита от тьмы",      "защита от тьмы",        "DarkProtection"),
                                   new AffectDescription("StoneSkin",       "Каменная кожа",       "каменная кожа",         "StoneSkin"),
                                   new AffectDescription("LifeTouch",       "Живое прикосновение", "живое прикосновение",   "LifeTouch"),
-                                  new AffectDescription("Enlarge",         "Увеличение",          "увеличение",            "Enlarge"),
+                                  new AffectDescription("Enlarge", "Увеличение", new List<string> { "увеличение", "увеличиться" }, new List<string> { "Enlarge", "Enlarge" }),
                                   new AffectDescription("Meditation",      "Медитация",           "медитация",             "Meditation"),
                                   new AffectDescription("WaterBreath",     "Дыхание под водой",   "дыхание под водой",     "WaterBreath"),
                                   new AffectDescription("Pain",            "Боль",                "боль",                  "Pain") { IsRoundBased = true },

@@ -126,6 +126,38 @@ namespace Adan.Client.ViewModel
         }
 
         /// <summary>
+        /// Brush for the status indicator dot in the scripts list.
+        /// </summary>
+        public System.Windows.Media.Brush StatusColor
+        {
+            get
+            {
+                switch (_scriptHost.GetScriptStatus(_script.Name))
+                {
+                    case Common.Scripting.ScriptRunStatus.Running:
+                    case Common.Scripting.ScriptRunStatus.WaitingOnTimer:
+                    case Common.Scripting.ScriptRunStatus.WaitingOnGroupState:
+                    case Common.Scripting.ScriptRunStatus.WaitingOnRoomState:
+                    case Common.Scripting.ScriptRunStatus.WaitingOnRoomChange:
+                    case Common.Scripting.ScriptRunStatus.WaitingOnText:
+                        return System.Windows.Media.Brushes.LimeGreen;
+                    case Common.Scripting.ScriptRunStatus.Faulted:
+                        return System.Windows.Media.Brushes.Red;
+                    case Common.Scripting.ScriptRunStatus.Finished:
+                        return System.Windows.Media.Brushes.Gray;
+                    default:
+                        return new System.Windows.Media.SolidColorBrush(
+                            System.Windows.Media.Color.FromRgb(0x55, 0x55, 0x55));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Glyph shown when Auto-start is on.
+        /// </summary>
+        public string AutoStartGlyph => _script.IsEnabled ? "⚡" : "";
+
+        /// <summary>
         /// Re-reads Status from the host and raises PropertyChanged --
         /// call this from a UI timer, since LuaScriptHost has no change
         /// notification of its own.
@@ -133,7 +165,9 @@ namespace Adan.Client.ViewModel
         public void RefreshStatus()
         {
             OnPropertyChanged("Status");
+            OnPropertyChanged("StatusColor");
             OnPropertyChanged("LastError");
+            OnPropertyChanged("AutoStartGlyph");
         }
 
         private void StartCommandExecute(object obj)

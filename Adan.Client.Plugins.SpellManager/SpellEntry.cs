@@ -12,6 +12,7 @@ namespace Adan.Client.Plugins.SpellManager
         private int _memorized;
         private int _memorizing;
         private int _desired;
+        private int _priority;
         private bool _isTrackedInCounter;
         private bool _isTrackedGlobally;
 
@@ -80,6 +81,22 @@ namespace Adan.Client.Plugins.SpellManager
                 {
                     _desired = value;
                     OnPropertyChanged("Desired");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Memorization priority. Higher = memorized first. 0 = normal.
+        /// </summary>
+        public int Priority
+        {
+            get { return _priority; }
+            set
+            {
+                if (_priority != value)
+                {
+                    _priority = value;
+                    OnPropertyChanged("Priority");
                 }
             }
         }

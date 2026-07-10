@@ -24,21 +24,14 @@
     {
         private readonly AdditionalOutputWindowManager _manager;
         private readonly WidgetDescription _widget;
+        private readonly AdditionalOutputWindowManager _manager2;
+        private readonly WidgetDescription _widget2;
 
-        /// <summary>
-        /// 
-        /// </summary>
         public override string Name
         {
-            get 
-            {
-                return "OutputAdditionalWindow";
-            }
+            get { return "OutputAdditionalWindow"; }
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
         public OutputToAdditionalWindowPlugin()
         {
             var viewModel = new AdditionalOutputWindowsViewModel();
@@ -52,49 +45,55 @@
                 Width = 400,
                 ResizeToContent = false
             };
+
+            var viewModel2 = new AdditionalOutputWindowsViewModel();
+            var additionalOutputWindowControl2 = new AdditionalOutputWindow(viewModel2);
+            _manager2 = new AdditionalOutputWindowManager(viewModel2);
+
+            _widget2 = new WidgetDescription("AdditionalOutputWindow2", "Additional output 2", additionalOutputWindowControl2)
+            {
+                Left = (int)SystemParameters.PrimaryScreenWidth - 400,
+                Top = 320,
+                Height = 300,
+                Width = 400,
+                ResizeToContent = false
+            };
         }
 
-        /// <summary>
-        /// Gets the widgets of this plugin.
-        /// </summary>
         public override IEnumerable<WidgetDescription> Widgets
         {
-            get
-            {
-                return Enumerable.Repeat(_widget, 1);
-            }
+            get { return new[] { _widget, _widget2 }; }
         }
 
-        /// <summary>
-        /// Gets the custom action description of this plugin.
-        /// </summary>
         public override IEnumerable<ActionDescription> CustomActions
         {
             get
             {
-                return Enumerable.Repeat(new OutputToAdditionalWindowActionDescription(RootModel.AllParameterDescriptions, RootModel.AllActionDescriptions), 1);
+                return new ActionDescription[]
+                {
+                    new OutputToAdditionalWindowActionDescription(RootModel.AllParameterDescriptions, RootModel.AllActionDescriptions),
+                    new OutputToAdditionalWindow2ActionDescription(RootModel.AllParameterDescriptions, RootModel.AllActionDescriptions),
+                };
             }
         }
 
-        /// <summary>
-        /// Gets the plugin xaml resources to merge.
-        /// </summary>
         public override IEnumerable<string> PluginXamlResourcesToMerge
         {
             get
             {
-                return Enumerable.Repeat(@"/Adan.Client.Plugins.OutputWindow;component/OutputToAdditionalWindowActionEditingTemplate.xaml", 1);
+                return new[]
+                {
+                    @"/Adan.Client.Plugins.OutputWindow;component/OutputToAdditionalWindowActionEditingTemplate.xaml",
+                    @"/Adan.Client.Plugins.OutputWindow;component/OutputToAdditionalWindow2ActionEditingTemplate.xaml",
+                };
             }
         }
 
-        /// <summary>
-        /// Gets the custom serialization types of this plugin.
-        /// </summary>
         public override IEnumerable<Type> CustomSerializationTypes
         {
             get
             {
-                return Enumerable.Repeat(typeof(OutputToAdditionalWindowAction), 1);
+                return new[] { typeof(OutputToAdditionalWindowAction), typeof(OutputToAdditionalWindow2Action) };
             }
         }
 
@@ -114,33 +113,25 @@
         public override void InitializeConveyor(MessageConveyor conveyor)
         {
             conveyor.AddConveyorUnit(new OutputToAdditionalWindowConveyorUnit(_manager, conveyor));
+            conveyor.AddConveyorUnit(new OutputToAdditionalWindow2ConveyorUnit(_manager2, conveyor));
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="rootModel"></param>
         public override void OnCreatedOutputWindow(RootModel rootModel)
         {
             _manager.OutputWindowCreated(rootModel);
+            _manager2.OutputWindowCreated(rootModel);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="rootModel"></param>
         public override void OnChangedOutputWindow(RootModel rootModel)
         {
             _manager.OutputWindowChanged(rootModel);
+            _manager2.OutputWindowChanged(rootModel);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="rootModel"></param>
         public override void OnClosedOutputWindow(RootModel rootModel)
         {
             _manager.OutputWindowClosed(rootModel);
+            _manager2.OutputWindowClosed(rootModel);
         }
     }
 }

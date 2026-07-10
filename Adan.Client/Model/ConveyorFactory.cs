@@ -40,6 +40,7 @@ namespace Adan.Client.Model
             conveyor.AddConveyorUnit(new VariableReplaceUnit(conveyor));
             conveyor.AddConveyorUnit(new CommandMultiplierUnit(conveyor));
             conveyor.AddConveyorUnit(new SubstitutionUnit(conveyor));
+            conveyor.AddConveyorUnit(new ScriptUnit(conveyor));
             conveyor.AddConveyorUnit(new TriggerUnit(conveyor));
             conveyor.AddConveyorUnit(new AliasUnit(conveyor));
             conveyor.AddConveyorUnit(new HotkeyUnit(conveyor));

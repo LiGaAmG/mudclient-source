@@ -22,7 +22,21 @@
         <ListBox Grid.Column="0" Grid.Row="0"
                   ItemsSource="{Binding Path=Scripts}"
                   SelectedItem="{Binding Path=SelectedScript}"
-                  DisplayMemberPath="Name" Margin="0,0,5,5" />
+                  Margin="0,0,5,5">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="●" Foreground="{Binding StatusColor}"
+                                   FontSize="10" Margin="0,0,5,0" VerticalAlignment="Center"
+                                   ToolTip="{Binding Status}" />
+                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding AutoStartGlyph}" Foreground="#FFDDAA00"
+                                   FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"
+                                   ToolTip="Auto-start on connect" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
         <Grid Grid.Column="1" Grid.Row="0" DataContext="{Binding Path=SelectedScript}">
             <Grid.RowDefinitions>

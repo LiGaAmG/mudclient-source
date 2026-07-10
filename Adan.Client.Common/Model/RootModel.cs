@@ -108,6 +108,26 @@
                     }
                 },
             });
+
+            _scriptHost.ScriptEvent += (scriptName, eventType, error) =>
+            {
+                switch (eventType)
+                {
+                    case Scripting.LuaScriptHost.ScriptEventType.Started:
+                        PushMessageToConveyor(new InfoMessage(string.Format("#Script [{0}] запущен.", scriptName)));
+                        break;
+                    case Scripting.LuaScriptHost.ScriptEventType.Stopped:
+                        PushMessageToConveyor(new InfoMessage(string.Format("#Script [{0}] остановлен.", scriptName)));
+                        break;
+                    case Scripting.LuaScriptHost.ScriptEventType.Finished:
+                        PushMessageToConveyor(new InfoMessage(string.Format("#Script [{0}] завершён.", scriptName)));
+                        break;
+                    case Scripting.LuaScriptHost.ScriptEventType.Faulted:
+                        PushMessageToConveyor(new Messages.ErrorMessage(string.Format("#Script [{0}] упал: {1}", scriptName, error)));
+                        break;
+                }
+            };
+
             ReloadScripts();
 
             GroupStatus = new List<CharacterStatus>();
@@ -173,18 +193,23 @@
             {
                 if (script.IsEnabled)
                 {
-                    try
+                    var status = _scriptHost.GetScriptStatus(script.Name);
+                    bool isAlive = status == Scripting.ScriptRunStatus.Running
+                                || status == Scripting.ScriptRunStatus.WaitingOnTimer
+                                || status == Scripting.ScriptRunStatus.WaitingOnGroupState
+                                || status == Scripting.ScriptRunStatus.WaitingOnRoomState
+                                || status == Scripting.ScriptRunStatus.WaitingOnRoomChange
+                                || status == Scripting.ScriptRunStatus.WaitingOnText;
+                    bool codeChanged = _scriptHost.GetScriptCode(script.Name) != script.Code;
+                    if (!isAlive || codeChanged)
                     {
-                        _scriptHost.StartScript(script.Name, script.Code);
-                    }
-                    catch (Exception)
-                    {
-                        // StartScript itself already catches Lua-level errors
-                        // (LoadString failures, watchdog trips on the first leg)
-                        // and reports them via GetScriptStatus == Faulted instead
-                        // of throwing -- this catch is defense in depth only,
-                        // e.g. against an unexpected non-Lua exception, so one
-                        // broken script can never prevent the tab from opening.
+                        try
+                        {
+                            _scriptHost.StartScript(script.Name, script.Code);
+                        }
+                        catch (Exception)
+                        {
+                        }
                     }
                 }
                 else

@@ -16,16 +16,12 @@ namespace Adan.Client.ViewModel
             {
                 HelpContentBlock.ForText(
                     "ГДЕ ПИСАТЬ СКРИПТЫ\n\n" +
-                    "Есть два независимых места:\n\n" +
-                    "1) Действие триггера/алиаса \"Run Lua script\" (в редакторе Triggers/Aliases). " +
-                    "Тут ничего не изменилось: код выполняется один раз, при каждом срабатывании " +
-                    "этого конкретного триггера/алиаса, и просто выполняется до конца (это не " +
-                    "корутина, Wait/WaitGroupState и т.п. тут не используются).\n\n" +
-                    "2) Диалог Scripts (Profile Options -> Scripts). Список именованных скриптов " +
-                    "профиля — НЕ привязанных к тексту и больше НЕ привязанных к фиксированному " +
-                    "типу пакета через галочки. Каждый скрипт — это независимая Lua-корутина, " +
-                    "которую вы запускаете и останавливаете кнопками Start/Stop. У неё есть имя, " +
-                    "код, статус и галочка \"Auto-start on connect\"."),
+                    "Диалог Scripts (Options -> Scripts, active tab). Список именованных скриптов " +
+                    "профиля. Каждый скрипт — это независимая Lua-корутина, которую вы запускаете " +
+                    "и останавливаете кнопками Start/Stop. У неё есть имя, код, статус и галочка " +
+                    "\"Auto-start on connect\".\n\n" +
+                    "Скрипт видит каждую строку текстового вывода через WaitText() и любые " +
+                    "структурные пакеты через WaitGroupState()/WaitRoomState()/WaitRoomChange()."),
                 HelpContentBlock.ForText(
                     "ОСНОВНАЯ ИДИОМА\n\n" +
                     "Скрипт в диалоге Scripts обычно выглядит как бесконечный цикл, который сам " +
@@ -58,10 +54,11 @@ namespace Adan.Client.ViewModel
                     "У разных вкладок (персонажей) — разные, не пересекающиеся состояния."),
                 HelpContentBlock.ForText(
                     "ПРИМЕНЕНИЕ ПРАВОК\n\n" +
-                    "Триггер/алиас со скриптом — правки действуют сразу же после сохранения триггера. " +
-                    "Диалог Scripts — правки кода применяются по кнопке Save или Close, но уже " +
-                    "ЗАПУЩЕННЫЕ корутины правки кода на лету не подхватывают — остановите (Stop) " +
-                    "и запустите (Start) скрипт заново, чтобы он начал работать по новому коду."),
+                    "Диалог Scripts — правки кода применяются по кнопке Save или Close. " +
+                    "Уже ЗАПУЩЕННЫЕ корутины правки кода на лету не подхватывают — " +
+                    "остановите (Stop) и запустите (Start) скрипт заново, чтобы он начал работать " +
+                    "по новому коду. Скрипты, код которых не менялся, при закрытии диалога " +
+                    "не перезапускаются и продолжают работать без прерывания."),
             }),
 
             new HelpTopic(CatEvents, "Wait(ms) — ждать по таймеру", new List<HelpContentBlock>
@@ -149,6 +146,59 @@ namespace Adan.Client.ViewModel
                     "end"),
                 HelpContentBlock.ForText(
                     "Поля __last_room — см. тему \"Поля __last_room (после WaitRoomChange)\"."),
+            }),
+
+            new HelpTopic(CatEvents, "WaitText(ms) — ждать строку вывода", new List<HelpContentBlock>
+            {
+                HelpContentBlock.ForCode("local line = WaitText(timeout_ms)"),
+                HelpContentBlock.ForText(
+                    "Приостанавливает скрипт до следующей текстовой строки от сервера " +
+                    "(любой строки в окне вывода). Возвращает строку как обычную Lua-строку.\n\n" +
+                    "timeout_ms — необязательный таймаут в миллисекундах. Если строки нет " +
+                    "дольше этого времени, WaitText возвращает nil. При timeout_ms = 0 или " +
+                    "без аргумента — ждёт бесконечно.\n\n" +
+                    "Обычная идиома — реакция на конкретную строку:"),
+                HelpContentBlock.ForCode(
+                    "while true do\n" +
+                    "    local line = WaitText(0)\n" +
+                    "    if line:find(\"Вы огляделись\", 1, true) then\n" +
+                    "        -- дальше собираем строки огляда\n" +
+                    "    end\n" +
+                    "end"),
+                HelpContentBlock.ForText(
+                    "В строке можно использовать Lua-паттерны (аналог регулярок) через " +
+                    "string.find / string.match / string.gmatch:"),
+                HelpContentBlock.ForCode(
+                    "local line = WaitText(2000)\n" +
+                    "if not line then\n" +
+                    "    Echo(\"таймаут — строки не было\")\n" +
+                    "elseif line:match(\"^%d+H %d+V\") then\n" +
+                    "    Echo(\"строка статуса: \" .. line)\n" +
+                    "end"),
+                HelpContentBlock.ForText(
+                    "Пример — реагировать на огляд и собирать мобов по направлениям:"),
+                HelpContentBlock.ForCode(
+                    "while true do\n" +
+                    "    -- ждём строку начала огляда\n" +
+                    "    local line\n" +
+                    "    repeat\n" +
+                    "        line = WaitText(0)\n" +
+                    "    until line:find(\"Вы огляделись\", 1, true)\n" +
+                    "\n" +
+                    "    -- собираем строки огляда до строки статуса\n" +
+                    "    local cur = nil\n" +
+                    "    while true do\n" +
+                    "        local t = WaitText(400)\n" +
+                    "        if not t then break end\n" +
+                    "        if t:find(\"Вых\", 1, true) and t:find(\">\", 1, true) then break end\n" +
+                    "        if t:find(\"На севере\", 1, true) then cur = \"Север\" end\n" +
+                    "        -- ... и т.д.\n" +
+                    "    end\n" +
+                    "end"),
+                HelpContentBlock.ForText(
+                    "ВАЖНО: WaitText() работает только в корутине (диалог Scripts). " +
+                    "В действии триггера вызов WaitText() немедленно падает с ошибкой " +
+                    "\"attempt to yield from outside a coroutine\" — используйте скрипты."),
             }),
 
             new HelpTopic(CatData, "Поля __last_group[i] / __last_room_monsters[i]", new List<HelpContentBlock>
@@ -313,6 +363,19 @@ namespace Adan.Client.ViewModel
                     "не появилось."),
             }),
 
+            new HelpTopic(CatFunctions, "Функции: Lower(text)", new List<HelpContentBlock>
+            {
+                HelpContentBlock.ForCode("local s = Lower(\"Привет МИР\")  --> \"привет мир\""),
+                HelpContentBlock.ForText(
+                    "Приводит строку к нижнему регистру с учётом Unicode (включая кириллицу). " +
+                    "Стандартный string.lower() Lua работает только с ASCII — для кириллических " +
+                    "строк используйте именно Lower().\n\n" +
+                    "Типичное применение — нормализация имён мобов для сравнения или вывода:"),
+                HelpContentBlock.ForCode(
+                    "local name = Lower(\"Серый Шакал\")\n" +
+                    "-- name == \"серый шакал\""),
+            }),
+
             new HelpTopic(CatControl, "Управление скриптами: Start/Stop/Auto-start", new List<HelpContentBlock>
             {
                 HelpContentBlock.ForText(
@@ -350,7 +413,9 @@ namespace Adan.Client.ViewModel
                     "string, table, math, tostring, tonumber, type, pairs, ipairs,\n" +
                     "select, error, pcall, xpcall, assert, print"),
                 HelpContentBlock.ForText(
-                    "...плюс SendCommand, Wait, WaitGroupState, WaitRoomState, WaitRoomChange " +
+                    "...плюс SendCommand, Echo, SetVariable/GetVariable/ClearVariable, " +
+                    "EnableGroup/DisableGroup, SetStatus, SendToWindow, SendToAllWindows, Lower, " +
+                    "Wait, WaitText, WaitGroupState, WaitRoomState, WaitRoomChange " +
                     "(см. отдельные темы), а также ограниченная таблица coroutine — из неё " +
                     "доступны ТОЛЬКО create, resume, yield, status. wrap, close и прочие функции " +
                     "coroutine НЕ доступны.\n\n" +

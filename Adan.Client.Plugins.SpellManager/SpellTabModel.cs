@@ -153,7 +153,7 @@ namespace Adan.Client.Plugins.SpellManager
 
         private void OnSpellPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == "Desired" || e.PropertyName == "IsTrackedInCounter" || e.PropertyName == "IsTrackedGlobally")
+            if (e.PropertyName == "Desired" || e.PropertyName == "IsTrackedInCounter" || e.PropertyName == "IsTrackedGlobally" || e.PropertyName == "Priority")
                 Save();
         }
 
@@ -326,6 +326,14 @@ namespace Adan.Client.Plugins.SpellManager
                 return;
             }
 
+            // Секции умений/ремёсел идут после заклинаний — прекращаем парсинг
+            if (line == "Ваши умения:" || line == "Ремесла" || line == "Ремёсла" ||
+                line.StartsWith("Ваши характеристики") || line.StartsWith("Вы умеете"))
+            {
+                SetState(ParseState.None);
+                return;
+            }
+
             // Circle header: -== Круг N ==-
             var circleMatch = _circleHeader.Match(line);
             if (circleMatch.Success)
@@ -446,6 +454,14 @@ namespace Adan.Client.Plugins.SpellManager
                 sp.Memorized = 0;
         }
 
+        public void ClearSpells()
+        {
+            Spells.Clear();
+            FreeSlots.Clear();
+            OnPropertyChanged("FreeSlotsDisplay");
+            Save();
+        }
+
         /// <summary>
         /// For each spell where Desired > (Memorized + Memorizing), send N copies of "зауч !spellname".
         /// Tracks available free slots as we schedule.
@@ -457,7 +473,7 @@ namespace Adan.Client.Plugins.SpellManager
             // Copy current free slots so we can decrement as we schedule
             var available = new Dictionary<int, int>(FreeSlots);
 
-            foreach (var spell in Spells)
+            foreach (var spell in Spells.OrderByDescending(s => s.Priority))
             {
                 int needed = spell.Desired - spell.Total;
                 if (needed <= 0) continue;
@@ -487,7 +503,7 @@ namespace Adan.Client.Plugins.SpellManager
         {
             if (rootModel == null) return;
 
-            foreach (var spell in Spells)
+            foreach (var spell in Spells.OrderByDescending(s => s.Priority))
             {
                 int diff = spell.Total - spell.Desired;
                 if (diff == 0) continue;
@@ -543,6 +559,7 @@ namespace Adan.Client.Plugins.SpellManager
                                 new XAttribute("name", sp.Name),
                                 new XAttribute("circle", sp.Circle),
                                 new XAttribute("desired", sp.Desired),
+                                new XAttribute("priority", sp.Priority),
                                 new XAttribute("tracked", sp.IsTrackedInCounter),
                                 new XAttribute("global", sp.IsTrackedGlobally),
                                 new XAttribute("memorized", sp.Memorized)
@@ -576,6 +593,7 @@ namespace Adan.Client.Plugins.SpellManager
                     string name = (string)el.Attribute("name") ?? string.Empty;
                     int circle = (int?)el.Attribute("circle") ?? 0;
                     int desired = (int?)el.Attribute("desired") ?? 0;
+                    int priority = (int?)el.Attribute("priority") ?? 0;
                     bool tracked = (bool?)el.Attribute("tracked") ?? false;
                     bool global = (bool?)el.Attribute("global") ?? false;
                     int memorized = (int?)el.Attribute("memorized") ?? 0;
@@ -587,6 +605,7 @@ namespace Adan.Client.Plugins.SpellManager
                     {
                         if (circle > 0) existing.Circle = circle;
                         existing.Desired = desired;
+                        existing.Priority = priority;
                         existing.IsTrackedInCounter = tracked;
                         existing.IsTrackedGlobally = global;
                         existing.Memorized = memorized;
@@ -598,6 +617,7 @@ namespace Adan.Client.Plugins.SpellManager
                             Name = name,
                             Circle = circle,
                             Desired = desired,
+                            Priority = priority,
                             IsTrackedInCounter = tracked,
                             IsTrackedGlobally = global,
                             Memorized = memorized

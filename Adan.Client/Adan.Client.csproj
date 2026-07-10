@@ -160,6 +160,7 @@
     <Compile Include="ConveyorUnits\ShowMainOutputUnit.cs" />
     <Compile Include="ConveyorUnits\SubstitutionUnit.cs" />
     <Compile Include="ConveyorUnits\ToggleFullScreenModeUnit.cs" />
+    <Compile Include="ConveyorUnits\ScriptUnit.cs" />
     <Compile Include="ConveyorUnits\TriggerUnit.cs" />
     <Compile Include="ConveyorUnits\VariableReplaceUnit.cs" />
     <Compile Include="Dialogs\AboutDialog.xaml.cs">

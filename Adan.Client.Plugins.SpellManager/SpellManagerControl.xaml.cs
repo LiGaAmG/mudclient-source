@@ -36,5 +36,17 @@ namespace Adan.Client.Plugins.SpellManager
             var rootModel = plugin.GetActiveRootModel(model.Uid);
             model.ForgetAndRememorize(rootModel);
         }
+
+        private void ClearListButton_Click(object sender, RoutedEventArgs e)
+        {
+            var model = DataContext as SpellTabModel;
+            if (model == null) return;
+
+            if (MessageBox.Show("Очистить список заклинаний?", "Подтверждение",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
+                model.ClearSpells();
+            }
+        }
     }
 }

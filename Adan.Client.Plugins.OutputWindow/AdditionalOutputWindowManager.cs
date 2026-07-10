@@ -48,12 +48,20 @@ namespace Adan.Client.Plugins.OutputWindow
 
         public void AddText(RootModel rootModel, OutputToAdditionalWindowMessage message)
         {
+            AddTextInternal(rootModel, message);
+        }
+
+        public void AddText(RootModel rootModel, Common.Messages.TextMessage message)
+        {
+            AddTextInternal(rootModel, message);
+        }
+
+        private void AddTextInternal(RootModel rootModel, Common.Messages.TextMessage message)
+        {
             var window = _viewModel.Windows.FirstOrDefault(w => w.RootModel == rootModel);
             if (window != null && window.TextPresenter != null)
             {
                 Application.Current.Dispatcher.BeginInvoke((Action)(() => window.TextPresenter.AddMessages(Enumerable.Repeat(message, 1))));
-
-
             }
         }
     }

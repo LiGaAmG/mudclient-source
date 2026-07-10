@@ -1430,6 +1430,7 @@
                 var routesContainigCurrentRoom = _allRoutes.Where(r => r.RoomIdentifiersSet.Contains(newCurrentRoom.RoomId));
                 Route minRoute = null;
                 int minDestinationLength = int.MaxValue;
+                int pipelineRouteDist = int.MaxValue;
                 bool gotoStart = false;
                 bool targetAchieved = false;
 
@@ -1452,12 +1453,17 @@
                         if (route.StartRoomId != newCurrentRoom.RoomId)
                         {
                             int dist = route.RoutePointsAvailableFromStart[_currentRouteTarget];
+                            // Add cost to reach the start waypoint from current position in this route
+                            int idxInRoute = route.RouteRoomIdentifiers.IndexOf(newCurrentRoom.RoomId);
+                            if (idxInRoute > 0) dist += idxInRoute;
                             // Penalize backward traversal only when we JUST arrived via this route
                             // (pipeline route). That prevents bouncing back along the same route,
                             // but allows a different route that happens to end here to be selected
                             // normally (e.g. пригорка→мт+ at мт+ after arriving via мм+→мт+).
                             if (route.EndRoomId == newCurrentRoom.RoomId && route == _pipelineRoute)
                                 dist += route.RouteRoomIdentifiers.Count;
+                            if (route == _pipelineRoute && dist < pipelineRouteDist)
+                                pipelineRouteDist = dist;
                             if (dist < minDestinationLength)
                             {
                                 gotoStart = true;
@@ -1472,6 +1478,12 @@
                         if (route.EndRoomId != newCurrentRoom.RoomId)
                         {
                             int dist = route.RoutePointsAvailableFromEnd[_currentRouteTarget];
+                            // Add cost to reach the end waypoint from current position in this route
+                            int idxInRoute = route.RouteRoomIdentifiers.IndexOf(newCurrentRoom.RoomId);
+                            if (idxInRoute >= 0 && idxInRoute < route.RouteRoomIdentifiers.Count - 1)
+                                dist += route.RouteRoomIdentifiers.Count - 1 - idxInRoute;
+                            if (route == _pipelineRoute && dist < pipelineRouteDist)
+                                pipelineRouteDist = dist;
                             if (dist < minDestinationLength)
                             {
                                 gotoStart = false;
@@ -1512,7 +1524,12 @@
                     {
                         bool canReach = _pipelineRoute.RoutePointsAvailableFromStart.ContainsKey(_currentRouteTarget)
                                      || _pipelineRoute.RoutePointsAvailableFromEnd.ContainsKey(_currentRouteTarget);
-                        if (canReach)
+                        // Allow override if the new route is significantly cheaper (>30 rooms saved).
+                        // This lets the bot transfer to a better route mid-journey (e.g. avoid мм+
+                        // when a shortcut via народец becomes available), while still protecting
+                        // against premature switches at shared junction rooms (e.g. эдорас).
+                        bool newRouteSignificantlyBetter = minDestinationLength < pipelineRouteDist - 1;
+                        if (canReach && !newRouteSignificantlyBetter)
                         {
                             RouteLog("  PIPELINE PROTECT: staying on {0}→{1} (not at junction)", _pipelineRoute.StartName, _pipelineRoute.EndName);
                             minRoute = _pipelineRoute;

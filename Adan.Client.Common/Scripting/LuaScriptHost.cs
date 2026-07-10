@@ -53,7 +53,20 @@ namespace Adan.Client.Common.Scripting
             public ScriptRunStatus Status;
             public string LastError;
             public DateTime TimerDueAtUtc;
+            public DateTime TextTimeoutUtc = DateTime.MaxValue;
+            public string Code;
         }
+
+        public enum ScriptEventType { Started, Stopped, Faulted, Finished }
+
+        /// <summary>
+        /// Raised when a named coroutine script transitions to a terminal or
+        /// initial state: Started, Stopped (explicit), Finished (ran to end),
+        /// or Faulted (runtime/syntax error). Third arg is the error string
+        /// for Faulted, null otherwise. Always raised on the UI thread
+        /// (the same thread that calls StartScript/StopScript/Tick).
+        /// </summary>
+        public event Action<string, ScriptEventType, string> ScriptEvent;
 
         public LuaScriptHost()
             : this(new LuaScriptHostBindings())
@@ -92,6 +105,7 @@ namespace Adan.Client.Common.Scripting
             _lua.RegisterFunction("SetStatus", this, GetType().GetMethod(nameof(SetStatusFromLua)));
             _lua.RegisterFunction("SendToWindow", this, GetType().GetMethod(nameof(SendToWindowFromLua)));
             _lua.RegisterFunction("SendToAllWindows", this, GetType().GetMethod(nameof(SendToAllWindowsFromLua)));
+            _lua.RegisterFunction("Lower", this, GetType().GetMethod(nameof(LowerFromLua)));
 
             // Keep a reference to the delegate for the lifetime of the host:
             // KeraLua's SetHook stores a native callback pointer derived from
@@ -126,6 +140,11 @@ namespace Adan.Client.Common.Scripting
 
                 function WaitRoomChange()
                     coroutine.yield('roomchange')
+                end
+
+                function WaitText(timeout_ms)
+                    coroutine.yield('text', timeout_ms or 0)
+                    return __last_text
                 end
             ", "scripting-runtime-prelude");
         }
@@ -224,13 +243,16 @@ namespace Adan.Client.Common.Scripting
             if (loadStatus != LuaStatus.OK)
             {
                 var loadError = thread.ToString(-1);
-                _runningScripts[name] = new RunningScript { Thread = thread, Status = ScriptRunStatus.Faulted, LastError = loadError };
+                _runningScripts[name] = new RunningScript { Thread = thread, Status = ScriptRunStatus.Faulted, LastError = loadError, Code = code };
+                ScriptEvent?.Invoke(name, ScriptEventType.Faulted, loadError);
                 return;
             }
 
-            var script = new RunningScript { Thread = thread, Status = ScriptRunStatus.Running };
+            var script = new RunningScript { Thread = thread, Status = ScriptRunStatus.Running, Code = code };
             _runningScripts[name] = script;
             ResumeScript(name, script);
+            if (script.Status != ScriptRunStatus.Faulted && script.Status != ScriptRunStatus.Finished)
+                ScriptEvent?.Invoke(name, ScriptEventType.Started, null);
         }
 
         /// <summary>
@@ -240,7 +262,38 @@ namespace Adan.Client.Common.Scripting
         /// </summary>
         public void StopScript(string name)
         {
-            _runningScripts.Remove(name);
+            if (_runningScripts.TryGetValue(name, out var existing))
+            {
+                bool wasAlive = existing.Status != ScriptRunStatus.Faulted
+                             && existing.Status != ScriptRunStatus.Finished
+                             && existing.Status != ScriptRunStatus.NotRunning;
+                _runningScripts.Remove(name);
+                if (wasAlive)
+                    ScriptEvent?.Invoke(name, ScriptEventType.Stopped, null);
+            }
+        }
+
+        /// <summary>Returns the Lua source code of the currently-running instance of a named
+        /// script, or null if no such script is registered.</summary>
+        public string GetScriptCode(string name)
+        {
+            RunningScript s;
+            return _runningScripts.TryGetValue(name, out s) ? s.Code : null;
+        }
+
+        /// <summary>Returns the number of scripts currently in a live (non-terminal) state
+        /// across all named scripts in this host.</summary>
+        public int GetRunningCount()
+        {
+            int count = 0;
+            foreach (var s in _runningScripts.Values)
+            {
+                if (s.Status != ScriptRunStatus.Faulted
+                 && s.Status != ScriptRunStatus.Finished
+                 && s.Status != ScriptRunStatus.NotRunning)
+                    count++;
+            }
+            return count;
         }
 
         /// <summary>
@@ -279,6 +332,12 @@ namespace Adan.Client.Common.Scripting
                 {
                     ResumeScript(pair.Key, pair.Value);
                 }
+                else if (pair.Value.Status == ScriptRunStatus.WaitingOnText && pair.Value.TextTimeoutUtc <= now)
+                {
+                    _lua["__last_text"] = null;
+                    pair.Value.TextTimeoutUtc = DateTime.MaxValue;
+                    ResumeScript(pair.Key, pair.Value);
+                }
             }
         }
 
@@ -299,6 +358,7 @@ namespace Adan.Client.Common.Scripting
             if (status == LuaStatus.OK)
             {
                 script.Status = ScriptRunStatus.Finished;
+                ScriptEvent?.Invoke(name, ScriptEventType.Finished, null);
                 return;
             }
 
@@ -312,6 +372,7 @@ namespace Adan.Client.Common.Scripting
                 // needed to tell the two apart in the captured text.
                 script.LastError = script.Thread.ToString(-1);
                 script.Status = ScriptRunStatus.Faulted;
+                ScriptEvent?.Invoke(name, ScriptEventType.Faulted, script.LastError);
                 return;
             }
 
@@ -333,6 +394,14 @@ namespace Adan.Client.Common.Scripting
             else if (tag == "roomchange")
             {
                 script.Status = ScriptRunStatus.WaitingOnRoomChange;
+            }
+            else if (tag == "text")
+            {
+                script.Status = ScriptRunStatus.WaitingOnText;
+                var timeoutMs = script.Thread.ToNumber(2);
+                script.TextTimeoutUtc = timeoutMs > 0
+                    ? DateTime.UtcNow.AddMilliseconds(timeoutMs)
+                    : DateTime.MaxValue;
             }
             else
             {
@@ -465,6 +534,11 @@ namespace Adan.Client.Common.Scripting
         /// Exposed to Lua as the global function <c>SendToAllWindows</c> -- sends
         /// a text command to every currently open tab (including this one).
         /// </summary>
+        public string LowerFromLua(string s)
+        {
+            return s != null ? s.ToLowerInvariant() : string.Empty;
+        }
+
         public void SendToAllWindowsFromLua(string text)
         {
             if (_bindings.SendToAllWindows != null)
@@ -525,6 +599,16 @@ namespace Adan.Client.Common.Scripting
 
             _lua["__last_room_monsters"] = monstersTable;
             ResumeAllWaitingOn(ScriptRunStatus.WaitingOnRoomState);
+        }
+
+        /// <summary>
+        /// Updates <c>__last_text</c> with the incoming line and resumes every
+        /// script currently suspended inside <c>WaitText()</c>.
+        /// </summary>
+        public void RaiseTextReceived(string line)
+        {
+            _lua["__last_text"] = line ?? string.Empty;
+            ResumeAllWaitingOn(ScriptRunStatus.WaitingOnText);
         }
 
         /// <summary>

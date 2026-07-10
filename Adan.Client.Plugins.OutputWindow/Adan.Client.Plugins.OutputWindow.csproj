@@ -60,11 +60,16 @@
     </Compile>
     <Compile Include="AdditionalOutputWindowManager.cs" />
     <Compile Include="Model\Actions\OutputToAdditionalWindowAction.cs" />
+    <Compile Include="Model\Actions\OutputToAdditionalWindow2Action.cs" />
     <Compile Include="ViewModel\AdditionalOutputWindowsViewModel.cs" />
     <Compile Include="ViewModel\OutputToAdditionalWindowActionViewModel.cs" />
+    <Compile Include="ViewModel\OutputToAdditionalWindow2ActionViewModel.cs" />
     <Compile Include="ConveyorUnits\OutputToAdditionalWindowConveyorUnit.cs" />
+    <Compile Include="ConveyorUnits\OutputToAdditionalWindow2ConveyorUnit.cs" />
     <Compile Include="Messages\OutputToAdditionalWindowMessage.cs" />
+    <Compile Include="Messages\OutputToAdditionalWindow2Message.cs" />
     <Compile Include="Model\OutputToAdditionalWindowActionDescription.cs" />
+    <Compile Include="Model\OutputToAdditionalWindow2ActionDescription.cs" />
     <Compile Include="OutputToAdditionalWindowPlugin.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -79,6 +84,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="OutputToAdditionalWindowActionEditingTemplate.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OutputToAdditionalWindow2ActionEditingTemplate.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

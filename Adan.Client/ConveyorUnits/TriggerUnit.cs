@@ -130,6 +130,8 @@ namespace Adan.Client.ConveyorUnits
             }
 
             // Запускаем триггеры в правильном порядке, пропуская те, чей литерал не найден
+            rootModel.ScriptHost.RaiseTextReceived(text);
+
             foreach (var entry in _orderedTriggers)
             {
                 if (message.SkipTriggers)

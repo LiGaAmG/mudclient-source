@@ -45,8 +45,14 @@ namespace Adan.Client.Plugins.SpellManager
         private void ApplyPendingModel(System.Windows.FrameworkElement control)
         {
             var m = _pendingModel;
-            if (m != null && !ReferenceEquals(control.DataContext, m))
-                control.DataContext = m;
+            if (m == null || ReferenceEquals(control.DataContext, m))
+                return;
+            // Defer to Loaded priority so any in-progress layout/collection refresh
+            // finishes first — setting DataContext during IsVisibleChanged causes
+            // "DeferRefresh not allowed during AddNew/EditItem" on the inner DataGrid.
+            Application.Current.Dispatcher.BeginInvoke(
+                DispatcherPriority.Loaded,
+                new System.Action(() => { if (!ReferenceEquals(control.DataContext, _pendingModel)) control.DataContext = _pendingModel; }));
         }
 
         /// <summary>

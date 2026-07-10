@@ -235,9 +235,20 @@ namespace Adan.Client
         /// </summary>
         private void HandleScriptsTickTimer(object sender, EventArgs e)
         {
+            int runningScripts = 0;
             foreach (var rootModel in _allRootModels)
             {
                 rootModel.ScriptHost.Tick();
+                runningScripts += rootModel.ScriptHost.GetRunningCount();
+            }
+            if (runningScripts > 0)
+            {
+                _scriptsIndicator.Text = string.Format("📜{0}", runningScripts);
+                _scriptsIndicator.Foreground = System.Windows.Media.Brushes.LimeGreen;
+            }
+            else
+            {
+                _scriptsIndicator.Text = "";
             }
         }
 
@@ -447,7 +458,8 @@ namespace Adan.Client
             actionDescriptions.Add(new SendToWindowActionDescription(actionDescriptions));
             actionDescriptions.Add(new ToggleFullScreenModeActionDescription(actionDescriptions));
             actionDescriptions.Add(new StatusActionDescription(parameterDescriptions, actionDescriptions));
-            actionDescriptions.Add(new LuaScriptActionDescription(actionDescriptions));
+            // LuaScriptAction removed: trigger scripts can't yield (no coroutine context).
+            // Use named scripts with WaitText() instead.
 
             parameterDescriptions.Add(new TriggerOrCommandParameterDescription(parameterDescriptions));
             parameterDescriptions.Add(new VariableReferenceParameterDescription(parameterDescriptions));

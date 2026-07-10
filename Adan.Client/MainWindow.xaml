@@ -53,6 +53,9 @@
         </Menu>
         <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal"
                     HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
+            <TextBlock Name="_scriptsIndicator" FontSize="11" Foreground="Gray" Text=""
+                       Margin="0,0,10,0"
+                       ToolTip="Активные Lua-скрипты по всем табам"/>
             <TextBlock Name="_timersIndicator" FontSize="11" Foreground="Gray" Text=""
                        Margin="0,0,10,0"
                        ToolTip="Активные игровые таймеры: #timer + отложенные команды #wait, по всем табам"/>

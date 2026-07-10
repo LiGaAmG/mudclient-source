@@ -66,6 +66,8 @@
                     Click="ExecutePlanButton_Click"/>
             <Button x:Name="ForgetAndRememorizeButton" Content="Забыть и перезаучить"
                     Click="ForgetAndRememorizeButton_Click"/>
+            <Button x:Name="ClearListButton" Content="Очистить список"
+                    Click="ClearListButton_Click"/>
             <TextBlock Text="Префикс:" Foreground="#FFAAAAAA" VerticalAlignment="Center" Margin="8,0,3,0"/>
             <TextBox Text="{Binding SpellPrefix, UpdateSourceTrigger=PropertyChanged}"
                      Width="28" MaxLength="2"
@@ -98,6 +100,14 @@
                 <DataGridTextColumn Header="Заучено" Binding="{Binding Memorized}" Width="65" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Учится" Binding="{Binding Memorizing}" Width="60" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Нужно" Binding="{Binding Desired, UpdateSourceTrigger=PropertyChanged}" Width="60">
+                    <DataGridTextColumn.EditingElementStyle>
+                        <Style TargetType="TextBox">
+                            <Setter Property="Background" Value="#FF1E1E1E"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </Style>
+                    </DataGridTextColumn.EditingElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Приор" Binding="{Binding Priority, UpdateSourceTrigger=PropertyChanged}" Width="52">
                     <DataGridTextColumn.EditingElementStyle>
                         <Style TargetType="TextBox">
                             <Setter Property="Background" Value="#FF1E1E1E"/>
