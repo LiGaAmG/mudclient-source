@@ -175,7 +175,18 @@ namespace Adan.Client.Map.Render
                 return;
             }
 
-            // All rooms are shown (visited = colored, unvisited = gray NonVisitedRoomBrush)
+            // Unvisited rooms with no visited/current neighbours: render as simple gray square, skip exits/icons
+            if (!RoomToVisualize.HasBeenVisited && !RoomToVisualize.IsConnectedToCurrent && !RoomToVisualize.Exits.Any(ex => ex.Room != null && ex.Room.HasBeenVisited))
+            {
+                _roomDrawing.Pen = _zoneVisual.RenderConstants.DefaultRoomPen;
+                _roomDrawing.Brush = _zoneVisual.RenderConstants.NonVisitedRoomBrush;
+                _iconDrawing.Brush = _zoneVisual.RenderConstants.InvisibleExitBrush;
+                foreach (var exitDrawing in GetAllExits())
+                    exitDrawing.Brush = _zoneVisual.RenderConstants.InvisibleExitBrush;
+                _transform.X = RoomToVisualize.XLocation * 30;
+                _transform.Y = RoomToVisualize.YLocation * 30;
+                return;
+            }
 
             _roomDrawing.Pen = RoomToVisualize.IsCurrent
                                    ? _zoneVisual.RenderConstants.CurrentRoomPen
