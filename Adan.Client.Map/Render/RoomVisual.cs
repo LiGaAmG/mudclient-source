@@ -175,12 +175,7 @@ namespace Adan.Client.Map.Render
                 return;
             }
 
-            if (!RoomToVisualize.HasBeenVisited && !RoomToVisualize.IsConnectedToCurrent && !RoomToVisualize.Exits.Any(ex => ex.Room != null && ex.Room.HasBeenVisited))
-            {
-                _transform.X = -10000;
-                _transform.Y = -10000;
-                return;
-            }
+            // All rooms are shown (visited = colored, unvisited = gray NonVisitedRoomBrush)
 
             _roomDrawing.Pen = RoomToVisualize.IsCurrent
                                    ? _zoneVisual.RenderConstants.CurrentRoomPen

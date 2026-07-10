@@ -272,7 +272,11 @@ namespace Adan.Client.Map.ViewModel
         {
             get
             {
+#if DEBUG
                 return true;
+#else
+                return AdditionalRoomParameters.HasBeenVisited;
+#endif
             }
         }
 
