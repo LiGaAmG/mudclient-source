@@ -428,7 +428,6 @@
                         }
                     }
 
-#if DEBUG
                     var zoneMapFileName = Path.Combine(GetZoneVisitsFolder(), zoneId.ToString(CultureInfo.InvariantCulture) + ".map");
                     if (File.Exists(zoneMapFileName))
                     {
@@ -440,22 +439,26 @@
                                 var lineContent = line.Split(' ');
                                 if (lineContent.Length == 4)
                                 {
-                                    var roomId = int.Parse(lineContent[0], CultureInfo.InvariantCulture);
-                                    var x = int.Parse(lineContent[1], CultureInfo.InvariantCulture);
-                                    var y = int.Parse(lineContent[2], CultureInfo.InvariantCulture);
-                                    var z = int.Parse(lineContent[3], CultureInfo.InvariantCulture);
-                                    //TODO: Почему Single() ?
-                                    var room = loadedZone.Rooms.Single(r => r.Id == roomId);
-                                    room.XLocation = x;
-                                    room.YLocation = y;
-                                    room.ZLocation = z;
+                                    int roomId, x, y, z;
+                                    if (int.TryParse(lineContent[0], System.Globalization.NumberStyles.Integer, CultureInfo.InvariantCulture, out roomId)
+                                        && int.TryParse(lineContent[1], System.Globalization.NumberStyles.Integer, CultureInfo.InvariantCulture, out x)
+                                        && int.TryParse(lineContent[2], System.Globalization.NumberStyles.Integer, CultureInfo.InvariantCulture, out y)
+                                        && int.TryParse(lineContent[3], System.Globalization.NumberStyles.Integer, CultureInfo.InvariantCulture, out z))
+                                    {
+                                        var room = loadedZone.Rooms.FirstOrDefault(r => r.Id == roomId);
+                                        if (room != null)
+                                        {
+                                            room.XLocation = x;
+                                            room.YLocation = y;
+                                            room.ZLocation = z;
+                                        }
+                                    }
                                 }
 
                                 line = reader.ReadLine();
                             }
                         }
                     }
-#endif
                 }
                 catch
                 {
