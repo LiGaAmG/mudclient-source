@@ -170,16 +170,13 @@
                     ZoneViewModel tempVal;
 
                     SaveAdditionalRoomParameters(zoneViewModel);
-#if DEBUG
                     SaveZoneDebugInfo(zoneViewModel);
-#endif
 
                     _loadedZones.TryRemove(zoneViewModel.Id, out tempVal);
                 }
             }
         }
 
-#if DEBUG
         private void SaveZoneDebugInfo(ZoneViewModel zoneViewModel)
         {
             var zoneMapFileName = Path.Combine(GetZoneVisitsFolder(), zoneViewModel.Id.ToString(CultureInfo.InvariantCulture) + ".map");
@@ -195,7 +192,6 @@
                 }
             }
         }
-#endif
 
         /// <summary>
         /// 
@@ -207,9 +203,7 @@
             foreach (var zoneViewModel in _loadedZones.Values.ToArray())
             {
                 SaveAdditionalRoomParameters(zoneViewModel);
-#if DEBUG
                 SaveZoneDebugInfo(zoneViewModel);
-#endif
             }
 
             Settings.Default.Save();
