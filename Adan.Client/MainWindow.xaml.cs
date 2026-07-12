@@ -1,4 +1,4 @@
-﻿using Adan.Client.Commands;
+using Adan.Client.Commands;
 using Adan.Client.Common.Commands;
 using Adan.Client.Common.Controls;
 using Adan.Client.Common.Model;
@@ -387,6 +387,7 @@ namespace Adan.Client
         public MainWindow()
         {
             InitializeComponent();
+            var _startupSw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 Icon = new BitmapImage(new Uri("pack://application:,,,/icon.ico", UriKind.Absolute));
@@ -423,7 +424,9 @@ namespace Adan.Client
                                 typeof(ToggleFullScreenModeAction),
                             };
 
-            //Load plugins
+            Adan.Client.Common.Conveyor.PerfLog.WriteTotal("STARTUP_INIT_COMPONENT", _startupSw.ElapsedMilliseconds, "", "");
+            _startupSw.Restart();
+            //Load plugins (MEF composition here)
             foreach (var plugin in PluginHost.Instance.AllPlugins)
             {
                 foreach (var customType in plugin.CustomSerializationTypes)
@@ -436,10 +439,14 @@ namespace Adan.Client
             types.Add(typeof(StatusAction));
 
             //Load settings
+            Adan.Client.Common.Conveyor.PerfLog.WriteTotal("STARTUP_MEF", _startupSw.ElapsedMilliseconds, "", "");
+            _startupSw.Restart();
             Properties.Settings settings = Properties.Settings.Default;
             settings.Reload();
 
             SettingsHolder.Instance.Initialize((SettingsFolder)settings.SettingsFolder, types);
+            Adan.Client.Common.Conveyor.PerfLog.WriteTotal("STARTUP_SETTINGS", _startupSw.ElapsedMilliseconds, "", "");
+            _startupSw.Restart();
             SettingsHolder.Instance.ErrorOccurred += HandleSettingsError;
 
             var actionDescriptions = new List<ActionDescription>();
@@ -487,10 +494,14 @@ namespace Adan.Client
                 ViewModel = new InitializationStatusModel()
             };
 
+            Adan.Client.Common.Conveyor.PerfLog.WriteTotal("STARTUP_BEFORE_PLUGINS", _startupSw.ElapsedMilliseconds, "", "");
+            _startupSw.Restart();
             Task task = Task.Factory.StartNew(() => PluginHost.Instance.InitializePlugins(initializationDalog.ViewModel, this))
                 .ContinueWith(t => Dispatcher.Invoke(initializationDalog.Close));
             initializationDalog.ShowDialog();
 
+            Adan.Client.Common.Conveyor.PerfLog.WriteTotal("STARTUP_PLUGINS", _startupSw.ElapsedMilliseconds, "", "");
+            _startupSw.Restart();
             //Initialize plugins
             foreach (var plugin in PluginHost.Instance.Plugins)
             {
@@ -516,6 +527,7 @@ namespace Adan.Client
 
             _dockManager.ActiveContentChanged += _dockManager_ActiveContentChanged;
             _dockManager.Theme = new AvalonDockDarkTheme();
+
         }
 
         #endregion

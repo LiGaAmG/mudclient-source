@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -67,6 +67,114 @@ namespace Adan.Client.Plugins.SpellManager
         }
 
         public ObservableCollection<SpellEntry> Spells { get; private set; }
+
+        // ---- Presets ----
+        private readonly Dictionary<string, SpellPreset> _presets = new Dictionary<string, SpellPreset>();
+        private string _activePresetName = string.Empty;
+
+        public ObservableCollection<string> PresetNames { get; private set; }
+
+        public string ActivePresetName
+        {
+            get { return _activePresetName; }
+            set
+            {
+                if (_activePresetName != value)
+                {
+                    _activePresetName = value ?? string.Empty;
+                    OnPropertyChanged("ActivePresetName");
+                }
+            }
+        }
+
+        public event EventHandler SpellFilterChanged;
+
+        private void RaiseSpellFilterChanged()
+        {
+            var h = SpellFilterChanged;
+            if (h != null) h(this, EventArgs.Empty);
+        }
+
+        private bool _hideZeroDesired = false;
+        public bool HideZeroDesired
+        {
+            get { return _hideZeroDesired; }
+            set
+            {
+                if (_hideZeroDesired != value)
+                {
+                    _hideZeroDesired = value;
+                    OnPropertyChanged("HideZeroDesired");
+                    RaiseSpellFilterChanged();
+                    Save();
+                }
+            }
+        }
+
+        public void SaveCurrentAsPreset(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+            name = name.Trim();
+            var preset = new SpellPreset { Name = name };
+            foreach (var sp in Spells)
+            {
+                if (sp.Desired > 0 || sp.IsTrackedInCounter || sp.IsTrackedGlobally || sp.Priority != 0)
+                    preset.Entries.Add(new SpellPresetEntry
+                    {
+                        SpellName = sp.Name,
+                        Desired = sp.Desired,
+                        Priority = sp.Priority,
+                        IsTrackedInCounter = sp.IsTrackedInCounter,
+                        IsTrackedGlobally = sp.IsTrackedGlobally
+                    });
+            }
+            bool isNew = !_presets.ContainsKey(name);
+            _presets[name] = preset;
+            if (isNew) PresetNames.Add(name);
+            _activePresetName = name;
+            OnPropertyChanged("ActivePresetName");
+            Save();
+        }
+
+        public void LoadPreset(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+            SpellPreset preset;
+            if (!_presets.TryGetValue(name, out preset)) return;
+
+            // Reset desired for all spells; apply from preset
+            foreach (var sp in Spells)
+            {
+                sp.Desired = 0;
+                sp.Priority = 0;
+                sp.IsTrackedInCounter = false;
+                sp.IsTrackedGlobally = false;
+            }
+            foreach (var entry in preset.Entries)
+            {
+                var sp = FindOrCreateSpell(entry.SpellName);
+                sp.Desired = entry.Desired;
+                sp.Priority = entry.Priority;
+                sp.IsTrackedInCounter = entry.IsTrackedInCounter;
+                sp.IsTrackedGlobally = entry.IsTrackedGlobally;
+            }
+            _activePresetName = name;
+            OnPropertyChanged("ActivePresetName");
+            Save();
+        }
+
+        public void DeletePreset(string name)
+        {
+            if (!_presets.ContainsKey(name)) return;
+            _presets.Remove(name);
+            PresetNames.Remove(name);
+            if (_activePresetName == name)
+            {
+                _activePresetName = string.Empty;
+                OnPropertyChanged("ActivePresetName");
+            }
+            Save();
+        }
 
         // Отладочный флаг: отображается в UI чтобы видеть когда конвейер считает себя внутри секции зауч/закл
         private bool _isInSection;
@@ -137,6 +245,7 @@ namespace Adan.Client.Plugins.SpellManager
         {
             Uid = uid;
             Spells = new ObservableCollection<SpellEntry>();
+            PresetNames = new ObservableCollection<string>();
             FreeSlots = new Dictionary<int, int>();
 
             // Авто-сохранение при изменении настроек (Desired, IsTrackedInCounter)
@@ -155,6 +264,8 @@ namespace Adan.Client.Plugins.SpellManager
         {
             if (e.PropertyName == "Desired" || e.PropertyName == "IsTrackedInCounter" || e.PropertyName == "IsTrackedGlobally" || e.PropertyName == "Priority")
                 Save();
+            if (e.PropertyName == "Desired" && _hideZeroDesired)
+                RaiseSpellFilterChanged();
         }
 
         // ---- Text parsing ----
@@ -554,6 +665,8 @@ namespace Adan.Client.Plugins.SpellManager
                     new XElement("SpellPlan",
                         new XAttribute("counterFontSize", _counterFontSize),
                         new XAttribute("spellPrefix", _spellPrefix),
+                        new XAttribute("activePreset", _activePresetName),
+                        new XAttribute("hideZeroDesired", _hideZeroDesired),
                         Spells.Select(sp =>
                             new XElement("Spell",
                                 new XAttribute("name", sp.Name),
@@ -563,6 +676,22 @@ namespace Adan.Client.Plugins.SpellManager
                                 new XAttribute("tracked", sp.IsTrackedInCounter),
                                 new XAttribute("global", sp.IsTrackedGlobally),
                                 new XAttribute("memorized", sp.Memorized)
+                            )
+                        ),
+                        new XElement("Presets",
+                            _presets.Values.Select(pr =>
+                                new XElement("Preset",
+                                    new XAttribute("name", pr.Name),
+                                    pr.Entries.Select(e =>
+                                        new XElement("Entry",
+                                            new XAttribute("name", e.SpellName),
+                                            new XAttribute("desired", e.Desired),
+                                            new XAttribute("priority", e.Priority),
+                                            new XAttribute("tracked", e.IsTrackedInCounter),
+                                            new XAttribute("global", e.IsTrackedGlobally)
+                                        )
+                                    )
+                                )
                             )
                         )
                     )
@@ -587,6 +716,33 @@ namespace Adan.Client.Plugins.SpellManager
 
                 _counterFontSize = (int?)doc.Root.Attribute("counterFontSize") ?? 11;
                 _spellPrefix = (string)doc.Root.Attribute("spellPrefix") ?? "!";
+                _activePresetName = (string)doc.Root.Attribute("activePreset") ?? string.Empty;
+                _hideZeroDesired = (bool?)doc.Root.Attribute("hideZeroDesired") ?? false;
+
+                // Load presets
+                var presetsEl = doc.Root.Element("Presets");
+                if (presetsEl != null)
+                {
+                    foreach (var prEl in presetsEl.Elements("Preset"))
+                    {
+                        var prName = (string)prEl.Attribute("name");
+                        if (string.IsNullOrWhiteSpace(prName)) continue;
+                        var preset = new SpellPreset { Name = prName };
+                        foreach (var eEl in prEl.Elements("Entry"))
+                        {
+                            preset.Entries.Add(new SpellPresetEntry
+                            {
+                                SpellName = (string)eEl.Attribute("name") ?? string.Empty,
+                                Desired = (int?)eEl.Attribute("desired") ?? 0,
+                                Priority = (int?)eEl.Attribute("priority") ?? 0,
+                                IsTrackedInCounter = (bool?)eEl.Attribute("tracked") ?? false,
+                                IsTrackedGlobally = (bool?)eEl.Attribute("global") ?? false
+                            });
+                        }
+                        _presets[prName] = preset;
+                        PresetNames.Add(prName);
+                    }
+                }
 
                 foreach (var el in doc.Root.Elements("Spell"))
                 {

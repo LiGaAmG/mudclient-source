@@ -1,4 +1,4 @@
-﻿namespace Adan.Client.Map
+namespace Adan.Client.Map
 {
     using System;
     using System.Collections.Concurrent;
@@ -92,7 +92,7 @@
                 try
                 {
                     // Короткая пауза, чтобы не толкаться с инициализацией плагинов
-                    System.Threading.Thread.Sleep(2000);
+                    System.Threading.Thread.Sleep(15000);
 
                     var folder = GetZonesFolder();
                     if (!Directory.Exists(folder)) return;

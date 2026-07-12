@@ -10,6 +10,7 @@
     using System.Linq;
     using System.Windows;
     using System.Xml.Serialization;
+    using Utils;
 
     /// <summary>
     /// Class whos hold settings like colors, windows sizes etc.
@@ -232,16 +233,27 @@
         /// </summary>
         public void SaveCommonSettings()
         {
+            var targetPath = Path.Combine(Folder, "Options.xml");
+            var tempPath = targetPath + ".tmp";
             var serializer = new XmlSerializer(typeof(SettingsSerializer), AllSerializationTypes.ToArray());
 
-            if (File.Exists(Path.Combine(Folder, "Options.xml")))
+            try
             {
-                File.Delete(Path.Combine(Folder, "Options.xml"));
-            }
+                using (var stream = File.Open(tempPath, FileMode.Create, FileAccess.Write))
+                {
+                    serializer.Serialize(stream, Settings);
+                }
 
-            using (var stream = File.Open(Path.Combine(Folder, "Options.xml"), FileMode.Create, FileAccess.Write))
+                File.Copy(tempPath, targetPath, true);
+            }
+            catch (Exception ex)
             {
-                serializer.Serialize(stream, Settings);
+                ErrorLogger.Instance.Write(string.Format("Error save global settings: {0}\r\n{1}", ex.Message, ex.StackTrace));
+            }
+            finally
+            {
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); }
+                catch { }
             }
         }
 

@@ -1,4 +1,4 @@
-﻿// --------------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // <copyright file="ConnectionUnit.cs" company="Adamand MUD">
 //   Copyright (c) Adamant MUD
 // </copyright>
@@ -26,6 +26,9 @@ namespace Adan.Client.ConveyorUnits
     /// </summary>
     public class ConnectionUnit : ConveyorUnit
     {
+        private static long _nextConnectTick = 0;
+        private static readonly object _staggerLock = new object();
+
         public ConnectionUnit(MessageConveyor conveyor) : base(conveyor)
         {
         }
@@ -70,7 +73,24 @@ namespace Adan.Client.ConveyorUnits
                 {
                     PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.CurrentUICulture, Resources.TryingToConnect, connectCommand.Host, connectCommand.Port)));
                     Conveyor.RootModel.ConnectionInProgress = true;
-                    Conveyor.Connect(connectCommand.Host, connectCommand.Port);
+                    var _host = connectCommand.Host;
+                    var _port = connectCommand.Port;
+                    var _conv = Conveyor;
+                    System.Threading.Tasks.Task.Run(() =>
+                    {
+                        long delayMs = 0;
+                        lock (_staggerLock)
+                        {
+                            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                            long freq = System.Diagnostics.Stopwatch.Frequency;
+                            long until = System.Threading.Interlocked.Read(ref _nextConnectTick);
+                            if (until > now) delayMs = (until - now) * 1000 / freq;
+                            long slot = System.Math.Max(now, until) + freq + freq / 2;
+                            System.Threading.Interlocked.Exchange(ref _nextConnectTick, slot);
+                        }
+                        if (delayMs > 0) System.Threading.Thread.Sleep((int)System.Math.Min((long)delayMs, 30000L));
+                        _conv.Connect(_host, _port);
+                    });
                 }
 
                 return;
@@ -152,3 +172,4 @@ namespace Adan.Client.ConveyorUnits
         #endregion
     }
 }
+

@@ -1,4 +1,4 @@
-﻿// --------------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // <copyright file="StuffDatabaseUnit.cs" company="Adamand MUD">
 //   Copyright (c) Adamant MUD
 // </copyright>
@@ -50,6 +50,14 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
         private string _lastShownObjectName = string.Empty;
 
+        // Состояние последнего поиска (для пагинации)
+        private List<string> _lastSearchFiles = new List<string>();
+        private string _lastSearchQuery = string.Empty;
+        private bool _lastSearchIsCompact = false;
+        private int _lastSearchPage = 0;
+        private const int LorePageSizeFull = 5;
+        private const int LorePageSizeCompact = 15;
+
         // Отображение лор-предметов в тексте (тултипы + подсветка). Отключается командой "лор выкл".
         private bool _loreEnabled = true;
         // Подсветка лор-предметов жёлтым цветом. Можно отключить командой "лор цвет выкл".
@@ -65,6 +73,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private static volatile HashSet<string> _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
         private static DateTime _loreFolderStampUtc = DateTime.MinValue;
         private static readonly object _cacheLock = new object();
+        private static readonly DateTime _startupTime = DateTime.UtcNow;
         private static System.Threading.Timer _cacheRefreshTimer;
 
         private static readonly Regex _whiteSpaceRx = new Regex(@" {2,}", RegexOptions.Compiled);
@@ -159,6 +168,25 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             }
             
             var commandText = _whiteSpaceRx.Replace(textCommand.CommandText.Trim(), " ");
+
+            // Пустой Enter во время пагинации — следующая страница
+            if (string.IsNullOrEmpty(commandText) && _lastSearchFiles.Count > 0)
+            {
+                int pageSizeCheck = _lastSearchIsCompact ? LorePageSizeCompact : LorePageSizeFull;
+                int totalPagesCheck = (_lastSearchFiles.Count + pageSizeCheck - 1) / pageSizeCheck;
+                if (_lastSearchPage < totalPagesCheck - 1)
+                {
+                    command.Handled = true;
+                    _lastSearchPage++;
+                    ShowLoreSearchPage();
+                    return;
+                }
+                else
+                {
+                    _lastSearchFiles = new List<string>();
+                }
+            }
+
             if (commandText.StartsWith(Resources.LoreHelpCommand + " ", StringComparison.CurrentCultureIgnoreCase)
                 || commandText.Equals(Resources.LoreHelpCommand, StringComparison.CurrentCultureIgnoreCase))
             {
@@ -308,6 +336,115 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 return;
             }
 
+            // "лор+" / "лор+ <query>" — следующая страница поиска по имени
+            var lorePlusCmd = Resources.LoreCommand + "+";
+            if (commandText.Equals(lorePlusCmd, StringComparison.CurrentCultureIgnoreCase)
+                || commandText.StartsWith(lorePlusCmd + " ", StringComparison.CurrentCultureIgnoreCase))
+            {
+                command.Handled = true;
+                var newQuery = commandText.Length > lorePlusCmd.Length
+                    ? commandText.Substring(lorePlusCmd.Length).Trim().Replace(" ", "_").Replace("\"", string.Empty)
+                    : string.Empty;
+                if (!string.IsNullOrEmpty(newQuery) && !string.Equals(newQuery, _lastSearchQuery, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    _lastSearchQuery = newQuery;
+                    _lastSearchPage = 0;
+                    _lastSearchIsCompact = false;
+                    _lastSearchFiles = Directory.Exists(GetStuffDbFolder())
+                        ? Directory.GetFiles(GetStuffDbFolder())
+                            .Where(f => Path.GetFileName(f).IndexOf(newQuery, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                            .OrderBy(f => f).ToList()
+                        : new List<string>();
+                }
+                else
+                {
+                    _lastSearchPage++;
+                }
+                ShowLoreSearchPage();
+                return;
+            }
+
+            // "лорхар <стат>[,<стат2>...]" — поиск по содержимому/характеристикам
+            // "лорхар+" — следующая страница предыдущего поиска
+            var loreStatCmd = Resources.LoreCommand + "хар";
+            if (commandText.Equals(loreStatCmd + "+", StringComparison.CurrentCultureIgnoreCase))
+            {
+                command.Handled = true;
+                _lastSearchPage++;
+                ShowLoreSearchPage();
+                return;
+            }
+            if (commandText.Equals(loreStatCmd, StringComparison.CurrentCultureIgnoreCase)
+                || commandText.StartsWith(loreStatCmd + " ", StringComparison.CurrentCultureIgnoreCase))
+            {
+                command.Handled = true;
+                var termsStr = commandText.Length > loreStatCmd.Length
+                    ? commandText.Substring(loreStatCmd.Length).Trim()
+                    : string.Empty;
+                if (string.IsNullOrEmpty(termsStr))
+                {
+                    PushMessageToConveyor(new InfoMessage("Укажите характеристику: лорхар <стат>[,<стат2>...]", TextColor.BrightYellow));
+                    PushMessageToConveyor(new InfoMessage("  Пример: лорхар сила,мудрость", TextColor.Cyan));
+                    return;
+                }
+                // Маппинг русских названий слотов в XML-коды
+                var slotMap = new System.Collections.Generic.Dictionary<string, string>(StringComparer.CurrentCultureIgnoreCase)
+                {
+                    { "голова", "HEAD" }, { "шлем", "HEAD" },
+                    { "тело", "BODY" }, { "торс", "BODY" }, { "броня", "BODY" },
+                    { "руки", "HANDS" }, { "перчатки", "HANDS" },
+                    { "ноги", "LEGS" },
+                    { "предплечья", "ARMS" }, { "наручи", "ARMS" },
+                    { "запястья", "WRIST" },
+                    { "шея", "NECK" },
+                    { "палец", "FINGER" }, { "кольцо", "FINGER" },
+                    { "пояс", "WAIST" },
+                    { "плащ", "ABOUT" }, { "накидка", "ABOUT" },
+                    { "оружие", "WIELD" }, { "двуручное", "DWIELD" }, { "двуруч", "DWIELD" },
+                    { "щит", "SHIELD" },
+                    { "держать", "HOLD" }, { "держ", "HOLD" },
+                    // Типы оружия (сокращения → полное название навыка)
+                    { "короткие", "короткие лезвия" }, { "клинки", "короткие лезвия" },
+                    { "длинные", "длинные лезвия" }, { "мечи", "длинные лезвия" },
+                    { "двуручник", "двуручники" },
+                    { "копья", "копья и пики" }, { "пики", "копья и пики" },
+                    { "луки", "луки" }, { "лук", "луки" },
+                    { "посохи", "посохи и дубины" }, { "дубины", "посохи и дубины" },
+                    { "проникающее", "проникающее оружие" }, { "кинжалы", "проникающее оружие" },
+                    { "топоры", "топоры" }, { "топор", "топоры" },
+                    { "разнообразное", "разнообразное оружие" },
+                };
+                var terms = termsStr.Split(',')
+                    .Select(t => t.Trim())
+                    .Where(t => t.Length > 0)
+                    .Select(t => slotMap.ContainsKey(t) ? slotMap[t] : t)
+                    .ToArray();
+                _lastSearchQuery = termsStr;
+                _lastSearchPage = 0;
+                _lastSearchIsCompact = true;
+                if (Directory.Exists(GetStuffDbFolder()))
+                {
+                    _lastSearchFiles = Directory.GetFiles(GetStuffDbFolder())
+                        .Where(f => {
+                            if (string.Equals(Path.GetFileName(f), LoreColorConfigFileName, StringComparison.OrdinalIgnoreCase))
+                                return false;
+                            try
+                            {
+                                var text = File.ReadAllText(f);
+                                return terms.All(term => text.IndexOf(term, StringComparison.CurrentCultureIgnoreCase) >= 0);
+                            }
+                            catch { return false; }
+                        })
+                        .OrderBy(f => f).ToList();
+                }
+                else
+                {
+                    _lastSearchFiles = new List<string>();
+                }
+                ShowLoreSearchPage();
+                return;
+            }
+
             if (commandText.StartsWith(Resources.LoreCommand + " ", StringComparison.CurrentCultureIgnoreCase)
                 || commandText.Equals(Resources.LoreCommand, StringComparison.CurrentCultureIgnoreCase))
             {
@@ -316,6 +453,14 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 var searchQuery = commandText.Equals(Resources.LoreCommand, StringComparison.CurrentCultureIgnoreCase)
                                       ? string.Empty
                                       : commandText.Remove(0, Resources.LoreCommand.Length + 1).Trim().Replace(" ", "_").Replace("\"", string.Empty);
+
+                // "лор стоп" — выход из пагинации
+                if (searchQuery.Equals("стоп", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    _lastSearchFiles = new List<string>();
+                    PushMessageToConveyor(new InfoMessage("Поиск сброшен.", TextColor.BrightYellow));
+                    return;
+                }
 
                 // "лор вкл" / "лор выкл"
                 if (searchQuery.Equals("вкл", StringComparison.CurrentCultureIgnoreCase)
@@ -362,50 +507,97 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     return;
                 }
 
-                const int maxDisplayItems = 4;
-
-                int foundItems = 0;
-                if (Directory.Exists(GetStuffDbFolder()))
-                {
-                    foreach (var file in Directory.GetFiles(GetStuffDbFolder()))
-                    {
-                        if (file.IndexOf(searchQuery, StringComparison.CurrentCultureIgnoreCase) < 0)
-                        {
-                            continue;
-                        }
-
-                        foundItems++;
-                        if (foundItems > maxDisplayItems)
-                        {
-                            PushMessageToConveyor(new InfoMessage(Resources.LoreTooMuchFound, TextColor.BrightYellow));
-                            break;
-                        }
-
-                        using (var stream = File.OpenRead(file))
-                        {
-                            var message = (LoreMessage)_loreSerializer.Deserialize(stream);
-                            PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.CurrentCulture, Resources.LoreFoundObject, message.ObjectName), TextColor.BrightYellow));
-                            foreach (var displayMessage in message.ConvertToMessages())
-                            {
-                                PushMessageToConveyor(displayMessage);
-                            }
-
-                            _lastShownObjectName = message.ObjectName;
-                        }
-                    }
-
-                    if (foundItems == 0)
-                    {
-                        PushMessageToConveyor(new InfoMessage(Resources.LoreNothingFound, TextColor.BrightYellow));
-                    }
-                }
-                else
-                {
-                    PushMessageToConveyor(new InfoMessage(Resources.LoreNothingFound, TextColor.BrightYellow));
-                }
+                _lastSearchQuery = searchQuery;
+                _lastSearchPage = 0;
+                _lastSearchIsCompact = false;
+                _lastSearchFiles = Directory.Exists(GetStuffDbFolder())
+                    ? Directory.GetFiles(GetStuffDbFolder())
+                        .Where(f => Path.GetFileName(f).IndexOf(searchQuery, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                        .OrderBy(f => f).ToList()
+                    : new List<string>();
+                ShowLoreSearchPage();
             }
         }
         
+        private void ShowLoreSearchPage()
+        {
+            if (_lastSearchFiles.Count == 0)
+            {
+                PushMessageToConveyor(new InfoMessage(Resources.LoreNothingFound, TextColor.BrightYellow));
+                return;
+            }
+
+            int pageSize = _lastSearchIsCompact ? LorePageSizeCompact : LorePageSizeFull;
+            int totalPages = (_lastSearchFiles.Count + pageSize - 1) / pageSize;
+            if (_lastSearchPage >= totalPages)
+                _lastSearchPage = totalPages - 1;
+
+            int start = _lastSearchPage * pageSize;
+            int end = Math.Min(start + pageSize, _lastSearchFiles.Count);
+
+            PushMessageToConveyor(new InfoMessage(
+                string.Format("Найдено: {0}. Страница {1}/{2}:", _lastSearchFiles.Count, _lastSearchPage + 1, totalPages),
+                TextColor.BrightYellow));
+
+            for (int i = start; i < end; i++)
+            {
+                var filePath = _lastSearchFiles[i];
+                try
+                {
+                    using (var stream = File.OpenRead(filePath))
+                    {
+                        var msg = (LoreMessage)_loreSerializer.Deserialize(stream);
+                        if (_lastSearchIsCompact)
+                        {
+                            var parts = new System.Collections.Generic.List<string>();
+                            // Слоты надевания
+                            if (msg.WearSlots.Count > 0)
+                                parts.Add(string.Join("/", msg.WearSlots));
+                            // Вес
+                            parts.Add("вес:" + msg.Weight.ToString("0.#", CultureInfo.InvariantCulture));
+                            // Броня/АС
+                            if (msg.ArmorStats != null)
+                            {
+                                if (msg.ArmorStats.Armor != 0)
+                                    parts.Add("броня:" + msg.ArmorStats.Armor);
+                                if (msg.ArmorStats.ArmorClass != 0)
+                                    parts.Add("АС:" + msg.ArmorStats.ArmorClass);
+                            }
+                            // Характеристики
+                            var statParts = msg.AppliedAffects
+                                .OfType<Adan.Client.Plugins.StuffDatabase.Model.Affects.Enhance>()
+                                .Select(e => e.ModifiedParameter + e.Value.ToString("+#;-#;0", CultureInfo.InvariantCulture));
+                            var statStr = string.Join(", ", statParts);
+                            if (!string.IsNullOrEmpty(statStr))
+                                parts.Add(statStr);
+                            var line = "  " + msg.ObjectName + "  [" + string.Join(" | ", parts) + "]";
+                            PushMessageToConveyor(new InfoMessage(line, TextColor.BrightGreen));
+                        }
+                        else
+                        {
+                            PushMessageToConveyor(new InfoMessage(string.Format(CultureInfo.CurrentCulture, Resources.LoreFoundObject, msg.ObjectName), TextColor.BrightYellow));
+                            foreach (var displayMessage in msg.ConvertToMessages())
+                                PushMessageToConveyor(displayMessage);
+                        }
+                        _lastShownObjectName = msg.ObjectName;
+                    }
+                }
+                catch { }
+            }
+
+            if (_lastSearchPage < totalPages - 1)
+            {
+                var remaining = _lastSearchFiles.Count - end;
+                PushMessageToConveyor(new InfoMessage(
+                    string.Format("  [ ещё {0} — Enter для продолжения | лор стоп — выйти ]", remaining),
+                    TextColor.Cyan));
+            }
+            else
+            {
+                _lastSearchFiles = new List<string>();
+            }
+        }
+
         public override void HandleMessage(Message message)
         {
             Assert.ArgumentNotNull(message, "message");
@@ -514,7 +706,10 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private void PushLoreCommandsHelp()
         {
             PushMessageToConveyor(new InfoMessage("── Команды лора ──────────────────────────────────────────", TextColor.BrightWhite));
-            PushMessageToConveyor(new InfoMessage("  лор <название>              — найти предмет в базе", TextColor.BrightYellow));
+            PushMessageToConveyor(new InfoMessage("  лор <название>              — найти предмет в базе (5 шт/стр)", TextColor.BrightYellow));
+            PushMessageToConveyor(new InfoMessage("  лор+ [<название>]           — следующая страница результатов", TextColor.BrightYellow));
+            PushMessageToConveyor(new InfoMessage("  лорхар <стат>[,<стат2>...]  — поиск по характеристикам/эффектам", TextColor.BrightYellow));
+            PushMessageToConveyor(new InfoMessage("    примеры: лорхар сила,мудрость   /   лорхар DAMROLL", TextColor.Cyan));
             PushMessageToConveyor(new InfoMessage("    пример: лор фляга для воды", TextColor.Cyan));
             PushMessageToConveyor(new InfoMessage("  лорк <текст>                — добавить комментарий к последнему предмету", TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage("    пример: лорк редкий дроп, фармить в подвале", TextColor.Cyan));
@@ -592,17 +787,31 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     return;
 
                 // Find matching lore file by name only (no cache access — not thread-safe)
-                string matchedFileName = null;
+                string exactMatchFileName = null;
+                string uniqueLongerFileName = null;
+                bool ambiguousLonger = false;
                 foreach (var file in Directory.GetFiles(stuffFolder))
                 {
                     var baseName = NormalizeLookupKey(Path.GetFileName(file).Replace("_", " ").TrimEnd('.', ',', ':', ';'));
-                    if (string.Equals(baseName, lookupKey, StringComparison.CurrentCultureIgnoreCase)
-                        || baseName.StartsWith(lookupKey + " ", StringComparison.CurrentCultureIgnoreCase))
+                    if (string.Equals(baseName, lookupKey, StringComparison.CurrentCultureIgnoreCase))
+                        exactMatchFileName = file;
+                    else if (baseName.Length > lookupKey.Length
+                        && baseName.StartsWith(lookupKey, StringComparison.CurrentCultureIgnoreCase)
+                        && !char.IsLetterOrDigit(baseName[lookupKey.Length]))
                     {
-                        matchedFileName = file;
-                        break;
+                        if (uniqueLongerFileName == null)
+                            uniqueLongerFileName = file;
+                        else
+                            ambiguousLonger = true;
                     }
                 }
+
+                // If exactly one longer variant exists, prefer it — server abbreviates names.
+                string matchedFileName;
+                if (exactMatchFileName != null && !ambiguousLonger && uniqueLongerFileName != null)
+                    matchedFileName = uniqueLongerFileName;
+                else
+                    matchedFileName = exactMatchFileName ?? uniqueLongerFileName;
 
                 if (matchedFileName == null)
                     return;
@@ -836,11 +1045,12 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         // Защищён _cacheLock от одновременного запуска из нескольких табов.
         private static void RefreshLoreCache()
         {
+            // ШАГ 1: Быстрая проверка актуальности — под локом, мгновенно
+            string stuffFolder;
+            DateTime folderStamp;
             lock (_cacheLock)
             {
-            try
-            {
-                var stuffFolder = GetStuffDbFolder();
+                stuffFolder = GetStuffDbFolder();
                 if (!Directory.Exists(stuffFolder))
                 {
                     _loreTooltipsByObjectName = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
@@ -848,14 +1058,29 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     _loreFolderStampUtc = DateTime.MinValue;
                     return;
                 }
-
-                var folderStamp = Directory.GetLastWriteTimeUtc(stuffFolder);
+                folderStamp = Directory.GetLastWriteTimeUtc(stuffFolder);
                 if (_loreTooltipsByObjectName.Count > 0 && folderStamp == _loreFolderStampUtc)
-                {
-                    return; // Папка не изменилась — кэш актуален
-                }
+                    return;
+            }
 
-                var newCache = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
+            // Если кэш пуст и с запуска < 10 сек — ждём окончания WPF-инициализации
+            var _sinceStart = (DateTime.UtcNow - _startupTime).TotalSeconds;
+            if (_sinceStart < 10.0)
+                System.Threading.Thread.Sleep((int)((10.0 - _sinceStart) * 1000));
+
+            // После ожидания повторно проверяем — может, другой поток уже загрузил кэш
+            lock (_cacheLock)
+            {
+                var folderStamp2 = Directory.GetLastWriteTimeUtc(stuffFolder);
+                if (_loreTooltipsByObjectName.Count > 0 && folderStamp2 == _loreFolderStampUtc)
+                    return;
+            }
+
+            // ШАГ 2: Читаем 2000+ файлов БЕЗ лока — никто не блокируется
+            var _refreshSw = System.Diagnostics.Stopwatch.StartNew();
+            var newCache = new Dictionary<string, LoreTooltip>(StringComparer.CurrentCultureIgnoreCase);
+            try
+            {
                 foreach (var fileName in Directory.GetFiles(stuffFolder))
                 {
                     try
@@ -881,16 +1106,20 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     }
                     catch { }
                 }
+            }
+            catch { }
 
-                // Атомарная замена: горячий путь увидит либо старый, либо новый словарь целиком
+            // ШАГ 3: Атомарный своп — под локом, мгновенно (только присваивания)
+            lock (_cacheLock)
+            {
                 _loreTooltipsByObjectName = newCache;
                 _negativeLoreLookupKeys = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
                 _linePositiveCache.Clear();
                 _lineNegativeCache.Clear();
                 _loreFolderStampUtc = folderStamp;
             }
-            catch { }
-            } // lock
+            _refreshSw.Stop();
+            Adan.Client.Common.Conveyor.PerfLog.WriteTotal("LORE_CACHE", _refreshSw.ElapsedMilliseconds, "items=" + newCache.Count);
         }
 
         [NotNull]
@@ -976,6 +1205,39 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             return null;
         }
 
+        // Extracts the name suffix embedded after stat tokens in <--- arrow annotations.
+        // E.g. "АС2,БР2,С4+1,!ДДКАСТЕРЫ, расшитый черными опалами [очень хорошее]"
+        //      returns "расшитый черными опалами"
+        // Stats: comma-separated tokens that are all-uppercase (with optional ! prefix, digits, +/-).
+        // Name suffix: first token that contains a lowercase letter.
+        private static string TryExtractNameSuffixFromArrow([NotNull] string afterArrow)
+        {
+            var tokens = afterArrow.Split(',');
+            for (var i = 0; i < tokens.Length; i++)
+            {
+                var token = tokens[i].Trim();
+                if (string.IsNullOrEmpty(token))
+                    continue;
+                var hasLower = false;
+                foreach (var c in token)
+                {
+                    if (char.IsLower(c)) { hasLower = true; break; }
+                }
+                if (!hasLower)
+                    continue;
+                // Everything from this token onwards (joined back with commas) is the name suffix.
+                var suffix = string.Join(",", tokens, i, tokens.Length - i).Trim();
+                // Strip trailing quality bracket like [очень хорошее]
+                var bracketIdx = suffix.LastIndexOf('[');
+                if (bracketIdx > 0)
+                    suffix = suffix.Substring(0, bracketIdx).TrimEnd();
+                // Strip trailing punctuation/period
+                suffix = suffix.TrimEnd('.', ',', ';', ':');
+                return string.IsNullOrEmpty(suffix) ? null : suffix;
+            }
+            return null;
+        }
+
         private bool TryMarkArrowLine([NotNull] TextMessage textMessage, [NotNull] string sourceText)
         {
             Assert.ArgumentNotNull(textMessage, "textMessage");
@@ -1012,6 +1274,20 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 replaceEnd++;
 
             AppendRangeAsStyledBlocks(resultBlocks, spans, 0, replaceStart);
+
+            // Server sometimes sends abbreviated name before <--- (e.g. equipment screen).
+            // Try to reconstruct full name from the lowercase name-suffix embedded after stats.
+            // E.g.: "[алый плащ] <--- АС2,БР2,!ФЛАГ, расшитый черными опалами [хорошее]"
+            var afterArrowText = sourceText.Substring(arrowIndex + 5).TrimStart(' ');
+            var arrowNameSuffix = TryExtractNameSuffixFromArrow(afterArrowText);
+            if (!string.IsNullOrEmpty(arrowNameSuffix))
+            {
+                var candidateFullName = loreMatch.ItemName + ", " + arrowNameSuffix;
+                var candidateKey = NormalizeLookupKey(candidateFullName);
+                LoreTooltip fullNameTooltip;
+                if (_loreTooltipsByObjectName.TryGetValue(candidateKey, out fullNameTooltip))
+                    loreMatch = new LoreMatch(loreMatch.Start, loreMatch.End, candidateFullName, fullNameTooltip);
+            }
 
             var styleBlock = GetBlockForCharIndex(spans, replaceStart) ?? sourceBlocks[0];
             resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
@@ -2052,6 +2328,36 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             LoreTooltip loreTooltip;
             if (_loreTooltipsByObjectName.TryGetValue(lookupItemName, out loreTooltip))
             {
+                // Server sometimes abbreviates item names (e.g. sending only the first two words).
+                // If exactly one longer variant exists in the DB starting with this key + separator,
+                // prefer it — it is unambiguously more specific than the short lookup key.
+                var len = lookupItemName.Length;
+                string uniqueLongerKey = null;
+                bool ambiguous = false;
+                foreach (var key in _loreTooltipsByObjectName.Keys)
+                {
+                    if (key.Length > len
+                        && key.StartsWith(lookupItemName, StringComparison.CurrentCultureIgnoreCase)
+                        && !char.IsLetterOrDigit(key[len]))
+                    {
+                        if (uniqueLongerKey == null)
+                            uniqueLongerKey = key;
+                        else
+                        {
+                            ambiguous = true;
+                            break;
+                        }
+                    }
+                }
+                if (!ambiguous && uniqueLongerKey != null)
+                {
+                    LoreTooltip longerTooltip;
+                    if (_loreTooltipsByObjectName.TryGetValue(uniqueLongerKey, out longerTooltip))
+                    {
+                        loreTooltip = longerTooltip;
+                        displayItemName = uniqueLongerKey;
+                    }
+                }
                 result = new LoreLookupResult(displayItemName, loreTooltip, 0);
                 return true;
             }

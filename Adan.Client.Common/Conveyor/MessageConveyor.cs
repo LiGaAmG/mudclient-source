@@ -70,6 +70,7 @@ namespace Adan.Client.Common.Conveyor
 
         // Метка последней неотвеченной отправки (Stopwatch ticks); 0 = ответ получен
         private long _rttSendTimestamp;
+        private volatile bool _firstNetAfterConnect = false;
 
         #endregion
 
@@ -507,7 +508,8 @@ namespace Adan.Client.Common.Conveyor
             
             try
             {
-                var _netSw = System.Diagnostics.Stopwatch.StartNew();
+                if (_firstNetAfterConnect) { _firstNetAfterConnect = false; PerfLog.WriteTotal("FIRST_NET", 0, "first bytes from server after connect"); }
+            var _netSw = System.Diagnostics.Stopwatch.StartNew();
                 int offset = e.Offset;
                 int actualBytesReceived = 0;
                 int end =  e.Offset + e.BytesReceived;
@@ -605,6 +607,8 @@ namespace Adan.Client.Common.Conveyor
             Assert.ArgumentNotNull(sender, "sender");
             Assert.ArgumentNotNull(e, "e");
 
+            PerfLog.WriteTotal("CONNECTED", 0, "tcp handshake done");
+            _firstNetAfterConnect = true;
             PushMessage(new ConnectedMessage());
         }
 

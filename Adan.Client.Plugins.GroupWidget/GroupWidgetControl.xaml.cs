@@ -32,7 +32,7 @@ namespace Adan.Client.Plugins.GroupWidget
         private readonly Stack<List<CharacterStatus>> _charactrers_stack = new Stack<List<CharacterStatus>>();
         private bool _updatePending = false;
         private long _updateQueuedTick;
-        // Дроссель: не чаще 1 раза в 100мс. Таймер стреляет один раз, диспатчит на UI-поток.
+        // Дроссель: не чаще 1 раза в 150мс. Таймер стреляет один раз, диспатчит на UI-поток.
         private readonly System.Threading.Timer _updateThrottle;
 
 
@@ -71,7 +71,7 @@ namespace Adan.Client.Plugins.GroupWidget
                     if (viewModel != null)
                         viewModel.UpdateModel(list);
                     updateSw.Stop();
-                    if (waitedMs >= 20 || updateSw.ElapsedMilliseconds >= 5)
+                    if (waitedMs >= 50 || updateSw.ElapsedMilliseconds >= 5)
                         Common.Conveyor.PerfLog.WriteWidget("GroupWidget", waitedMs, updateSw.ElapsedMilliseconds);
                 }
                 catch (Exception) { }
@@ -152,7 +152,7 @@ namespace Adan.Client.Plugins.GroupWidget
                 {
                     _updatePending = true;
                     _updateQueuedTick = System.Diagnostics.Stopwatch.GetTimestamp();
-                    _updateThrottle.Change(100, System.Threading.Timeout.Infinite);
+                    _updateThrottle.Change(150, System.Threading.Timeout.Infinite);
                 }
             }
         }
@@ -167,3 +167,4 @@ namespace Adan.Client.Plugins.GroupWidget
         }
     }
 }
+

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
@@ -74,6 +74,19 @@ namespace Adan.Client.Plugins.SpellManager
                 Application.Current.Dispatcher.BeginInvoke(
                     DispatcherPriority.Normal,
                     new System.Action(() => _model.ExecutePlan(rootModel)));
+                return;
+            }
+
+            if (text.StartsWith("мем пресет ", System.StringComparison.OrdinalIgnoreCase))
+            {
+                var presetName = text.Substring("мем пресет ".Length).Trim();
+                if (!string.IsNullOrEmpty(presetName))
+                {
+                    textCommand.Handled = true;
+                    Application.Current.Dispatcher.BeginInvoke(
+                        DispatcherPriority.Normal,
+                        new System.Action(() => _model.LoadPreset(presetName)));
+                }
                 return;
             }
 
