@@ -1,4 +1,4 @@
-﻿<Window x:Class="Adan.Client.MainWindow"
+<Window x:Class="Adan.Client.MainWindow"
          xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:AvalonDock="http://schemas.xceed.com/wpf/xaml/avalondock"
@@ -36,6 +36,7 @@
                 <MenuItem Header="Global profile" Click="HandleGlobalProfile"/>
                 <MenuItem Header="Profiles" Click="HandleEditProfiles"/>
                 <MenuItem Header="Scripts (active tab)" Click="HandleActiveTabScripts"/>
+                <MenuItem Header="Scripts (все табы)..." Click="HandleOpenScriptsWindow"/>
                 <Separator />
                 <MenuItem Header="Options" Click="HandleEditOptions"/>
                 <Separator Visibility="Collapsed" />

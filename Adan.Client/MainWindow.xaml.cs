@@ -4,6 +4,7 @@ using Adan.Client.Common.Controls;
 using Adan.Client.Common.Model;
 using Adan.Client.Common.Plugins;
 using Adan.Client.Common.Settings;
+using Adan.Client.Common.Scripting;
 using Adan.Client.Common.Themes;
 using Adan.Client.Common.Utils;
 using Adan.Client.Common.ViewModel;
@@ -51,6 +52,7 @@ namespace Adan.Client
         private readonly IList<Window> _allWidgets = new List<Window>();
         private readonly IList<OutputWindow> _outputWindows = new List<OutputWindow>();
         private readonly IList<RootModel> _allRootModels = new List<RootModel>();
+        private Windows.ScriptsWindow _scriptsWindow;
         private readonly DispatcherTimer _scriptsTickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
 
         private WindowState _nonFullScreenWindowState;
@@ -1089,6 +1091,22 @@ namespace Adan.Client
             scriptsEditDialog.SaveRequested += (s, args) => applyChanges();
             scriptsEditDialog.Closed += (s, args) => applyChanges();
             scriptsEditDialog.Show();
+        }
+
+        private void HandleOpenScriptsWindow([NotNull] object sender, [NotNull] RoutedEventArgs e)
+        {
+            if (_scriptsWindow != null && _scriptsWindow.IsVisible)
+            {
+                _scriptsWindow.Activate();
+                return;
+            }
+            var folder = System.IO.Path.Combine(Common.Settings.SettingsHolder.Instance.Folder, "scripts");
+            var manager = new ScriptFileManager(folder);
+            var tabs = _allRootModels
+                .Where(m => m.Profile != null)
+                .Select(m => (m.Uid, m.Profile.Name, m.ScriptHost));
+            _scriptsWindow = new Windows.ScriptsWindow(manager, tabs) { Owner = this };
+            _scriptsWindow.Show();
         }
 
         private void HandleConnect([NotNull] object sender, [NotNull] RoutedEventArgs e)
