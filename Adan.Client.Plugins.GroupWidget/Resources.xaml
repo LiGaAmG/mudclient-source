@@ -6057,6 +6057,12 @@
                 ImageSource="Images/tornado.png" />
     <ImageBrush x:Key="Brush_StunImmune"
                 ImageSource="Images/stun-immune.png" />
+    <ImageBrush x:Key="Brush_ShockPhoto"
+                ImageSource="Images/shock.png"
+                Stretch="Uniform" />
+    <ImageBrush x:Key="Brush_IceShieldPhoto"
+                ImageSource="Images/ice-shield.png"
+                Stretch="Uniform" />
     <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_Fog"
                  Stretch="Uniform">
         <VisualBrush.Visual>
@@ -6420,6 +6426,8 @@
     </VisualBrush>
     <!-- Sanctify — нимб над головой -->
     <ImageBrush x:Key="Brush_Sanctify" ImageSource="Images/sanctify.png" Stretch="Uniform" />
+    <!-- FireShield — огненный щит -->
+    <ImageBrush x:Key="Brush_FireShield" ImageSource="Images/fire-shield.png" Stretch="Uniform" />
     <!-- MagicShield — щит со звездой (магический щит) -->
     <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_MagicShield" Stretch="Uniform">
         <VisualBrush.Visual>
@@ -6457,22 +6465,8 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
-    <!-- SpiritAura — 8-конечная звезда (духовная аура) -->
-    <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_SpiritAura" Stretch="Uniform">
-        <VisualBrush.Visual>
-            <Canvas Height="26" Width="26">
-                <Path Data="M12,1 L13.7,7.8 L19.8,4.2 L16.2,10.3 L23,12 L16.2,13.7 L19.8,19.8 L13.7,16.2 L12,23 L10.3,16.2 L4.2,19.8 L7.8,13.7 L1,12 L7.8,10.3 L4.2,4.2 L10.3,7.8 Z"
-                      Width="22" Height="22" Canvas.Left="2" Canvas.Top="2" Stretch="Fill" StrokeThickness="0">
-                    <Path.Fill>
-                        <RadialGradientBrush>
-                            <GradientStop Color="#FFEE88FF" Offset="0"/>
-                            <GradientStop Color="#FF7700CC" Offset="1"/>
-                        </RadialGradientBrush>
-                    </Path.Fill>
-                </Path>
-            </Canvas>
-        </VisualBrush.Visual>
-    </VisualBrush>
+    <!-- SpiritAura — исходная растровая иконка -->
+    <ImageBrush x:Key="Brush_SpiritAura" ImageSource="Images/spirit-aura.png" Stretch="Uniform" />
     <!-- LightProtection — 4-конечная звезда/солнце (защита от света) -->
     <VisualBrush RenderOptions.CachingHint="Cache" RenderOptions.CacheInvalidationThresholdMinimum="0.5" RenderOptions.CacheInvalidationThresholdMaximum="2" x:Key="Brush_LightProtection" Stretch="Uniform">
         <VisualBrush.Visual>
@@ -6972,7 +6966,7 @@
         </GeometryDrawing.Geometry>
     </GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_Shock"
-                     Brush="{StaticResource Brush_Shock}">
+                     Brush="{StaticResource Brush_ShockPhoto}">
         <GeometryDrawing.Geometry>
             <RectangleGeometry Rect="0,0,100,100" />
         </GeometryDrawing.Geometry>
@@ -7075,8 +7069,9 @@
     </GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_Calm"         Brush="{StaticResource Brush_Calm}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_Sanctify"     Brush="{StaticResource Brush_Sanctify}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_FireShield"   Brush="{StaticResource Brush_FireShield}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_MagicShield"  Brush="{StaticResource Brush_MagicShield}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
-    <GeometryDrawing x:Key="Drawing_IceShield"    Brush="{StaticResource Brush_IceShield}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_IceShield"    Brush="{StaticResource Brush_IceShieldPhoto}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_SpiritAura"   Brush="{StaticResource Brush_SpiritAura}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_LightProtection" Brush="{StaticResource Brush_LightProtection}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_DarkProtection"  Brush="{StaticResource Brush_DarkProtection}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
@@ -7192,6 +7187,7 @@
 
     <DrawingImage x:Key="ImageSource_Calm"            Drawing="{StaticResource Drawing_Calm}" />
     <DrawingImage x:Key="ImageSource_Sanctify"         Drawing="{StaticResource Drawing_Sanctify}" />
+    <DrawingImage x:Key="ImageSource_FireShield"       Drawing="{StaticResource Drawing_FireShield}" />
     <DrawingImage x:Key="ImageSource_MagicShield"      Drawing="{StaticResource Drawing_MagicShield}" />
     <DrawingImage x:Key="ImageSource_IceShield"        Drawing="{StaticResource Drawing_IceShield}" />
     <DrawingImage x:Key="ImageSource_SpiritAura"       Drawing="{StaticResource Drawing_SpiritAura}" />
@@ -7369,6 +7365,7 @@
                            Then="{StaticResource ImageSource_Thirst}" />
         <Utils:SwitchCase  When="Calm"            Then="{StaticResource ImageSource_Calm}" />
         <Utils:SwitchCase  When="Sanctify"        Then="{StaticResource ImageSource_Sanctify}" />
+        <Utils:SwitchCase  When="FireShield"      Then="{StaticResource ImageSource_FireShield}" />
         <Utils:SwitchCase  When="MagicShield"     Then="{StaticResource ImageSource_MagicShield}" />
         <Utils:SwitchCase  When="IceShield"       Then="{StaticResource ImageSource_IceShield}" />
         <Utils:SwitchCase  When="SpiritAura"      Then="{StaticResource ImageSource_SpiritAura}" />

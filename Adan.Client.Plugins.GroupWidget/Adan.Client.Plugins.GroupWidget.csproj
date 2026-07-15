@@ -153,7 +153,11 @@
     <EmbeddedResource Include="Properties\Resources.RU-RU.resx" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="Images\fire-shield.png" />
+    <Resource Include="Images\ice-shield.png" />
     <Resource Include="Images\sanctify.png" />
+    <Resource Include="Images\shock.png" />
+    <Resource Include="Images\spirit-aura.png" />
     <Resource Include="Images\stun-immune.png" />
     <Resource Include="Images\tornado.png" />
   </ItemGroup>
