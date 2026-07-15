@@ -12,7 +12,6 @@
 /*.user
 /Adan.Client.Setup/Debug/
 /Adan.Client.Setup/Release/
-/Adan.Client.Plugins.AI
 /**/obj
 /**/bin/
 
@@ -23,3 +22,11 @@
 /*.log
 
 Adan.Client.Common/packages/
+
+# Local AI — model files and runtime data
+*.gguf
+Models/
+Data/ai-memory.db
+Data/ai-memory.db-shm
+Data/ai-memory.db-wal
+ai-settings.xml

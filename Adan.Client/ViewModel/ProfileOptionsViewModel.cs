@@ -234,36 +234,8 @@ namespace Adan.Client.ViewModel
                     hotKeysEditDialog.Show();
                     break;
                 case "Scripts":
-                    if (Profile == null)
-                    {
-                        MessageBox.Show(
-                            "Scripts are per-character and not available for the synthetic Global profile.",
-                            "Scripts",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                        break;
-                    }
-
-                    var liveRootModel = _allRootModels != null
-                        ? _allRootModels.FirstOrDefault(m => m.Profile != null && m.Profile.Name == Profile.Name)
-                        : null;
-                    var scriptHostForDialog = liveRootModel != null
-                        ? liveRootModel.ScriptHost
-                        : new Adan.Client.Common.Scripting.LuaScriptHost();
-
-                    var scriptsEditDialog = new ScriptsEditDialog
-                    {
-                        DataContext = new ScriptsViewModel(Profile.Scripts, scriptHostForDialog, Profile.SettingsFolderPath),
-                        Owner = owner
-                    };
-                    // SaveRequested (Save button, dialog stays open) and
-                    // Closed (window actually closing) both apply the same
-                    // way -- a user clicking Save repeatedly, then Close,
-                    // should not behave any differently than just clicking
-                    // Close once.
-                    scriptsEditDialog.SaveRequested += (s, e) => ApplyScriptsChanges();
-                    scriptsEditDialog.Closed += (s, e) => ApplyScriptsChanges();
-                    scriptsEditDialog.Show();
+                    var scriptsFolder = System.IO.Path.Combine(SettingsHolder.Instance.Folder, "scripts");
+                    new Windows.ScriptsForm(new Adan.Client.Common.Scripting.ScriptFileManager(scriptsFolder), _allRootModels).Show();
                     break;
                 case "Substitutions":
                     var substitutionsEditDialog = new SubstitutionsEditDialog
@@ -331,7 +303,7 @@ namespace Adan.Client.ViewModel
         /// is this view model's <see cref="Profile"/>, see EditProfile's
         /// "Scripts" case) onto the live, SettingsHolder-tracked profile
         /// instance, persists it, and reloads it into every already-open
-        /// tab using this profile. Called from both ScriptsEditDialog's
+        /// tab using this profile. Called when profile settings are applied.
         /// Save button (dialog stays open) and its Closed event (window
         /// actually closing), so either path behaves identically.
         /// </summary>

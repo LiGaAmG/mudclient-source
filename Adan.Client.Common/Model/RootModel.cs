@@ -8,6 +8,7 @@
     using Messages;
     using Plugins;
     using Properties;
+    using Scripting;
     using System;
     using System.Collections.Generic;
     using System.Globalization;
@@ -189,32 +190,30 @@
                 return;
             }
 
-            foreach (var script in _profile.Scripts)
+            var scriptsFolder = System.IO.Path.Combine(SettingsHolder.Instance.Folder, "scripts");
+            using (var manager = new ScriptFileManager(scriptsFolder, false))
             {
-                if (script.IsEnabled)
+                foreach (var script in manager.GetApplicableScripts(_profile.Name).Where(s => s.AutoStart))
                 {
-                    var status = _scriptHost.GetScriptStatus(script.Name);
+                    var status = _scriptHost.GetScriptStatus(script.FileName);
                     bool isAlive = status == Scripting.ScriptRunStatus.Running
                                 || status == Scripting.ScriptRunStatus.WaitingOnTimer
                                 || status == Scripting.ScriptRunStatus.WaitingOnGroupState
                                 || status == Scripting.ScriptRunStatus.WaitingOnRoomState
                                 || status == Scripting.ScriptRunStatus.WaitingOnRoomChange
                                 || status == Scripting.ScriptRunStatus.WaitingOnText;
-                    bool codeChanged = _scriptHost.GetScriptCode(script.Name) != script.Code;
+                    var code = manager.ReadCode(script.FileName);
+                    bool codeChanged = _scriptHost.GetScriptCode(script.FileName) != code;
                     if (!isAlive || codeChanged)
                     {
                         try
                         {
-                            _scriptHost.StartScript(script.Name, script.Code);
+                            _scriptHost.StartScript(script.FileName, code);
                         }
                         catch (Exception)
                         {
                         }
                     }
-                }
-                else
-                {
-                    _scriptHost.StopScript(script.Name);
                 }
             }
         }

@@ -52,7 +52,7 @@ namespace Adan.Client
         private readonly IList<Window> _allWidgets = new List<Window>();
         private readonly IList<OutputWindow> _outputWindows = new List<OutputWindow>();
         private readonly IList<RootModel> _allRootModels = new List<RootModel>();
-        private Windows.ScriptsWindow _scriptsWindow;
+        private System.Windows.Forms.Form _scriptsForm;
         private readonly DispatcherTimer _scriptsTickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
 
         private WindowState _nonFullScreenWindowState;
@@ -1051,62 +1051,20 @@ namespace Adan.Client
         /// </summary>
         private void HandleActiveTabScripts([NotNull] object sender, [NotNull] RoutedEventArgs e)
         {
-            Assert.ArgumentNotNull(sender, "sender");
-            Assert.ArgumentNotNull(e, "e");
-
-            var activeContent = _dockManager.ActiveContent as MainOutputWindow;
-            var rootModel = activeContent != null ? activeContent.RootModel : null;
-            if (rootModel == null || rootModel.Profile == null)
-            {
-                MessageBox.Show(
-                    "Select (or connect) a tab first -- Scripts are per-character.",
-                    "Scripts",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            var profile = rootModel.Profile;
-            var scriptsEditDialog = new ScriptsEditDialog
-            {
-                DataContext = new ScriptsViewModel(profile.Scripts, rootModel.ScriptHost, profile.SettingsFolderPath),
-                Owner = this
-            };
-
-            Action applyChanges = () =>
-            {
-                SettingsHolder.Instance.SetProfile(profile.Name);
-
-                // Other tabs (if any) on this same profile pick up the
-                // edit too, not just the one this dialog was opened from.
-                foreach (var openRootModel in _allRootModels)
-                {
-                    if (openRootModel.Profile != null && openRootModel.Profile.Name == profile.Name)
-                    {
-                        openRootModel.ReloadScripts();
-                    }
-                }
-            };
-
-            scriptsEditDialog.SaveRequested += (s, args) => applyChanges();
-            scriptsEditDialog.Closed += (s, args) => applyChanges();
-            scriptsEditDialog.Show();
+            HandleOpenScriptsWindow(sender, e);
         }
 
         private void HandleOpenScriptsWindow([NotNull] object sender, [NotNull] RoutedEventArgs e)
         {
-            if (_scriptsWindow != null && _scriptsWindow.IsVisible)
+            if (_scriptsForm != null && _scriptsForm.Visible)
             {
-                _scriptsWindow.Activate();
+                _scriptsForm.Activate();
                 return;
             }
             var folder = System.IO.Path.Combine(Common.Settings.SettingsHolder.Instance.Folder, "scripts");
             var manager = new ScriptFileManager(folder);
-            var tabs = _allRootModels
-                .Where(m => m.Profile != null)
-                .Select(m => (m.Uid, m.Profile.Name, m.ScriptHost));
-            _scriptsWindow = new Windows.ScriptsWindow(manager, tabs) { Owner = this };
-            _scriptsWindow.Show();
+            try { _scriptsForm = new Windows.ScriptsForm(manager, _allRootModels); _scriptsForm.Show(); }
+            catch (Exception ex) { System.Windows.MessageBox.Show(ex.ToString(), "Scripts error"); }
         }
 
         private void HandleConnect([NotNull] object sender, [NotNull] RoutedEventArgs e)

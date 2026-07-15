@@ -53,6 +53,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
     <Reference Include="System.Xml.Linq" />
@@ -114,6 +115,8 @@
     <Compile Include="Scripting\LuaScriptHost.cs" />
     <Compile Include="Scripting\ScriptFileEntry.cs" />
     <Compile Include="Scripting\ScriptFileManager.cs" />
+    <Compile Include="Scripting\ScriptDraftHistory.cs" />
+    <Compile Include="Scripting\ScriptSnippetCatalog.cs" />
     <Compile Include="Scripting\LuaScriptHost.SandboxSetup.cs" />
     <Compile Include="Scripting\LuaScriptHostBindings.cs" />
     <Compile Include="Scripting\LuaScriptTimeoutException.cs" />

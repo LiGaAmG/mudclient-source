@@ -328,6 +328,25 @@
                 int startIdx = (MatchingPattern.Length > 0 && MatchingPattern[0] == '^') ? 1 : 0;
                 int wildIdx = MatchingPattern.IndexOf('%', startIdx);
                 string lit = wildIdx < 0 ? MatchingPattern.Substring(startIdx) : MatchingPattern.Substring(startIdx, wildIdx - startIdx);
+                // $переменная подставляется при матчинге — литерал с '$' в тексте
+                // никогда не встретится, триггер вечно отсекался бы pre-фильтром.
+                int dollarIdx = lit.IndexOf('$');
+                if (dollarIdx >= 0)
+                {
+                    // Берём кусок после имени переменной (имя заканчивается пробелом)
+                    int spaceAfterVar = lit.IndexOf(' ', dollarIdx);
+                    if (spaceAfterVar >= 0)
+                    {
+                        string tail = lit.Substring(spaceAfterVar + 1);
+                        if (tail.IndexOf('$') < 0)
+                        {
+                            tail = tail.TrimEnd('.', '!', ',', ':', ';', ' ');
+                            if (tail.Length >= 3) return tail;
+                        }
+                    }
+                    return null;
+                }
+
                 if (lit.Length >= 2) return lit;
 
                 // Паттерн начинается с %N — берём первый литерал после wildcard

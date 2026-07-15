@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Adan.Client.Common.Model;
 using Adan.Client.Common.Scripting;
@@ -8,6 +9,59 @@ namespace Adan.Client.Common.Tests.Scripting
     [TestFixture]
     public class LuaScriptHostTests
     {
+        [Test]
+        public void ScriptDraftHistory_KeepsUndoAndRedoAcrossEditorSwitches()
+        {
+            var history = new ScriptDraftHistory();
+            string text;
+
+            history.RecordChange("one");
+            history.RecordChange("two");
+
+            Assert.That(history.TryUndo("three", out text), Is.True);
+            Assert.That(text, Is.EqualTo("two"));
+            Assert.That(history.TryRedo("two", out text), Is.True);
+            Assert.That(text, Is.EqualTo("three"));
+        }
+
+        [Test]
+        public void ScriptSnippetCatalog_SeparatesLuaClientAndWaitSnippets()
+        {
+            var categories = ScriptSnippetCatalog.All.Select(s => s.Category).Distinct().ToList();
+
+            Assert.That(categories, Does.Contain("Lua"));
+            Assert.That(categories, Does.Contain("Клиент"));
+            Assert.That(categories, Does.Contain("Ожидание"));
+        }
+
+        [Test]
+        public void NeedsRestart_OnlyReturnsTrueWhenRunningCodeChanged()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("test.lua", "while true do Wait(1000) end");
+
+                Assert.That(host.NeedsRestart("test.lua", "while true do Wait(1000) end"), Is.False);
+                Assert.That(host.NeedsRestart("test.lua", "while true do Wait(2000) end"), Is.True);
+                host.StopScript("test.lua");
+                Assert.That(host.NeedsRestart("test.lua", "while true do Wait(2000) end"), Is.False);
+            }
+        }
+
+        [Test]
+        public void TryValidateScript_InvalidCodeDoesNotStopRunningScript()
+        {
+            using (var host = new LuaScriptHost())
+            {
+                host.StartScript("keep", "while true do Wait(1000) end");
+                string error;
+
+                Assert.That(host.TryValidateScript("keep", "this is not lua ((", out error), Is.False);
+                Assert.That(error, Is.Not.Empty);
+                Assert.That(host.GetScriptStatus("keep"), Is.Not.EqualTo(ScriptRunStatus.NotRunning));
+            }
+        }
+
         [Test]
         public void SandboxedState_HasNoIoLibrary()
         {

@@ -64,7 +64,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private bool _loreHighlightEnabled = true;
         // Автозапись места дропа при подборе вещи из трупа. Отключается командой "лор дроп выкл".
         private bool _loreDropEnabled = true;
-        private static readonly string LoreColorConfigFileName = "_color.cfg";
+        private const string LoreSettingsConfigFileName = "items_lore_setting.cfg";
+        private const string LegacyLoreColorConfigFileName = "_color.cfg";
 
         // Volatile: фоновый таймер атомарно заменяет весь словарь новой версией.
         // Горячий путь (MarkKnownLoreItems) только читает — никогда не трогает диск.
@@ -114,8 +115,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
         public StuffDatabaseUnit(MessageConveyor conveyor) : base(conveyor)
         {
-            // Загрузить настройку цвета
-            LoadLoreColorConfig();
+            LoadLoreSettings();
 
             // Таймер и кэш — статические, создаём только один раз для всех табов
             lock (_cacheLock)
@@ -426,7 +426,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 {
                     _lastSearchFiles = Directory.GetFiles(GetStuffDbFolder())
                         .Where(f => {
-                            if (string.Equals(Path.GetFileName(f), LoreColorConfigFileName, StringComparison.OrdinalIgnoreCase))
+                            if (string.Equals(Path.GetFileName(f), LoreSettingsConfigFileName, StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(Path.GetFileName(f), LegacyLoreColorConfigFileName, StringComparison.OrdinalIgnoreCase))
                                 return false;
                             try
                             {
@@ -467,6 +468,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     || searchQuery.Equals("выкл", StringComparison.CurrentCultureIgnoreCase))
                 {
                     _loreEnabled = searchQuery.Equals("вкл", StringComparison.CurrentCultureIgnoreCase);
+                    SaveLoreSettings();
                     PushMessageToConveyor(new InfoMessage(
                         _loreEnabled ? "Лор вещей в тексте включён." : "Лор вещей в тексте выключен.",
                         TextColor.BrightYellow));
@@ -478,7 +480,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     || searchQuery.Equals("цвет_выкл", StringComparison.CurrentCultureIgnoreCase))
                 {
                     _loreHighlightEnabled = searchQuery.Equals("цвет_вкл", StringComparison.CurrentCultureIgnoreCase);
-                    SaveLoreColorConfig();
+                    SaveLoreSettings();
                     PushMessageToConveyor(new InfoMessage(
                         _loreHighlightEnabled ? "Подсветка лор-предметов включена." : "Подсветка лор-предметов выключена.",
                         TextColor.BrightYellow));
@@ -490,6 +492,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     || searchQuery.Equals("дроп_выкл", StringComparison.CurrentCultureIgnoreCase))
                 {
                     _loreDropEnabled = searchQuery.Equals("дроп_вкл", StringComparison.CurrentCultureIgnoreCase);
+                    SaveLoreSettings();
                     PushMessageToConveyor(new InfoMessage(
                         _loreDropEnabled ? "Автозапись мест дропа включена." : "Автозапись мест дропа выключена.",
                         TextColor.BrightYellow));
@@ -724,28 +727,56 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             PushMessageToConveyor(new InfoMessage("──────────────────────────────────────────────────────────", TextColor.BrightWhite));
         }
 
-        private void LoadLoreColorConfig()
+        private void LoadLoreSettings()
         {
             try
             {
-                var path = Path.Combine(GetStuffDbFolder(), LoreColorConfigFileName);
+                var path = Path.Combine(GetStuffDbFolder(), LoreSettingsConfigFileName);
                 if (File.Exists(path))
                 {
-                    var val = File.ReadAllText(path).Trim();
-                    _loreHighlightEnabled = !val.Equals("выкл", StringComparison.OrdinalIgnoreCase);
+                    foreach (var line in File.ReadAllLines(path))
+                    {
+                        var separator = line.IndexOf('=');
+                        if (separator <= 0)
+                            continue;
+
+                        var key = line.Substring(0, separator).Trim();
+                        var value = line.Substring(separator + 1).Trim();
+                        bool enabled;
+                        if (!bool.TryParse(value, out enabled))
+                            continue;
+
+                        if (key.Equals("lore_enabled", StringComparison.OrdinalIgnoreCase))
+                            _loreEnabled = enabled;
+                        else if (key.Equals("lore_highlight_enabled", StringComparison.OrdinalIgnoreCase))
+                            _loreHighlightEnabled = enabled;
+                        else if (key.Equals("lore_drop_enabled", StringComparison.OrdinalIgnoreCase))
+                            _loreDropEnabled = enabled;
+                    }
+                    return;
                 }
+
+                var legacyPath = Path.Combine(GetStuffDbFolder(), LegacyLoreColorConfigFileName);
+                if (File.Exists(legacyPath))
+                    _loreHighlightEnabled = !File.ReadAllText(legacyPath).Trim().Equals("выкл", StringComparison.OrdinalIgnoreCase);
+
+                SaveLoreSettings();
             }
             catch { }
         }
 
-        private void SaveLoreColorConfig()
+        private void SaveLoreSettings()
         {
             try
             {
                 if (!Directory.Exists(GetStuffDbFolder()))
                     Directory.CreateDirectory(GetStuffDbFolder());
-                File.WriteAllText(Path.Combine(GetStuffDbFolder(), LoreColorConfigFileName),
-                    _loreHighlightEnabled ? "вкл" : "выкл");
+                File.WriteAllLines(Path.Combine(GetStuffDbFolder(), LoreSettingsConfigFileName), new[]
+                {
+                    "lore_enabled=" + _loreEnabled.ToString().ToLowerInvariant(),
+                    "lore_highlight_enabled=" + _loreHighlightEnabled.ToString().ToLowerInvariant(),
+                    "lore_drop_enabled=" + _loreDropEnabled.ToString().ToLowerInvariant()
+                });
             }
             catch { }
         }
@@ -849,7 +880,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
                 // Запустить немедленный рефреш кэша в фоне (мы уже в Task.Run)
                 _loreFolderStampUtc = DateTime.MinValue;
-                RefreshLoreCache();
+                System.Threading.Tasks.Task.Run(() => RefreshLoreCache());
             }
             catch { }
         }

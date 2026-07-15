@@ -193,11 +193,6 @@
     <Compile Include="Dialogs\HighlightEditDialog.xaml.cs">
       <DependentUpon>HighlightEditDialog.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Controls\HelpBlockTemplateSelector.cs" />
-    <Compile Include="Controls\HelpListEntryTemplateSelector.cs" />
-    <Compile Include="Dialogs\HelpWindow.xaml.cs">
-      <DependentUpon>HelpWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Dialogs\HighlightsEditDialog.xaml.cs">
       <DependentUpon>HighlightsEditDialog.xaml</DependentUpon>
     </Compile>
@@ -210,15 +205,8 @@
     <Compile Include="Dialogs\OptionsDialog.xaml.cs">
       <DependentUpon>OptionsDialog.xaml</DependentUpon>
     </Compile>
-        <Compile Include="Windows\ScriptsWindow.xaml.cs">
-      <DependentUpon>ScriptsWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Windows\NewScriptNameDialog.xaml.cs">
-      <DependentUpon>NewScriptNameDialog.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Dialogs\ScriptsEditDialog.xaml.cs">
-      <DependentUpon>ScriptsEditDialog.xaml</DependentUpon>
-    </Compile>
+        <Compile Include="Windows\ScriptHelpForm.cs" />
+        <Compile Include="Windows\ScriptsForm.cs" />
     <Compile Include="Dialogs\PluginInitializationStatusDialog.xaml.cs">
       <DependentUpon>PluginInitializationStatusDialog.xaml</DependentUpon>
     </Compile>
@@ -405,10 +393,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Dialogs\HelpWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="Dialogs\HighlightsEditDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -418,18 +402,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Dialogs\HotkeysEditDialog.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-        <Page Include="Windows\ScriptsWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Include="Windows\NewScriptNameDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Include="Dialogs\ScriptsEditDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

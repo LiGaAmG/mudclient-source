@@ -256,6 +256,24 @@ namespace Adan.Client.Common.Scripting
         }
 
         /// <summary>
+        /// Compiles code without touching an existing running instance. Used by
+        /// auto-reload so a typo in a file cannot stop a working script.
+        /// </summary>
+        public bool TryValidateScript(string name, string code, out string error)
+        {
+            var thread = _lua.State.NewThread();
+            var status = thread.LoadString(code, name);
+            if (status == LuaStatus.OK)
+            {
+                error = null;
+                return true;
+            }
+
+            error = thread.ToString(-1);
+            return false;
+        }
+
+        /// <summary>
         /// Stops a running script -- it will not be resumed again. The
         /// coroutine itself is simply dropped (no cooperative cleanup/finally
         /// support in this version); its Lua thread becomes garbage.
@@ -279,6 +297,13 @@ namespace Adan.Client.Common.Scripting
         {
             RunningScript s;
             return _runningScripts.TryGetValue(name, out s) ? s.Code : null;
+        }
+
+        /// <summary>True only when a live script has genuinely different source code.</summary>
+        public bool NeedsRestart(string name, string code)
+        {
+            var runningCode = GetScriptCode(name);
+            return runningCode != null && !string.Equals(runningCode, code, StringComparison.Ordinal);
         }
 
         /// <summary>Returns the number of scripts currently in a live (non-terminal) state

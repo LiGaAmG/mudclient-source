@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Xml.Serialization;
+using System.Runtime.Serialization;
 
 namespace Adan.Client.Common.Scripting
 {
@@ -7,32 +7,36 @@ namespace Adan.Client.Common.Scripting
     {
         public ScriptFileEntry()
         {
-            EnabledTabUids = new List<string>();
+            EnabledProfileNames = new List<string>();
         }
 
-        [XmlAttribute]
         public string FileName { get; set; }
 
-        [XmlAttribute]
-        public bool IsShared { get; set; }
+        public bool IsGlobal { get; set; }
 
-        [XmlAttribute]
         public bool AutoStart { get; set; }
 
-        [XmlArray]
-        [XmlArrayItem("Uid")]
-        public List<string> EnabledTabUids { get; set; }
+        public List<string> EnabledProfileNames { get; set; }
+
+        // Compatibility with the unfinished WinForms editor. Remove after its
+        // per-tab controls have been replaced with profile assignment controls.
+        public bool IsShared { get { return IsGlobal; } set { IsGlobal = value; } }
+        public List<string> EnabledTabUids { get { return EnabledProfileNames; } set { EnabledProfileNames = value; } }
     }
 
-    [XmlRoot("ScriptFiles")]
+    [DataContract]
     public class ScriptFileMetadata
     {
-        public ScriptFileMetadata()
-        {
-            Entries = new List<ScriptFileEntry>();
-        }
+        [DataMember(Name = "version")]
+        public int Version { get; set; }
 
-        [XmlElement("Script")]
-        public List<ScriptFileEntry> Entries { get; set; }
+        [DataMember(Name = "global")]
+        public bool IsGlobal { get; set; }
+
+        [DataMember(Name = "autoStart")]
+        public bool AutoStart { get; set; }
+
+        [DataMember(Name = "profiles")]
+        public List<string> ProfileNames { get; set; }
     }
 }
