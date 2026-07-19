@@ -1,4 +1,4 @@
-// --------------------------------------------------------------------------------------------------------------------
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// --------------------------------------------------------------------------------------------------------------------
 // <copyright file="StuffDatabaseUnit.cs" company="Adamand MUD">
 //   Copyright (c) Adamant MUD
 // </copyright>
@@ -64,6 +64,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         private bool _loreHighlightEnabled = true;
         // Автозапись места дропа при подборе вещи из трупа. Отключается командой "лор дроп выкл".
         private bool _loreDropEnabled = true;
+        // Компактные статы вещей после [Название] в тексте. Отключается командой "лор стат выкл".
+        private bool _loreInlineStatsEnabled = true;
         private const string LoreSettingsConfigFileName = "items_lore_setting.cfg";
         private const string LegacyLoreColorConfigFileName = "_color.cfg";
 
@@ -498,6 +500,18 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                         TextColor.BrightYellow));
                     return;
                 }
+                // "лор стат вкл" / "лор стат выкл"
+                if (searchQuery.Equals("стат_вкл", StringComparison.CurrentCultureIgnoreCase)
+                    || searchQuery.Equals("стат_выкл", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    _loreInlineStatsEnabled = searchQuery.Equals("стат_вкл", StringComparison.CurrentCultureIgnoreCase);
+                    SaveLoreSettings();
+                    PushMessageToConveyor(new InfoMessage(
+                        _loreInlineStatsEnabled ? "Инлайн-статы после [предметов] включены." : "Инлайн-статы после [предметов] выключены.",
+                        TextColor.BrightYellow));
+                    return;
+                }
+
 
                 // "лор" / "lore" без аргументов или с "?" / "help" / "справка" — показать список команд
                 if (string.IsNullOrEmpty(searchQuery)
@@ -724,6 +738,7 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             PushMessageToConveyor(new InfoMessage(string.Format("  лор вкл/выкл                — показывать лор вещей в тексте (сейчас: {0})", _loreEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage(string.Format("  лор цвет вкл/выкл           — подсветка [предметов] жёлтым (сейчас: {0})", _loreHighlightEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage(string.Format("  лор дроп вкл/выкл           — автозапись места дропа при подборе (сейчас: {0})", _loreDropEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
+            PushMessageToConveyor(new InfoMessage(string.Format("  лор стат вкл/выкл           — инлайн-статы после [предметов] (сейчас: {0})", _loreInlineStatsEnabled ? "вкл" : "выкл"), TextColor.BrightYellow));
             PushMessageToConveyor(new InfoMessage("──────────────────────────────────────────────────────────", TextColor.BrightWhite));
         }
 
@@ -752,6 +767,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                             _loreHighlightEnabled = enabled;
                         else if (key.Equals("lore_drop_enabled", StringComparison.OrdinalIgnoreCase))
                             _loreDropEnabled = enabled;
+                        else if (key.Equals("lore_inline_stats_enabled", StringComparison.OrdinalIgnoreCase))
+                            _loreInlineStatsEnabled = enabled;
                     }
                     return;
                 }
@@ -775,7 +792,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 {
                     "lore_enabled=" + _loreEnabled.ToString().ToLowerInvariant(),
                     "lore_highlight_enabled=" + _loreHighlightEnabled.ToString().ToLowerInvariant(),
-                    "lore_drop_enabled=" + _loreDropEnabled.ToString().ToLowerInvariant()
+                    "lore_drop_enabled=" + _loreDropEnabled.ToString().ToLowerInvariant(),
+                    "lore_inline_stats_enabled=" + _loreInlineStatsEnabled.ToString().ToLowerInvariant()
                 });
             }
             catch { }
@@ -1025,11 +1043,15 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                     if (styleBlock != null)
                     {
                         resultBlocks.Add(new TextMessageBlock("[" + objectName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreTooltip.PlainText, loreTooltip.Lines));
+                        if (_loreInlineStatsEnabled && !string.IsNullOrEmpty(loreTooltip.CompactStats))
+                            resultBlocks.Add(new TextMessageBlock(loreTooltip.CompactStats, TextColor.Cyan));
                         isChanged = true;
                     }
                     else
                     {
                         resultBlocks.Add(new TextMessageBlock("[" + objectName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : TextColor.None, TextColor.None, loreTooltip.PlainText, loreTooltip.Lines));
+                        if (_loreInlineStatsEnabled && !string.IsNullOrEmpty(loreTooltip.CompactStats))
+                            resultBlocks.Add(new TextMessageBlock(loreTooltip.CompactStats, TextColor.Cyan));
                         isChanged = true;
                     }
 
@@ -1322,6 +1344,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
             var styleBlock = GetBlockForCharIndex(spans, replaceStart) ?? sourceBlocks[0];
             resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
+            if (_loreInlineStatsEnabled && !string.IsNullOrEmpty(loreMatch.Tooltip.CompactStats))
+                resultBlocks.Add(new TextMessageBlock(loreMatch.Tooltip.CompactStats, TextColor.Cyan));
 
             AppendRangeAsStyledBlocks(resultBlocks, spans, replaceEnd, sourceText.Length);
             textMessage.UpdateMessageBlocks(resultBlocks);
@@ -1375,6 +1399,8 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
             AppendRangeAsStyledBlocks(resultBlocks, spans, 0, replaceStart);
             var styleBlock = GetBlockForCharIndex(spans, replaceStart) ?? sourceBlocks[0];
             resultBlocks.Add(new TextMessageBlock("[" + loreMatch.ItemName + "]", _loreHighlightEnabled ? TextColor.BrightYellow : styleBlock.Foreground, styleBlock.Background, loreMatch.Tooltip.PlainText, loreMatch.Tooltip.Lines));
+            if (_loreInlineStatsEnabled && !string.IsNullOrEmpty(loreMatch.Tooltip.CompactStats))
+                resultBlocks.Add(new TextMessageBlock(loreMatch.Tooltip.CompactStats, TextColor.Cyan));
             AppendRangeAsStyledBlocks(resultBlocks, spans, replaceEnd, sourceText.Length);
             textMessage.UpdateMessageBlocks(resultBlocks);
         }
@@ -2991,6 +3017,218 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
         }
 
         [NotNull]
+        private static readonly Dictionary<string, string> _statAbbrevs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Основные атрибуты
+            { "СИЛА", "СИЛ" }, { "ЛОВКОСТЬ", "ЛОВ" }, { "ТЕЛОСЛОЖЕНИЕ", "ТЕЛ" },
+            { "ИНТЕЛЛЕКТ", "ИНТ" }, { "МУДРОСТЬ", "МУД" }, { "ОБАЯНИЕ", "ОБА" }, { "СТОЙКОСТЬ", "СТО" },
+            { "РАЗУМ", "РЗМ" }, { "РАЗМЕР", "РАЗ" },
+            // HP/EN
+            { "ВСЕГО_ЖИЗНИ", "ХП" }, { "ВСЕГО_ЭНЕРГИИ", "ЭН" },
+            { "ВОСТАНОВЛ_ЖИЗНИ", "вХП" }, { "ВОСТАНОВЛ_ЭНЕРГИИ", "вЭН" },
+            { "СИЛА ИСЦЕЛЕНИЙ", "ИСЦ" },
+            // Боевые
+            { "DAMROLL", "ДАМ" }, { "HITROLL", "ХИТ" },
+            { "БРОНЯ", "БРН" }, { "КЛАСС_БРОНИ", "АС" }, { "МАГИЧЕСКАЯ БРОНЯ", "МБР" },
+            { "КРИТ. УДАР", "КРТ" }, { "КРИТ. УДАР ПО МОНСТРАМ", "КМ" },
+            { "ШАНС ПРОБИТЬ БРОНЮ", "ШПБ" }, { "ШАНС ШОКИРОВАТЬ", "ШОК" },
+            { "РЕЙТИНГ УСТОЙЧИВОСТИ", "УСТ" }, { "ЗАЩИТА", "ЗЩ" },
+            { "КО ВСЕМ УМЕНИЯМ", "УМЕ" }, { "SAVING_SPELL", "СПС" },
+            // Проценты урона
+            { "ПРОЦ_ПОВРЕЖДЕНИЮ", "%ДАМ" }, { "ПРОЦ. ПОВРЕЖДЕНИЮ", "%ДАМ" },
+            { "ПРОЦ_ПОВРЕЖДЕНИЮ_ПО_МОНСТРАМ", "%ДМ" }, { "ПРОЦ. ПОВРЕЖДЕНИЮ ПО МОНСТРАМ", "%ДМ" },
+            { "ПРОЦ. ПОВРЕЖДЕНИЮ ПО ИГРОКАМ", "%ДИ" },
+            { "ПРОЦ. ПОВРЕЖДЕНИЯ ПО ШОКУ", "%ШОК" },
+            { "ПРОЦ. К ВХОДЯЩИМ ПОВРЕЖДЕНИЯМ", "%вДАМ" },
+            { "ПРОЦ. К РАЗМЕРУ БЛОКИРОВАНИЯ", "%БЛК" }, { "ПРОЦ. К БЛОКУ ЩИТОМ", "%ЩИТ" },
+            // Пронизывания
+            { "ПРОНИЗЫВАНИЕ ОГНЯ", "пОГН" }, { "ПРОНИЗЫВАНИЕ ВОЗДУХА", "пВОЗ" },
+            { "ПРОНИЗЫВАНИЕ ЗЕМЛИ", "пЗЕМ" }, { "ПРОНИЗЫВАНИЕ ВОДЫ", "пВОД" },
+            { "ПРОНИЗЫВАНИЕ РАЗУМА", "пРЗМ" },
+            // Стихии
+            { "ОГОНЬ", "ОГН" }, { "ВОЗДУХ", "ВОЗ" }, { "ЗЕМЛЯ", "ЗЕМ" }, { "РАСТЕНИЕ", "РСТ" },
+            { "КОЛДОВСКАЯ ПЫЛЬ", "КЛП" },
+            { "FIRE", "ОГН" }, { "AIR", "ВОЗ" }, { "EARTH", "ЗЕМ" }, { "WATER", "ВОД" },
+            // Запоминание/скорость
+            { "ПРОЦ_СКОРОСТЬ_ЗАП", "%ЗАП" }, { "ПРОЦ_ЗАПОМИНАНИЯ", "%ЗАП" },
+            // Слоты
+            { "ADD_SLOT_C1", "С1" }, { "ADD_SLOT_C2", "С2" }, { "ADD_SLOT_C3", "С3" }, { "ADD_SLOT_C4", "С4" },
+            { "ADD_SLOT_C5", "С5" }, { "ADD_SLOT_C6", "С6" }, { "ADD_SLOT_C7", "С7" }, { "ADD_SLOT_C8", "С8" },
+            { "ADD_SLOT_C9", "С9" }, { "ADD_SLOT_C10", "С10" }, { "ADD_SLOT_C11", "С11" }, { "ADD_SLOT_C12", "С12" },
+        };
+
+        private static readonly HashSet<string> _obviousTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "ОРУЖИЕ", "БРОНЯ", "ОДЕЖДА" };
+
+        private static readonly Dictionary<string, string> _typeAbbrevs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "СВЕТ", "СВТ" }, { "ЗЕЛЬЕ", "ЗЛЬ" }, { "СВИТОК", "СВК" }, { "ЖЕЗЛ", "ЖЕЗ" },
+            { "ПОСОХ", "ПОС" }, { "КОНТЕЙНЕР", "КНТ" }, { "КНИГА", "КНГ" }, { "РЕЛИКВИЯ", "РЛК" },
+            { "РЕЦЕПТ", "РЦП" }, { "ИНГРЕДИЕНТ", "ИНГ" }, { "НАБОР", "НБР" },
+            { "ЕДА", "ЕДА" }, { "ВОДА", "ВОД" }, { "МОНЕТЫ", "МНТ" }, { "КЛЮЧ", "КЛЮ" },
+            { "МУСОР", "МУС" }, { "ЗАГОТОВКА", "ЗГТ" },
+        };
+
+        private static readonly string[] _allClasses = { "МАГ", "ЛЕКАРЬ", "ВОР", "ВОИН", "ПАЛАДИН", "СЛЕДОПЫТ", "ДРУИД", "ВАРВАР", "РЫЦАРЬ СМЕРТИ", "ЛУЧНИК" };
+        private static readonly Dictionary<string, string> _classAbbrevs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "МАГ", "МАГ" }, { "ЛЕКАРЬ", "ЛЕК" }, { "ВОР", "ВОР" }, { "ВОИН", "ВОИ" },
+            { "ПАЛАДИН", "ПАЛ" }, { "СЛЕДОПЫТ", "СЛД" }, { "ДРУИД", "ДРУ" }, { "ВАРВАР", "ВАР" },
+            { "РЫЦАРЬ СМЕРТИ", "РСМ" }, { "ЛУЧНИК", "ЛУЧ" },
+        };
+
+        private static readonly Dictionary<string, string> _affectAbbrevs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "ИНФРАЗРЕНИЕ", "ИНФ" }, { "ВИД.НЕВИДИМОСТЬ", "вНВ" }, { "ВИД.НАКЛОННОСТИ", "вНК" },
+            { "ЧУВСТ.ЖИЗНЬ", "чЖ" }, { "ВИД.МАГИЮ", "вМГ" }, { "ПОЛЕТ", "ПЛТ" },
+            { "ЗАЩИТА_ОТ_СВЕТА", "зСВ" }, { "НАСТОРОЖЕННОСТЬ", "НСТ" }, { "НЕВИДИМОСТЬ", "НВД" },
+            { "!ВЫСЛЕДИТЬ", "!ВСЛ" }, { "ОСВЯЩЕНИЕ", "ОСВ" }, { "ПРОКЛЯТИЕ", "ПРК" },
+            { "ДЫХАНИЕ_ПОД_ВОДОЙ", "дПВ" }, { "ЗАЩИТА_ОТ_ТЬМЫ", "зТМ" },
+            { "ПОДКРАСТЬСЯ", "ПДК" }, { "СПРЯТАТЬСЯ", "СПР" }, { "МОЛЧАНИЕ", "МЛЧ" },
+            { "МАГ.ЩИТ", "МЩТ" }, { "СЛЕПОТА", "СЛП" },
+        };
+
+        private static readonly Dictionary<string, string> _wearSlotAbbrevs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "WIELD", "ПР" }, { "DWIELD", "2Р" }, { "OFF_HAND", "ЛВ" }, { "SHIELD", "ЩТ" },
+            { "HOLD", "ЛВ" }, { "FLOAT", "ПЛВ" },
+            { "FINGER", "ПЛЦ" }, { "NECK", "ШЕЯ" }, { "HEAD", "ГЛВ" }, { "BODY", "ТРС" },
+            { "ARMS", "ПЛЧ" }, { "HANDS", "КСТ" }, { "WAIST", "ПОЯ" },
+            { "LEGS", "БДР" }, { "FEET", "СТП" }, { "WRIST", "ЗПС" }, { "ABOUT", "НАТ" },
+        };
+
+        private static readonly Dictionary<string, string> _flagAbbrevs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "МАГИЧЕСКИЙ", "МГК" }, { "ЗАТОЧЕН", "ЗАТ" }, { "БЛАГОСЛОВЛЕН", "БЛГ" },
+            { "ПРИВЯЗЫВАЕТСЯ", "ПРВ" }, { "ПРИВЯЗЫВАЕТСЯ_ГРУППА", "ПРВг" },
+            { "СВЕТИТСЯ", "СВТ" }, { "ШУМИТ", "ШУМ" }, { "!НЕВИДИМ", "!НВД" }, { "НЕВИДИМ", "НВД" },
+            { "!ВЫБИТЬ_ИЗ_РУК", "!ВБТ" }, { "!РАСПЫЛИТЬ", "!РСП" }, { "!ПРОДАТЬ", "!ПРД" },
+            { "!РЕНТ", "!РНТ" }, { "!НАЙТИ", "!НАЙ" }, { "!ПОЖЕРТВОВАТЬ", "!ПЖТ" },
+            { "ОДЕТЬ_ОДИН", "1ШТ" }, { "ПРОКЛЯТ", "ПРК" }, { "УНИКАЛЬНЫЙ", "УНК" },
+            { "РАССЫПЛЕТСЯ", "РСП" }, { "РАССЫПЛЕТСЯ_ЗОНА", "РСПз" }, { "РАССЫПЛЕТСЯ_ИГРОК", "РСПи" },
+            { "ЗАДАНИЕ", "ЗАД" },
+        };
+
+        private static string BuildCompactStats([NotNull] LoreMessage lore)
+        {
+            var parts = new List<string>(4);
+
+            // Тип — только для СВЕТ
+            if (lore.ObjectType != null && lore.ObjectType.Equals("СВЕТ", StringComparison.OrdinalIgnoreCase))
+                parts.Add("СВТ");
+
+            // ВЕС, АС, БРН — первыми
+            var statParts = new List<string>(8);
+            if (lore.Weight > 0 && lore.WeaponStats != null)
+                statParts.Add("ВЕС" + (int)lore.Weight);
+            if (lore.ArmorStats != null)
+            {
+                if (lore.ArmorStats.ArmorClass != 0)
+                    statParts.Add("АС" + (lore.ArmorStats.ArmorClass > 0 ? "+" : "") + lore.ArmorStats.ArmorClass);
+                if (lore.ArmorStats.Armor != 0)
+                    statParts.Add("БРН" + (lore.ArmorStats.Armor > 0 ? "+" : "") + lore.ArmorStats.Armor);
+            }
+            if (lore.WeaponStats != null)
+                statParts.Add("ДАМ" + (int)Math.Round(lore.WeaponStats.AverageDamage));
+
+            foreach (var affect in lore.AppliedAffects)
+            {
+                var enh = affect as Model.Affects.Enhance;
+                if (enh == null || enh.NecessarySetItemsCount > 0) continue;
+                string abbr;
+                if (!_statAbbrevs.TryGetValue(enh.ModifiedParameter, out abbr)) continue;
+                statParts.Add(abbr + (enh.Value >= 0 ? "+" : "") + enh.Value);
+            }
+            // Passive affects (ПОЛЕТ, НАСТОРОЖЕННОСТЬ...)
+            foreach (var aff in lore.Affects)
+            {
+                if (string.IsNullOrEmpty(aff)) continue;
+                string affAbbr;
+                statParts.Add(_affectAbbrevs.TryGetValue(aff, out affAbbr) ? affAbbr : aff);
+            }
+
+            if (statParts.Count > 0)
+                parts.Add(string.Join(",", statParts));
+
+            // Item flags (Properties) — только важные
+            if (lore.Properties.Count > 0)
+            {
+                var flagParts = new List<string>();
+                foreach (var flag in lore.Properties)
+                {
+                    if (flag == "!РАСПЫЛИТЬ") flagParts.Add("!РСП");
+                    else if (flag == "!ВЫБИТЬ_ИЗ_РУК") flagParts.Add("!ВБТ");
+                    else if (flag == "ПРОКЛЯТ") flagParts.Add("ПРК");
+                    else if (flag == "ОДЕТЬ_ОДИН") flagParts.Add("1ШТ");
+                }
+                if (flagParts.Count > 0)
+                    parts.Add(string.Join(",", flagParts));
+            }
+
+            // Class restrictions — may be in Restrictions (RestrictionFlags) or BannedFor (NoFlags)
+            var bannedSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var flag in lore.Restrictions)
+            {
+                var cls = flag.StartsWith("!") ? flag.Substring(1).Trim() : flag.Trim();
+                if (_classAbbrevs.ContainsKey(cls))
+                    bannedSet.Add(cls);
+            }
+            foreach (var flag in lore.BannedFor)
+            {
+                var cls = flag.StartsWith("!") ? flag.Substring(1).Trim() : flag.Trim();
+                if (_classAbbrevs.ContainsKey(cls))
+                    bannedSet.Add(cls);
+            }
+            if (bannedSet.Count > 0)
+            {
+                if (bannedSet.Count > 5)
+                {
+                    // Revert: show who CAN use
+                    var canUse = new List<string>();
+                    foreach (var cls in _allClasses)
+                        if (!bannedSet.Contains(cls))
+                            canUse.Add(_classAbbrevs[cls]);
+                    if (canUse.Count > 0)
+                        parts.Add(string.Join(",", canUse));
+                }
+                else
+                {
+                    var banned = new List<string>();
+                    foreach (var cls in _allClasses)
+                        if (bannedSet.Contains(cls))
+                            banned.Add("!" + _classAbbrevs[cls]);
+                    parts.Add(string.Join(",", banned));
+                }
+            }
+
+            // WearingAffect
+            if (lore.WearingAffect != null && !string.IsNullOrEmpty(lore.WearingAffect.AffectName))
+            {
+                var spellAbbr = lore.WearingAffect.AffectName.Length > 3
+                    ? lore.WearingAffect.AffectName.Substring(0, 3)
+                    : lore.WearingAffect.AffectName;
+                parts.Add("[" + spellAbbr + lore.WearingAffect.Level + "]");
+            }
+
+            // Min level
+            if (lore.MinLevel > 1)
+                parts.Add("Ур" + lore.MinLevel);
+
+            // WearSlots — только для оружия
+            if (lore.WeaponStats != null && lore.WearSlots.Count > 0)
+            {
+                var slotParts = new List<string>(lore.WearSlots.Count);
+                foreach (var slot in lore.WearSlots)
+                {
+                    string slotAbbr;
+                    slotParts.Add(_wearSlotAbbrevs.TryGetValue(slot, out slotAbbr) ? slotAbbr : slot);
+                }
+                parts.Add(string.Join("/", slotParts));
+            }
+
+            if (parts.Count == 0) return null;
+            return " <·· " + string.Join(",", parts);
+        }
         private static LoreTooltip CreateLoreTooltip([NotNull] LoreMessage loreMessage)
         {
             Assert.ArgumentNotNull(loreMessage, "loreMessage");
@@ -3012,16 +3250,18 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
                 }
             }
 
-            return new LoreTooltip(tooltipBuilder.ToString(), tooltipLines);
+            var compactStats = BuildCompactStats(loreMessage);
+            return new LoreTooltip(tooltipBuilder.ToString(), tooltipLines, compactStats);
         }
 
         private sealed class LoreTooltip
         {
-            public LoreTooltip([NotNull] string plainText, [CanBeNull] IList<TextMessageBlock.ToolTipLine> lines)
+            public LoreTooltip([NotNull] string plainText, [CanBeNull] IList<TextMessageBlock.ToolTipLine> lines, [CanBeNull] string compactStats = null)
             {
                 Assert.ArgumentNotNull(plainText, "plainText");
                 PlainText = plainText;
                 Lines = lines;
+                CompactStats = compactStats;
             }
 
             [NotNull]
@@ -3033,6 +3273,13 @@ namespace Adan.Client.Plugins.StuffDatabase.ConveyorUnits
 
             [CanBeNull]
             public IList<TextMessageBlock.ToolTipLine> Lines
+            {
+                get;
+                private set;
+            }
+
+            [CanBeNull]
+            public string CompactStats
             {
                 get;
                 private set;

@@ -155,6 +155,8 @@
   <ItemGroup>
     <Resource Include="Images\fire-shield.png" />
     <Resource Include="Images\ice-shield.png" />
+    <Resource Include="Images\holy-rite.png" />
+    <Resource Include="Images\medium-shock-elixir.png" />
     <Resource Include="Images\sanctify.png" />
     <Resource Include="Images\shock.png" />
     <Resource Include="Images\spirit-aura.png" />

@@ -18,6 +18,7 @@ namespace Adan.Client.Plugins.AI.Commands
         private readonly GameEventExtractor _extractor;
         private readonly IGameMemoryService _memory;
         private readonly AiSettings _settings;
+        private readonly ILocalLlmService _llm;
         private const int MaxRecentLines = 30;
 
         public AiConveyorUnit(
@@ -27,7 +28,8 @@ namespace Adan.Client.Plugins.AI.Commands
             GameEventExtractor extractor,
             GameSessionState session,
             IGameMemoryService memory = null,
-            AiSettings settings = null)
+            AiSettings settings = null,
+            ILocalLlmService llm = null)
             : base(conveyor)
         {
             _settings = settings;
@@ -36,6 +38,7 @@ namespace Adan.Client.Plugins.AI.Commands
             _extractor = extractor;
             _session = session;
             _memory = memory;
+            _llm = llm;
         }
 
         public override IEnumerable<int> HandledMessageTypes
@@ -67,9 +70,10 @@ namespace Adan.Client.Plugins.AI.Commands
 
         public override void HandleMessage(Message message)
         {
-            // Модуль выключен — не тратим время на буфер/регексы/SQLite.
+            // Модуль выключен или LLM не загружена — не тратим время на буфер/регексы/SQLite.
             // Команды (ии вкл) при этом продолжают работать через HandleCommand.
             if (_settings != null && !_settings.Enabled) return;
+            if (_llm == null || (_llm.Status != LlmStatus.Ready && _llm.Status != LlmStatus.Generating)) return;
 
             var textMsg = message as OutputToMainWindowMessage;
             if (textMsg == null) return;
@@ -91,20 +95,18 @@ namespace Adan.Client.Plugins.AI.Commands
                 // Не тратим SQLite-запись на каждый переход между комнатами.
                 if (ev != null && ev.Type != GameEventType.RoomEntered)
                 {
-                    try
+                    var record = new GameEventRecord
                     {
-                        _memory.SaveEvent(new GameEventRecord
-                        {
-                            Timestamp = ev.Timestamp,
-                            EventType = ev.Type,
-                            RawText = ev.RawText,
-                            Importance = ev.Importance,
-                            ZoneId = _session.CurrentZoneId > 0 ? (long?)_session.CurrentZoneId : null,
-                            RoomId = _session.CurrentRoomId > 0 ? (long?)_session.CurrentRoomId : null,
-                            StructuredDataJson = ev.EntityName != null ? "{\"entity\":\"" + ev.EntityName.Replace("\"", "\\\"") + "\"}" : null,
-                        });
-                    }
-                    catch { }
+                        Timestamp = ev.Timestamp,
+                        EventType = ev.Type,
+                        RawText = ev.RawText,
+                        Importance = ev.Importance,
+                        ZoneId = _session.CurrentZoneId > 0 ? (long?)_session.CurrentZoneId : null,
+                        RoomId = _session.CurrentRoomId > 0 ? (long?)_session.CurrentRoomId : null,
+                        StructuredDataJson = ev.EntityName != null ? "{\"entity\":\"" + ev.EntityName.Replace("\"", "\\\"") + "\"}" : null,
+                    };
+                    var mem = _memory;
+                    System.Threading.Tasks.Task.Run(() => { try { mem.SaveEvent(record); } catch { } });
                 }
             }
         }

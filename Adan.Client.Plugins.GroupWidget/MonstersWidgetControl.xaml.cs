@@ -30,6 +30,12 @@ namespace Adan.Client.Plugins.GroupWidget
     {
         private readonly object _stack_lock = new object();
         private readonly Stack<List<MonsterStatus>> _monsters_stack = new Stack<List<MonsterStatus>>();
+        private List<MonsterStatus> _lastRawMonsters;
+
+        public List<MonsterStatus> GetLastMonsters()
+        {
+            lock (_stack_lock) { return _lastRawMonsters; }
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MonstersWidgetControl"/> class.
@@ -147,6 +153,7 @@ namespace Adan.Client.Plugins.GroupWidget
 
             lock (_stack_lock)
             {
+                _lastRawMonsters = characters;
                 _monsters_stack.Push(characters);
             }
 

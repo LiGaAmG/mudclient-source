@@ -6426,6 +6426,8 @@
     </VisualBrush>
     <!-- Sanctify — нимб над головой -->
     <ImageBrush x:Key="Brush_Sanctify" ImageSource="Images/sanctify.png" Stretch="Uniform" />
+    <ImageBrush x:Key="Brush_HolyRite" ImageSource="Images/holy-rite.png" Stretch="Uniform" />
+    <ImageBrush x:Key="Brush_MediumShockElixir" ImageSource="Images/medium-shock-elixir.png" Stretch="Uniform" />
     <!-- FireShield — огненный щит -->
     <ImageBrush x:Key="Brush_FireShield" ImageSource="Images/fire-shield.png" Stretch="Uniform" />
     <!-- MagicShield — щит со звездой (магический щит) -->
@@ -7069,6 +7071,8 @@
     </GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_Calm"         Brush="{StaticResource Brush_Calm}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_Sanctify"     Brush="{StaticResource Brush_Sanctify}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_HolyRite"     Brush="{StaticResource Brush_HolyRite}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing x:Key="Drawing_MediumShockElixir" Brush="{StaticResource Brush_MediumShockElixir}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_FireShield"   Brush="{StaticResource Brush_FireShield}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_MagicShield"  Brush="{StaticResource Brush_MagicShield}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
     <GeometryDrawing x:Key="Drawing_IceShield"    Brush="{StaticResource Brush_IceShieldPhoto}"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,100,100"/></GeometryDrawing.Geometry></GeometryDrawing>
@@ -7187,6 +7191,8 @@
 
     <DrawingImage x:Key="ImageSource_Calm"            Drawing="{StaticResource Drawing_Calm}" />
     <DrawingImage x:Key="ImageSource_Sanctify"         Drawing="{StaticResource Drawing_Sanctify}" />
+    <DrawingImage x:Key="ImageSource_HolyRite"         Drawing="{StaticResource Drawing_HolyRite}" />
+    <DrawingImage x:Key="ImageSource_MediumShockElixir" Drawing="{StaticResource Drawing_MediumShockElixir}" />
     <DrawingImage x:Key="ImageSource_FireShield"       Drawing="{StaticResource Drawing_FireShield}" />
     <DrawingImage x:Key="ImageSource_MagicShield"      Drawing="{StaticResource Drawing_MagicShield}" />
     <DrawingImage x:Key="ImageSource_IceShield"        Drawing="{StaticResource Drawing_IceShield}" />
@@ -7365,6 +7371,8 @@
                            Then="{StaticResource ImageSource_Thirst}" />
         <Utils:SwitchCase  When="Calm"            Then="{StaticResource ImageSource_Calm}" />
         <Utils:SwitchCase  When="Sanctify"        Then="{StaticResource ImageSource_Sanctify}" />
+        <Utils:SwitchCase  When="HolyRite"        Then="{StaticResource ImageSource_HolyRite}" />
+        <Utils:SwitchCase  When="MediumShockElixir" Then="{StaticResource ImageSource_MediumShockElixir}" />
         <Utils:SwitchCase  When="FireShield"      Then="{StaticResource ImageSource_FireShield}" />
         <Utils:SwitchCase  When="MagicShield"     Then="{StaticResource ImageSource_MagicShield}" />
         <Utils:SwitchCase  When="IceShield"       Then="{StaticResource ImageSource_IceShield}" />

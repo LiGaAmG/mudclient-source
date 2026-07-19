@@ -60,7 +60,7 @@ namespace Adan.Client.Plugins.AI
             var commandHandler = new AiCommandHandler(_llm, contextBuilder, _memory, lore, session, _settings, conveyor);
             var commentary = new AiCommentaryService(_settings, _llm, contextBuilder, conveyor);
 
-            conveyor.AddConveyorUnit(new AiConveyorUnit(conveyor, commandHandler, commentary, new GameEventExtractor(), session, _memory, _settings));
+            conveyor.AddConveyorUnit(new AiConveyorUnit(conveyor, commandHandler, commentary, new GameEventExtractor(), session, _memory, _settings, _llm));
 
             // MEF вызывает InitializeConveyor для каждого инстанса — реиндекс лора нужен один
             bool startReindex = false;

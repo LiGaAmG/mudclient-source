@@ -29,8 +29,8 @@ finally {
     $image.Dispose()
 }
 
-if ((Get-FileHash -Algorithm SHA256 $iconPath).Hash -ne 'EACD9F6871E6EBE333F2165C02290381C23A4F509251236F31AAAD4512A74BE5') {
-    throw 'Sanctify icon has not been updated to the approved holy-talisman asset.'
+if ((Get-FileHash -Algorithm SHA256 $iconPath).Hash -ne '9D7D906B352DCAF1F05248FF95C40998E9EBE32878F009F725B64FEC2320B366') {
+    throw 'Sanctify must use its original icon.'
 }
 
 Write-Host 'Sanctify icon test passed.'

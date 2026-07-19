@@ -32,6 +32,7 @@ namespace Adan.Client.Plugins.GroupWidget
         private readonly Stack<List<CharacterStatus>> _charactrers_stack = new Stack<List<CharacterStatus>>();
         private bool _updatePending = false;
         private long _updateQueuedTick;
+        private List<CharacterStatus> _lastRawGroupStatus;
         // Дроссель: не чаще 1 раза в 150мс. Таймер стреляет один раз, диспатчит на UI-поток.
         private readonly System.Threading.Timer _updateThrottle;
 
@@ -141,12 +142,18 @@ namespace Adan.Client.Plugins.GroupWidget
         /// 
         /// </summary>
         /// <param name="characters"></param>
+        public List<CharacterStatus> GetLastGroupStatus()
+        {
+            lock (_stack_lock) { return _lastRawGroupStatus; }
+        }
+
         public void UpdateModel([NotNull] List<CharacterStatus> characters)
         {
             Assert.ArgumentNotNull(characters, "characters");
 
             lock (_stack_lock)
             {
+                _lastRawGroupStatus = characters;
                 _charactrers_stack.Push(characters);
                 if (!_updatePending)
                 {

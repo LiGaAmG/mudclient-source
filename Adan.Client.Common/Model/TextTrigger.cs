@@ -1,4 +1,4 @@
-﻿namespace Adan.Client.Common.Model
+namespace Adan.Client.Common.Model
 {
     using System;
     using System.Collections.Generic;
@@ -12,6 +12,7 @@
     using Messages;
 
     using Utils.PatternMatching;
+    using Utils;
 
     /// <summary>
     /// Trigger that handles text messages from server.
@@ -161,7 +162,12 @@
 
         public bool MatchMessage(TextMessage textMessage, RootModel rootModel)
         {
-            ClearMatchingResults();
+            return MatchMessage(textMessage, rootModel, _matchingResults);
+        }
+
+        private bool MatchMessage(TextMessage textMessage, RootModel rootModel, IList<string> results)
+        {
+            for (int i = 0; i < results.Count; i++) results[i] = string.Empty;
 
             if (IsRegExp)
             {
@@ -242,7 +248,7 @@
                 for (int i = 0; i < 10; i++)
                 {
                     if (i + 1 < match.Groups.Count)
-                        _matchingResults[i] = match.Groups[i + 1].ToString();
+                        results[i] = match.Groups[i + 1].ToString();
                 }
 
                 return true;
@@ -258,7 +264,7 @@
             if (_firstConstant != null && textMessage.InnerText.IndexOf(_firstConstant, StringComparison.Ordinal) < 0)
                 return false;
 
-            var res = GetRootPatternToken(rootModel).Match(textMessage.InnerText, 0, _matchingResults);
+            var res = GetRootPatternToken(rootModel).Match(textMessage.InnerText, 0, results);
             return res.IsSuccess;
         }
 
@@ -278,20 +284,20 @@
                 return;
             }
 
-            if (!MatchMessage(textMessage, rootModel))
+            var localResults = new string[10];
+            for (int i = 0; i < 10; i++) localResults[i] = string.Empty;
+
+            if (!MatchMessage(textMessage, rootModel, localResults))
                 return;
 
+            var localContext = new ActionExecutionContext();
             for (int i = 0; i < 10; i++)
-            {
-                if (i < _matchingResults.Count)
-                    Context.Parameters[i] = _matchingResults[i];
-            }
-
-            Context.CurrentMessage = message;
+                localContext.Parameters[i] = localResults[i];
+            localContext.CurrentMessage = message;
 
             foreach (var action in Actions)
             {
-                action.Execute(rootModel, Context);
+                action.Execute(rootModel, localContext);
             }
 
             rootModel.PushCommandToConveyor(FlushOutputQueueCommand.Instance);
@@ -303,6 +309,7 @@
 
             if (DoNotDisplayOriginalMessage)
             {
+                ErrorLogger.Instance.Write(string.Format("[DIAG] Trigger hiding line. Pattern='{0}' Line='{1}'", MatchingPattern, textMessage.InnerText));
                 textMessage.Handled = true;
             }
         }
@@ -333,7 +340,11 @@
                 int dollarIdx = lit.IndexOf('$');
                 if (dollarIdx >= 0)
                 {
-                    // Берём кусок после имени переменной (имя заканчивается пробелом)
+                    // Если есть текст ДО переменной — используем его как literal
+                    string prefix = lit.Substring(0, dollarIdx).TrimEnd(' ');
+                    if (prefix.Length >= 2) return prefix;
+
+                    // Текст ДО переменной слишком короткий — берём кусок ПОСЛЕ переменной
                     int spaceAfterVar = lit.IndexOf(' ', dollarIdx);
                     if (spaceAfterVar >= 0)
                     {

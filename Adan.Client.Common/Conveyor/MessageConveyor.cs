@@ -418,6 +418,9 @@ namespace Adan.Client.Common.Conveyor
 
                 if (message.Handled)
                 {
+                    var diagMsg = message as Common.Messages.TextMessage;
+                    if (diagMsg != null)
+                        ErrorLogger.Instance.Write(string.Format("[DIAG] TextMessage suppressed by conveyor: '{0}'", diagMsg.InnerText));
                     return;
                 }
 

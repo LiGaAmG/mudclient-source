@@ -376,6 +376,7 @@ namespace Adan.Client.Common.Scripting
         {
             _budgetExceeded = false;
             _timeoutRequested = false;
+            script.Thread.SetHook(_hookFunction, LuaHookMask.Count, InstructionBudget);
 
             int resultCount;
             var status = script.Thread.Resume(_lua.State, 0, out resultCount);
